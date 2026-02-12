@@ -1,105 +1,173 @@
 
 
-# Ticket 0000: Guardrails First
+# Ticket 0000A: Guardrails Repair
 
 ## Goal
-Establish the project's verification pipeline and constitution before any product work begins. One command (`npm run verify`) runs all oracles. CI enforces it on every push/PR.
+Bring the repo into conformance with the Guardrails-First contract. Add a canonical `./tools/verify` shell entrypoint, missing config files, and align CI. No renames, no product features.
+
+## Current State
+- `tools/check-boundaries.ts` and `tools/check-hygiene.ts` exist and work
+- `.github/workflows/verify.yml` exists but calls steps individually (not a single entrypoint)
+- `eslint.config.js` (flat config) exists -- we will NOT replace it; no `.eslintrc.cjs` needed
+- No `.prettierrc`, `.prettierignore`, `.editorconfig`
+- `package.json` has no `verify` script (and may be read-only in Lovable)
+- `CONSTITUTION.md` and `README.md` already updated from Ticket 0000
 
 ## Files to Create
 
 | # | Path | Purpose |
 |---|------|---------|
-| 1 | `tools/check-boundaries.ts` | Dependency boundary checker (app/ui -> domain -> infra, no reverse) |
-| 2 | `tools/check-hygiene.ts` | Repo hygiene checks (no console.log in src, max file length 350, max function length 60) |
-| 3 | `.github/workflows/verify.yml` | CI workflow: runs `npm run verify` on push and PR |
-| 4 | `CONSTITUTION.md` | Enforceable rules and enforcement mechanisms |
+| 1 | `tools/verify` | Bash script -- canonical single entrypoint for all oracles |
+| 2 | `.prettierrc` | Prettier config (consistent formatting rules) |
+| 3 | `.prettierignore` | Exclude dist, node_modules, lockfiles from formatting |
+| 4 | `.editorconfig` | Editor-neutral whitespace/encoding settings |
 
 ## Files to Edit
 
 | # | Path | Change |
 |---|------|--------|
-| 1 | `package.json` | Add `verify`, `check:boundaries`, `check:hygiene`, `typecheck`, `format:check` scripts |
-| 2 | `index.html` | Fix broken `<title>` tag (line 7) |
-| 3 | `README.md` | Add "Local Verification Loop" section |
+| 1 | `package.json` | Add `"verify"` script (see variant handling below) |
+| 2 | `.github/workflows/verify.yml` | Simplify to call `./tools/verify` instead of individual steps |
 
-**No other files will be touched.**
+**No other files will be touched.** Existing `tools/check-boundaries.ts`, `tools/check-hygiene.ts`, `eslint.config.js`, `CONSTITUTION.md`, `README.md` are kept as-is.
 
-## Scripts Added to package.json
+## package.json Read-Only Handling
 
+**Variant A (preferred):** Edit `package.json` to add:
 ```json
+"verify": "bash tools/verify"
+```
+This makes `npm run verify` work.
+
+**Variant B (fallback):** If `package.json` is read-only, `./tools/verify` is the canonical entrypoint. CI calls it directly. README documents `bash tools/verify` as the local command. `npm run verify` is noted as unavailable until package.json can be edited externally.
+
+The plan implements Variant A first and falls back to Variant B if the edit fails.
+
+## tools/verify (Bash Script)
+
+```text
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "=== [1/7] Repo hygiene ==="
+npx tsx tools/check-hygiene.ts
+echo ""
+
+echo "=== [2/7] Format check ==="
+npx prettier --check "src/**/*.{ts,tsx}"
+echo ""
+
+echo "=== [3/7] Lint ==="
+npm run lint
+echo ""
+
+echo "=== [4/7] Typecheck ==="
+npx tsc --noEmit
+echo ""
+
+echo "=== [5/7] Boundary check ==="
+npx tsx tools/check-boundaries.ts
+echo ""
+
+echo "=== [6/7] Build (load smoke) ==="
+npm run build
+echo ""
+
+echo "=== [7/7] Unit tests ==="
+npm run test
+echo ""
+
+echo "==============================="
+echo "VERIFY: ALL CHECKS PASSED"
+echo "==============================="
+```
+
+Each step uses `set -e` so any failure exits immediately with a non-zero code. PASS/FAIL output:
+- Individual steps print their own output (e.g. "Hygiene: PASS", "Boundaries: PASS")
+- On success: final banner "VERIFY: ALL CHECKS PASSED"
+- On failure: script exits at the failing step with that step's error output
+
+## .github/workflows/verify.yml (updated)
+
+```text
+name: Verify
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: chmod +x tools/verify && bash tools/verify
+```
+
+Single step calls the canonical entrypoint.
+
+## .prettierrc
+
+```text
 {
-  "scripts": {
-    "typecheck": "tsc --noEmit",
-    "format:check": "npx prettier --check \"src/**/*.{ts,tsx}\"",
-    "check:boundaries": "npx tsx tools/check-boundaries.ts",
-    "check:hygiene": "npx tsx tools/check-hygiene.ts",
-    "verify": "npm run check:hygiene && npm run format:check && npm run lint && npm run typecheck && npm run check:boundaries && npm run build && npm run test"
-  }
+  "semi": true,
+  "singleQuote": false,
+  "trailingComma": "all",
+  "printWidth": 100,
+  "tabWidth": 2
 }
 ```
 
-## Oracle Details
+## .prettierignore
 
-The `npm run verify` pipeline runs these checks in order. Any failure stops the pipeline.
-
-| Step | Command | What it checks | PASS | FAIL |
-|------|---------|----------------|------|------|
-| 1 | `check:hygiene` | No file > 350 lines, no function > 60 lines, no stray `console.log` in src | "Hygiene: PASS" | "Hygiene: FAIL - [reason]" + exit 1 |
-| 2 | `format:check` | Prettier formatting consistency | Prettier default output | Exit 1 with diff |
-| 3 | `lint` | ESLint rules (already configured) | Clean output | Exit 1 with errors |
-| 4 | `typecheck` | TypeScript compilation (`tsc --noEmit`) | Clean output | Exit 1 with type errors |
-| 5 | `check:boundaries` | No `domain` imports from `infra` or `app/ui`; no `infra` imports from `app/ui` | "Boundaries: PASS" | "Boundaries: FAIL - [file]: illegal import" + exit 1 |
-| 6 | `build` | Vite build succeeds (import/load smoke) | Build output | Exit 1 |
-| 7 | `test` | Vitest unit tests | Test results | Exit 1 |
-
-## Technical Details
-
-### tools/check-boundaries.ts
-- Uses Node `fs` and `path` to glob `src/**/*.{ts,tsx}`
-- Parses import statements with regex
-- Enforces: files under `src/domain/` must not import from `src/infra/` or `src/components/` (app/ui layer)
-- Enforces: files under `src/infra/` must not import from `src/components/`
-- Currently passes vacuously (no domain/infra dirs yet) -- this is intentional; the guardrail is in place for future tickets
-
-### tools/check-hygiene.ts
-- Walks `src/**/*.{ts,tsx}` files
-- Checks: file line count <= 350
-- Checks: no function body exceeds 60 lines (simple brace-counting heuristic)
-- Checks: no bare `console.log` (warns; `console.error`/`console.warn` allowed)
-- Prints summary and exits 1 on any violation
-
-### .github/workflows/verify.yml
-- Triggers on `push` and `pull_request`
-- Single job: checkout, setup Node 20, `npm ci`, `npm run verify`
-
-### CONSTITUTION.md
-Documents these enforceable rules:
-- Risk tier B classification
-- Layer boundaries (app/ui -> domain -> infra)
-- Complexity budgets (350 lines/file, 60 lines/function, cyclomatic <= 12)
-- Every ticket must pass `npm run verify`
-- No product features until this ticket merges
-- Scope creep rule: unlisted files require a new ticket
-- All enforcement mechanisms map to specific oracles
-
-### index.html fix
-Line 7 changes from:
+```text
+dist
+node_modules
+bun.lockb
+package-lock.json
+*.tsbuildinfo
 ```
-<title>Complex Mapper</title>Lovable App</title>
+
+## .editorconfig
+
+```text
+root = true
+
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
 ```
-to:
-```
-<title>Complex Mapper</title>
-```
+
+## Verify Pipeline Steps (Summary)
+
+| Step | Oracle | PASS | FAIL |
+|------|--------|------|------|
+| 1 | Repo hygiene (check-hygiene.ts) | "Hygiene: PASS" | "Hygiene: FAIL" + exit 1 |
+| 2 | Prettier format check | Clean exit | Exit 1 with diff |
+| 3 | ESLint | Clean exit | Exit 1 with errors |
+| 4 | TypeScript typecheck | Clean exit | Exit 1 with type errors |
+| 5 | Boundaries (check-boundaries.ts) | "Boundaries: PASS" | "Boundaries: FAIL" + exit 1 |
+| 6 | Vite build (load smoke) | Build succeeds | Exit 1 |
+| 7 | Vitest unit tests | Tests pass | Exit 1 |
+| Final | All passed | "VERIFY: ALL CHECKS PASSED" | (never reached) |
 
 ## What This Proves vs. Does Not Prove
 
 **Proves:**
-- All oracles run and pass on current codebase
-- CI will block merges that violate any oracle
-- Boundary and hygiene rules are machine-enforced
+- Single canonical entrypoint (`./tools/verify`) runs all oracles
+- CI uses the same entrypoint
+- Prettier and editor configs are explicit and committed
+- Existing tooling (check-hygiene, check-boundaries, eslint flat config) is preserved without renames
 
 **Does not prove:**
-- Cyclomatic complexity check (deferred -- would require a heavier tool like `eslint-plugin-complexity`; flagged for follow-up ticket)
-- End-to-end coverage of domain/infra boundaries (no domain/infra code exists yet; passes vacuously)
+- `npm run verify` works (depends on package.json editability -- Variant B covers this)
+- Cyclomatic complexity enforcement (deferred from Ticket 0000)
 
