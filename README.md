@@ -50,6 +50,29 @@ npm run dev
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 
+## Local Verification Loop
+
+Before pushing, run the full oracle pipeline:
+
+```sh
+# Run all checks (hygiene, format, lint, typecheck, boundaries, build, tests)
+npx tsx tools/check-hygiene.ts && npx prettier --check "src/**/*.{ts,tsx}" && npm run lint && npx tsc --noEmit && npx tsx tools/check-boundaries.ts && npm run build && npm run test
+```
+
+Or run individual checks:
+
+```sh
+npx tsx tools/check-hygiene.ts     # File length, function length, no console.log
+npx prettier --check "src/**/*.{ts,tsx}"  # Format check
+npm run lint                        # ESLint
+npx tsc --noEmit                   # TypeScript compilation
+npx tsx tools/check-boundaries.ts  # Layer boundary enforcement
+npm run build                       # Import/load smoke test
+npm run test                        # Unit tests
+```
+
+CI runs this same pipeline on every push and PR via `.github/workflows/verify.yml`.
+
 ## What technologies are used for this project?
 
 This project is built with:
