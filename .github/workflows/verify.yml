@@ -13,10 +13,4 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
-      - run: npx tsx tools/check-hygiene.ts
-      - run: npx prettier --check "src/**/*.{ts,tsx}"
-      - run: npm run lint
-      - run: npx tsc --noEmit
-      - run: npx tsx tools/check-boundaries.ts
-      - run: npm run build
-      - run: npm run test
+      - run: chmod +x tools/verify && bash tools/verify
