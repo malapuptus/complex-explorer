@@ -1,3 +1,6 @@
+# Verify workflow — forwards to CI.
+# Canonical CI is in .github/workflows/ci.yml.
+# This file is kept to avoid breaking existing branch protections.
 name: Verify
 
 on:
@@ -6,11 +9,4 @@ on:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm ci
-      - run: chmod +x tools/verify && bash tools/verify
+    uses: ./.github/workflows/ci.yml
