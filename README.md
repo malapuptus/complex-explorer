@@ -52,26 +52,32 @@ npm run dev
 
 ## Local Verification Loop
 
-Before pushing, run the full oracle pipeline:
-
 ```sh
-# Run all checks (hygiene, format, lint, typecheck, boundaries, build, tests)
-npx tsx tools/check-hygiene.ts && npx prettier --check "src/**/*.{ts,tsx}" && npm run lint && npx tsc --noEmit && npx tsx tools/check-boundaries.ts && npm run build && npm run test
+# 1. Install dependencies
+npm ci
+
+# 2. Run all 7 oracles (single command)
+bash tools/verify
+
+# 3. Fix any failures, then re-run
+bash tools/verify
 ```
 
-Or run individual checks:
+The `tools/verify` script runs these checks in order (fails fast):
 
-```sh
-npx tsx tools/check-hygiene.ts     # File length, function length, no console.log
-npx prettier --check "src/**/*.{ts,tsx}"  # Format check
-npm run lint                        # ESLint
-npx tsc --noEmit                   # TypeScript compilation
-npx tsx tools/check-boundaries.ts  # Layer boundary enforcement
-npm run build                       # Import/load smoke test
-npm run test                        # Unit tests
-```
+| # | Oracle | What it checks |
+|---|--------|---------------|
+| 1 | Repo hygiene | File length ≤350, function length ≤60, no console.log |
+| 2 | Format | Prettier compliance |
+| 3 | Lint | ESLint rules |
+| 4 | Typecheck | TypeScript compilation |
+| 5 | Boundaries | Layer imports (domain cannot import infra/ui) |
+| 6 | Build | Vite production build (import smoke test) |
+| 7 | Tests | Vitest unit tests |
 
-CI runs this same pipeline on every push and PR via `.github/workflows/verify.yml`.
+**Cross-platform alternative:** `node tools/verify.mjs`
+
+CI runs the same pipeline on every push and PR via `.github/workflows/ci.yml`.
 
 ## What technologies are used for this project?
 
