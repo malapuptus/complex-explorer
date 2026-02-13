@@ -151,10 +151,31 @@ function readDraft(): DraftSession | null {
   try {
     const raw = localStorage.getItem(DRAFT_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as DraftSession;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return migrateDraft(parsed);
   } catch {
     return null;
   }
+}
+
+/** Migrate older draft schemas to current shape. */
+function migrateDraft(raw: Record<string, unknown>): DraftSession {
+  const wordList = (raw.wordList as string[]) ?? [];
+  return {
+    id: raw.id as string,
+    stimulusListId: (raw.stimulusListId as string) ?? "",
+    stimulusListVersion: (raw.stimulusListVersion as string) ?? "",
+    orderPolicy: ((raw.orderPolicy as string) ?? "fixed") as "fixed" | "seeded",
+    seedUsed: (raw.seedUsed as number | null) ?? null,
+    wordList,
+    practiceWords: (raw.practiceWords as string[]) ?? [],
+    stimulusOrder: (raw.stimulusOrder as string[]) ?? wordList,
+    trials: (raw.trials as DraftSession["trials"]) ?? [],
+    currentIndex: (raw.currentIndex as number) ?? 0,
+    savedAt: (raw.savedAt as string) ?? new Date().toISOString(),
+    trialTimeoutMs: raw.trialTimeoutMs as number | undefined,
+    breakEveryN: raw.breakEveryN as number | undefined,
+  };
 }
 
 function writeDraft(draft: DraftSession): void {

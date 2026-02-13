@@ -43,7 +43,13 @@ export interface DraftSession {
   readonly seedUsed: number | null;
   readonly wordList: readonly string[];
   readonly practiceWords: readonly string[];
+  /** The realized stimulus order (post-shuffle). */
+  readonly stimulusOrder: readonly string[];
   readonly trials: readonly Trial[];
   readonly currentIndex: number;
   readonly savedAt: string;
+  /** Per-trial timeout in ms (undefined = no timeout). */
+  readonly trialTimeoutMs?: number;
+  /** Break interval in scored trials (undefined = no breaks). */
+  readonly breakEveryN?: number;
 }

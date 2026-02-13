@@ -104,9 +104,12 @@ export function DemoSession() {
       seedUsed: session.seedUsed,
       wordList: list.words as string[],
       practiceWords: PRACTICE_WORDS,
+      stimulusOrder: session.stimulusOrder,
       trials: session.trials,
       currentIndex: session.currentIndex,
       savedAt: new Date().toISOString(),
+      trialTimeoutMs: session.trialTimeoutMs,
+      breakEveryN: BREAK_EVERY,
     };
     localStorageSessionStore.saveDraft(draft);
   }, [
@@ -176,10 +179,10 @@ export function DemoSession() {
       return;
     }
 
-    // Rebuild the word list as StimulusWord[]
+    // Rebuild word list using realized stimulusOrder (not raw wordList)
     const allWords = [
       ...pendingDraft.practiceWords,
-      ...pendingDraft.wordList,
+      ...pendingDraft.stimulusOrder,
     ];
     const snapshot: SessionSnapshot = {
       words: allWords.map((word, index) => ({ word, index })),
@@ -187,8 +190,8 @@ export function DemoSession() {
       trials: [...pendingDraft.trials],
       practiceCount: pendingDraft.practiceWords.length,
       seedUsed: pendingDraft.seedUsed,
-      stimulusOrder: pendingDraft.wordList as string[],
-      trialTimeoutMs: session.trialTimeoutMs,
+      stimulusOrder: [...pendingDraft.stimulusOrder],
+      trialTimeoutMs: pendingDraft.trialTimeoutMs,
     };
 
     draftIdRef.current = pendingDraft.id;
@@ -238,6 +241,9 @@ export function DemoSession() {
           <p className="text-sm text-muted-foreground">
             Pack: {pendingDraft.stimulusListId} · {scoredDone} words
             completed
+            {pendingDraft.seedUsed !== null && (
+              <> · Seed: {pendingDraft.seedUsed}</>
+            )}
           </p>
         </div>
         <div className="flex gap-3">
