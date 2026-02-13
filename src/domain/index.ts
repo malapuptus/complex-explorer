@@ -12,7 +12,8 @@ export type {
   ProvenanceSnapshot,
 } from "./types";
 
-export type { SessionStore, SessionListEntry, DraftSession } from "./sessionStore";
+export type { SessionStore, SessionListEntry, DraftSession, DraftLock } from "./sessionStore";
+export { DRAFT_LOCK_TTL_MS } from "./sessionStore";
 
 export { scoreSession } from "./scoring";
 

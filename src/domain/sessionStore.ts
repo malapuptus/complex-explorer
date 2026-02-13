@@ -25,6 +25,16 @@ export interface SessionStore {
   loadDraft(): Promise<DraftSession | null>;
   /** Delete the current draft. */
   deleteDraft(): Promise<void>;
+
+  /**
+   * Attempt to acquire the draft lock for this tab.
+   * Returns true if lock was acquired (or stolen after TTL expiry).
+   */
+  acquireDraftLock(tabId: string): boolean;
+  /** Release the draft lock if held by this tabId. */
+  releaseDraftLock(tabId: string): void;
+  /** Check whether the lock is held by a different tab (TTL not expired). */
+  isDraftLockedByOther(tabId: string): boolean;
 }
 
 export interface SessionListEntry {
@@ -53,3 +63,12 @@ export interface DraftSession {
   /** Break interval in scored trials (undefined = no breaks). */
   readonly breakEveryN?: number;
 }
+
+/** Draft lock record persisted in storage. */
+export interface DraftLock {
+  readonly tabId: string;
+  readonly acquiredAtMs: number;
+}
+
+/** Lock TTL in milliseconds (2 minutes). */
+export const DRAFT_LOCK_TTL_MS = 2 * 60 * 1000;
