@@ -12,15 +12,22 @@ No product features until Ticket 0000 (this constitution + verify pipeline) is m
 
 ### 1. Layer Boundaries
 
-Architecture: `app/ui → domain → infra`. No reverse imports.
+Architecture: `app → domain → infra`. No reverse imports.
 
-| Layer | Directories | May import from |
-|-------|------------|-----------------|
-| app/ui | `src/components/`, `src/pages/` | domain, infra, external |
+| Layer | Directory | May import from |
+|-------|-----------|-----------------|
+| app | `src/app/` | domain, infra, external |
 | domain | `src/domain/` | external only (pure, no I/O) |
 | infra | `src/infra/` | domain, external |
 
+> **Legacy directories** (`src/components/`, `src/pages/`, `src/hooks/`) are treated as **app** layer for backward compatibility. New code must use `src/app/`.
+
 **Enforced by:** `tools/check-boundaries.ts`
+
+**Violation message format:**
+```
+Boundary violation: <file> (<layer> layer) imports from <target> layer via "<import>" — rule: <layer> cannot import <target>
+```
 
 ### 2. Complexity Budgets
 
@@ -41,13 +48,14 @@ Architecture: `app/ui → domain → infra`. No reverse imports.
 
 The canonical enforcement gate is `tools/verify` (bash) or `tools/verify.mjs` (cross-platform fallback). All checks run in order and fail fast:
 
-1. Repo hygiene (`check-hygiene`)
-2. Format check (`prettier --check`)
-3. Lint (`eslint`)
-4. Typecheck (`tsc --noEmit`)
-5. Boundary check (`check-boundaries`)
-6. Build smoke (`vite build`)
-7. Unit tests (`vitest`)
+1. Repo hygiene (`npx tsx tools/check-hygiene.ts`)
+2. Format check (`npx prettier --check`)
+3. Lint (`npx eslint .`)
+4. Typecheck (`npx tsc --noEmit`)
+5. Boundary check (`npx tsx tools/check-boundaries.ts`)
+6. Load smoke (`node tools/load-smoke.mjs`)
+7. Build (`npx vite build`)
+8. Unit tests (`npx vitest run`)
 
 > **GitHub Actions / CI gating is deferred** to a future ticket. Until then, `tools/verify` is the sole gate, run locally or inside Lovable.
 
