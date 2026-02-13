@@ -19,6 +19,8 @@ export { scoreSession } from "./scoring";
 
 export { sessionTrialsToCsv, sessionResultsToCsv } from "./csvExport";
 
+export { computeSessionFingerprint } from "./fingerprint";
+
 export type { ReflectionPrompt } from "./reflection";
 export { generateReflectionPrompts } from "./reflection";
 

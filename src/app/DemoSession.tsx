@@ -3,7 +3,11 @@
  * Autosaves draft after each scored trial; offers resume on reload.
  */
 
-import { getStimulusList, listAvailableStimulusLists } from "@/domain";
+import {
+  getStimulusList,
+  listAvailableStimulusLists,
+  computeSessionFingerprint,
+} from "@/domain";
 import type {
   SessionResult,
   ProvenanceSnapshot,
@@ -71,6 +75,7 @@ export function DemoSession() {
   const [pendingDraft, setPendingDraft] = useState<DraftSession | null>(null);
   const [draftChecked, setDraftChecked] = useState(false);
   const [draftLocked, setDraftLocked] = useState(false);
+  const [sessionFingerprint, setSessionFingerprint] = useState<string | null>(null);
   const draftIdRef = useRef(generateId());
   const tabIdRef = useRef(generateTabId());
 
@@ -153,26 +158,36 @@ export function DemoSession() {
         licenseNote: list.provenance.licenseNote,
         wordCount: list.words.length,
       };
-      const result: SessionResult = {
-        id: draftIdRef.current,
-        config: {
-          stimulusListId: list.id,
-          stimulusListVersion: list.version,
-          maxResponseTimeMs: 0,
-          orderPolicy,
-          seed: session.seedUsed,
-          trialTimeoutMs: session.trialTimeoutMs,
-          breakEveryN,
-        },
-        trials: session.trials,
-        startedAt: new Date().toISOString(),
-        completedAt: new Date().toISOString(),
-        scoring: session.scoring,
-        seedUsed: session.seedUsed,
-        stimulusOrder: session.stimulusOrder,
-        provenanceSnapshot: provSnapshot,
+      const config = {
+        stimulusListId: list.id,
+        stimulusListVersion: list.version,
+        maxResponseTimeMs: 0,
+        orderPolicy,
+        seed: session.seedUsed,
+        trialTimeoutMs: session.trialTimeoutMs,
+        breakEveryN,
       };
-      localStorageSessionStore.save(result);
+      void (async () => {
+        const fingerprint = await computeSessionFingerprint({
+          config,
+          stimulusOrder: session.stimulusOrder,
+          seedUsed: session.seedUsed,
+        });
+        const result: SessionResult = {
+          id: draftIdRef.current,
+          config,
+          trials: session.trials,
+          startedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          scoring: session.scoring,
+          seedUsed: session.seedUsed,
+          stimulusOrder: session.stimulusOrder,
+          provenanceSnapshot: provSnapshot,
+          sessionFingerprint: fingerprint,
+        };
+        localStorageSessionStore.save(result);
+        setSessionFingerprint(fingerprint);
+      })();
     }
   }, [
     session.phase,
@@ -267,6 +282,7 @@ export function DemoSession() {
     setOnBreak(false);
     setActiveConfig(null);
     setDraftLocked(false);
+    setSessionFingerprint(null);
     localStorageSessionStore.releaseDraftLock(tabIdRef.current);
     session.reset();
   };
@@ -454,6 +470,7 @@ export function DemoSession() {
           packId: list.id,
           packVersion: list.version,
           seed: session.seedUsed,
+          sessionFingerprint,
         }}
       />
     );

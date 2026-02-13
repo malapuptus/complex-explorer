@@ -70,6 +70,8 @@ export interface SessionResult {
   readonly stimulusOrder: readonly string[];
   /** Snapshot of the stimulus pack provenance at time of session. */
   readonly provenanceSnapshot: ProvenanceSnapshot | null;
+  /** Deterministic SHA-256 fingerprint of config + order (null for legacy sessions). */
+  readonly sessionFingerprint: string | null;
 }
 
 /** Frozen copy of stimulus pack metadata at time of session. */

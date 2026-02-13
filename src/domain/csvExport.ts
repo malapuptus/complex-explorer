@@ -7,6 +7,7 @@ import type { SessionResult, Trial, TrialFlag } from "./types";
 
 const CSV_HEADERS = [
   "session_id",
+  "session_fingerprint",
   "pack_id",
   "pack_version",
   "seed",
@@ -32,6 +33,7 @@ function escapeCsv(value: string): string {
 
 function trialToCsvRow(
   sessionId: string,
+  sessionFingerprint: string | null,
   packId: string,
   packVersion: string,
   seed: number | null,
@@ -41,6 +43,7 @@ function trialToCsvRow(
   const a = trial.association;
   const values: string[] = [
     sessionId,
+    sessionFingerprint ?? "",
     packId,
     packVersion,
     seed !== null ? String(seed) : "",
@@ -67,12 +70,13 @@ export function sessionTrialsToCsv(
   packId: string,
   packVersion: string,
   seed: number | null,
+  sessionFingerprint?: string | null,
 ): string {
   const rows = [CSV_HEADERS.join(",")];
   for (let i = 0; i < trials.length; i++) {
     const flags = trialFlags[i]?.flags ?? [];
     rows.push(
-      trialToCsvRow(sessionId, packId, packVersion, seed, trials[i], flags),
+      trialToCsvRow(sessionId, sessionFingerprint ?? null, packId, packVersion, seed, trials[i], flags),
     );
   }
   return rows.join("\n");
@@ -87,7 +91,7 @@ export function sessionResultsToCsv(sessions: SessionResult[]): string {
     for (let i = 0; i < s.trials.length; i++) {
       const flags = s.scoring.trialFlags[i]?.flags ?? [];
       rows.push(
-        trialToCsvRow(s.id, packId, packVersion, s.seedUsed, s.trials[i], flags),
+        trialToCsvRow(s.id, s.sessionFingerprint ?? null, packId, packVersion, s.seedUsed, s.trials[i], flags),
       );
     }
   }
