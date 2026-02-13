@@ -77,7 +77,7 @@ The `tools/verify` script runs these checks in order (fails fast):
 | 6 | Build | Vite production build (import smoke test) |
 | 7 | Tests | Vitest unit tests |
 
-> **Note:** GitHub Actions CI gating is deferred to a future ticket. For now, `tools/verify` is the sole enforcement gate, run locally or inside Lovable.
+> **Note:** GitHub Actions CI gating is deferred to a future ticket. For now, `tools/verify` is the sole enforcement gate, run locally or inside Lovable. See [docs/LOCAL_VERIFY.md](docs/LOCAL_VERIFY.md) for the full local runbook.
 
 For manual integration testing, see [docs/QA_CHECKLIST.md](docs/QA_CHECKLIST.md).
 
