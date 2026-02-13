@@ -1,4 +1,6 @@
+import { useMemo } from "react";
 import type { Trial, TrialFlag } from "@/domain";
+import { generateReflectionPrompts } from "@/domain";
 
 interface Props {
   trials: Trial[];
@@ -15,6 +17,11 @@ export function ResultsView({
   medianReactionTimeMs,
   onReset,
 }: Props) {
+  const reflectionPrompts = useMemo(
+    () => generateReflectionPrompts(trials, trialFlags),
+    [trials, trialFlags],
+  );
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <h2 className="mb-2 text-2xl font-bold text-foreground">
@@ -79,6 +86,31 @@ export function ResultsView({
           </tbody>
         </table>
       </div>
+
+      {reflectionPrompts.length > 0 && (
+        <div className="mt-8">
+          <h3 className="mb-3 text-lg font-semibold text-foreground">
+            Explore Further
+          </h3>
+          <p className="mb-4 text-xs text-muted-foreground italic">
+            These prompts are for personal reflection only — they are not
+            diagnostic and do not indicate any condition.
+          </p>
+          <ul className="space-y-3">
+            {reflectionPrompts.map((rp, i) => (
+              <li
+                key={i}
+                className="rounded-md border border-border bg-muted/30 px-4 py-3"
+              >
+                <p className="text-sm text-foreground">{rp.prompt}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Signal: {rp.flag.replace(/_/g, " ")}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <button
         onClick={onReset}

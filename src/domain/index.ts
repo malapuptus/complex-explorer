@@ -16,6 +16,9 @@ export type { SessionStore, SessionListEntry } from "./sessionStore";
 
 export { scoreSession } from "./scoring";
 
+export type { ReflectionPrompt } from "./reflection";
+export { generateReflectionPrompts } from "./reflection";
+
 export { seededShuffle, randomSeed } from "./shuffle";
 
 export type {
