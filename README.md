@@ -63,6 +63,8 @@ bash tools/verify
 bash tools/verify
 ```
 
+**Cross-platform fallback:** `node tools/verify.mjs`
+
 The `tools/verify` script runs these checks in order (fails fast):
 
 | # | Oracle | What it checks |
@@ -75,9 +77,7 @@ The `tools/verify` script runs these checks in order (fails fast):
 | 6 | Build | Vite production build (import smoke test) |
 | 7 | Tests | Vitest unit tests |
 
-**Cross-platform alternative:** `node tools/verify.mjs`
-
-CI runs the same pipeline on every push and PR via `.github/workflows/ci.yml`.
+> **Note:** GitHub Actions CI gating is deferred to a future ticket. For now, `tools/verify` is the sole enforcement gate, run locally or inside Lovable.
 
 ## What technologies are used for this project?
 
