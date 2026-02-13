@@ -16,7 +16,7 @@ export function ResultsView({
   onReset,
 }: Props) {
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
+    <div className="mx-auto max-w-3xl px-4 py-8">
       <h2 className="mb-2 text-2xl font-bold text-foreground">
         Session Results
       </h2>
@@ -29,33 +29,42 @@ export function ResultsView({
         <table className="w-full text-left text-sm">
           <thead className="bg-muted text-muted-foreground">
             <tr>
-              <th className="px-4 py-2">#</th>
-              <th className="px-4 py-2">Stimulus</th>
-              <th className="px-4 py-2">Response</th>
-              <th className="px-4 py-2 text-right">RT (ms)</th>
-              <th className="px-4 py-2">Flags</th>
+              <th className="px-3 py-2">#</th>
+              <th className="px-3 py-2">Stimulus</th>
+              <th className="px-3 py-2">Response</th>
+              <th className="px-3 py-2 text-right">1st Key</th>
+              <th className="px-3 py-2 text-right">Submit</th>
+              <th className="px-3 py-2 text-right">BS</th>
+              <th className="px-3 py-2">Flags</th>
             </tr>
           </thead>
           <tbody>
             {trials.map((trial, i) => {
               const flags = trialFlags[i]?.flags ?? [];
+              const a = trial.association;
               return (
                 <tr key={i} className="border-t border-border">
-                  <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
-                  <td className="px-4 py-2 font-medium text-foreground">
+                  <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
+                  <td className="px-3 py-2 font-medium text-foreground">
                     {trial.stimulus.word}
                   </td>
-                  <td className="px-4 py-2 text-foreground">
-                    {trial.association.response || (
+                  <td className="px-3 py-2 text-foreground">
+                    {a.response || (
                       <span className="italic text-muted-foreground">
                         (empty)
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-2 text-right font-mono text-foreground">
-                    {trial.association.reactionTimeMs}
+                  <td className="px-3 py-2 text-right font-mono text-foreground">
+                    {a.tFirstKeyMs !== null ? a.tFirstKeyMs : "—"}
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-3 py-2 text-right font-mono text-foreground">
+                    {a.reactionTimeMs}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-foreground">
+                    {a.backspaceCount}
+                  </td>
+                  <td className="px-3 py-2">
                     {flags.length > 0 ? (
                       <span className="text-xs text-destructive">
                         {flags.join(", ")}

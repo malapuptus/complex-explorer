@@ -37,6 +37,9 @@ function stdDev(values: number[], avg: number): number {
 /** Threshold: responses faster than this (ms) are flagged. */
 const FAST_THRESHOLD_MS = 200;
 
+/** Threshold: backspaceCount above this flags "high_editing". */
+const HIGH_EDITING_THRESHOLD = 3;
+
 /**
  * Score a completed set of trials.
  *
@@ -98,6 +101,11 @@ export function scoreSession(trials: Trial[]): SessionScoring {
       }
     }
 
+    // High editing flag
+    if (trial.association.backspaceCount > HIGH_EDITING_THRESHOLD) {
+      flags.push("high_editing");
+    }
+
     trialFlags.push({ trialIndex: i, flags });
   }
 
@@ -120,6 +128,9 @@ export function scoreSession(trials: Trial[]): SessionScoring {
         f.flags.includes("timing_outlier_slow") ||
         f.flags.includes("timing_outlier_fast"),
     ).length,
+    highEditingCount: trialFlags.filter((f) =>
+      f.flags.includes("high_editing"),
+    ).length,
   };
 
   return { trialFlags, summary };
@@ -134,6 +145,7 @@ function emptySummary(): SessionSummary {
     emptyResponseCount: 0,
     repeatedResponseCount: 0,
     timingOutlierCount: 0,
+    highEditingCount: 0,
   };
 }
 
