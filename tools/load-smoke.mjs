@@ -1,17 +1,35 @@
 #!/usr/bin/env node
 /**
  * tools/load-smoke.mjs — Import/load smoke test.
- * Runs a production build via Vite to verify all imports resolve and the bundle compiles.
+ * Discovers all modules under src/**\/*.{ts,tsx}, excludes tests/mocks/declarations,
+ * and attempts to import each one. Fails fast on the first broken module.
+ *
  * Usage: node tools/load-smoke.mjs
  */
 
-import { execSync } from "child_process";
+import { glob } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
+import { resolve } from "node:path";
 
-console.log("Load smoke: building project...");
-try {
-  execSync("npx vite build", { stdio: "inherit" });
-  console.log("Load smoke: PASS");
-} catch {
-  console.error("Load smoke: FAIL — build did not complete");
-  process.exit(1);
+const patterns = ["src/**/*.ts", "src/**/*.tsx"];
+const excludeRe = /(\/__tests__\/|__mocks__|\.test\.|\.d\.ts$)/;
+
+let scanned = 0;
+
+for (const pattern of patterns) {
+  for await (const file of glob(pattern)) {
+    if (excludeRe.test(file)) continue;
+    const abs = resolve(file);
+    try {
+      await import(pathToFileURL(abs).href);
+    } catch (err) {
+      console.error(`load-smoke: FAIL — ${file}`);
+      console.error(err);
+      process.exit(1);
+    }
+    scanned++;
+  }
 }
+
+console.log(`load-smoke: scanned ${scanned} modules`);
+console.log("load-smoke: PASS");

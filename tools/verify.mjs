@@ -13,7 +13,7 @@ const steps = [
   { name: "Lint", cmd: "npm run lint" },
   { name: "Typecheck", cmd: "npx tsc --noEmit" },
   { name: "Boundary check", cmd: "npx tsx tools/check-boundaries.ts" },
-  { name: "Build (load smoke)", cmd: "npm run build" },
+  { name: "Load smoke", cmd: "node tools/load-smoke.mjs" },
   { name: "Unit tests", cmd: "npm run test" },
 ];
 
