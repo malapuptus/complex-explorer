@@ -155,12 +155,15 @@ The session summary includes:
 
 - **Words:** 100 common English stimulus words.
 - **Source:** Kent, G. H., & Rosanoff, A. J. (1910). "A study of
-  association in insanity." *American Journal of Insanity*, 67, 37–96.
+  association in insanity." *American Journal of Insanity*, 67(1),
+  37–96 (Part I); 67(2), 317–390 (Part II).
+- **Verification:** Word list and canonical ordering confirmed against
+  frequency tables in Rosanoff, A. J., *Manual of Psychiatry*,
+  Appendix VI.
 - **Purpose:** Standardized free association test designed to elicit
   associations without emotional loading.
 - **License:** Public domain (published 1910, US copyright expired).
-- **Note:** Word list sourced from secondary digital archives; minor
-  ordering variations may exist across published reproductions.
+  Word list and ordering confirmed against primary source.
 
 ---
 
@@ -209,4 +212,8 @@ personal reflection, education, and exploratory research only.
 - Iglewicz, B., & Hoaglin, D. C. (1993). *Volume 16: How to Detect
   and Handle Outliers.* ASQ Quality Press.
 - Kent, G. H., & Rosanoff, A. J. (1910). A study of association in
-  insanity. *American Journal of Insanity*, 67, 37–96.
+  insanity. *American Journal of Insanity*, 67(1), 37–96 (Part I);
+  67(2), 317–390 (Part II).
+- Rosanoff, A. J. *Manual of Psychiatry*. Appendix VI: Free
+  Association Test (Kent–Rosanoff). [Frequency tables used for word
+  list verification.]

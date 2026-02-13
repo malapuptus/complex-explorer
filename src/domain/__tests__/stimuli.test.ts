@@ -93,12 +93,16 @@ describe("stimulus registry", () => {
     expect(list!.provenance.sourceName).toBeTruthy();
   });
 
-  it("returns the Kent-Rosanoff list", () => {
+  it("returns the Kent-Rosanoff list with correct metadata", () => {
     const list = getStimulusList("kent-rosanoff-1910", "1.0.0");
     expect(list).toBeDefined();
     expect(list!.words).toHaveLength(100);
+    expect(list!.words[0]).toBe("table");
+    expect(list!.words[99]).toBe("afraid");
     expect(list!.provenance.sourceYear).toBe("1910");
     expect(list!.provenance.licenseNote).toContain("Public domain");
+    expect(list!.provenance.sourceCitation).toContain("Part I");
+    expect(list!.provenance.sourceCitation).toContain("Part II");
   });
 
   it("all registered lists pass validation", () => {
