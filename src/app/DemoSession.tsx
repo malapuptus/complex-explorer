@@ -9,6 +9,7 @@ import { localStorageSessionStore } from "@/infra";
 import { useSession } from "./useSession";
 import { TrialView } from "./TrialView";
 import { ResultsView } from "./ResultsView";
+import { ProtocolScreen } from "./ProtocolScreen";
 import { useEffect, useRef } from "react";
 
 function generateId(): string {
@@ -46,24 +47,11 @@ export function DemoSession() {
 
   if (session.phase === "idle") {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6">
-        <h1 className="text-3xl font-bold text-foreground">
-          Word Association Demo
-        </h1>
-        <p className="max-w-md text-center text-muted-foreground">
-          You'll see {list.words.length} words, one at a time. Type the first
-          word that comes to mind and press Enter or click Next.
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Source: {list.source}
-        </p>
-        <button
-          onClick={session.start}
-          className="rounded-md bg-primary px-8 py-3 text-lg text-primary-foreground hover:opacity-90"
-        >
-          Start
-        </button>
-      </div>
+      <ProtocolScreen
+        wordCount={list.words.length}
+        source={list.source}
+        onReady={session.start}
+      />
     );
   }
 
