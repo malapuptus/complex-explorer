@@ -48,21 +48,33 @@ export interface SessionSnapshot {
   trialTimeoutMs?: number;
 }
 
+/** Overrides passed at start time (from protocol screen). */
+export interface StartOverrides {
+  orderPolicy?: OrderPolicy;
+  seed?: number | null;
+  trialTimeoutMs?: number;
+}
+
 export function useSession(words: string[], options?: UseSessionOptions) {
   const practiceWords = options?.practiceWords ?? [];
-  const orderPolicy = options?.orderPolicy ?? "fixed";
+  const defaultOrderPolicy = options?.orderPolicy ?? "fixed";
   const practiceCount = practiceWords.length;
-  const trialTimeoutMs = options?.trialTimeoutMs;
+  const defaultTimeoutMs = options?.trialTimeoutMs;
 
   const baseWords = useMemo(() => [...words], [words]);
 
   const buildState = useCallback(
-    (phase: SessionPhase): SessionState => {
+    (phase: SessionPhase, overrides?: StartOverrides): SessionState => {
+      const orderPolicy = overrides?.orderPolicy ?? defaultOrderPolicy;
+      const timeoutMs = overrides?.trialTimeoutMs ?? defaultTimeoutMs;
       let scoredWords: string[];
       let seedUsed: number | null = null;
 
       if (orderPolicy === "seeded") {
-        seedUsed = options?.seed ?? randomSeed();
+        seedUsed =
+          overrides?.seed != null
+            ? overrides.seed
+            : (options?.seed ?? randomSeed());
         scoredWords = seededShuffle(baseWords, seedUsed);
       } else {
         scoredWords = [...baseWords];
@@ -83,16 +95,16 @@ export function useSession(words: string[], options?: UseSessionOptions) {
         practiceCount,
         seedUsed,
         stimulusOrder: scoredWords,
-        trialTimeoutMs,
+        trialTimeoutMs: timeoutMs,
       };
     },
     [
       baseWords,
       practiceWords,
       practiceCount,
-      orderPolicy,
+      defaultOrderPolicy,
       options?.seed,
-      trialTimeoutMs,
+      defaultTimeoutMs,
     ],
   );
 
@@ -100,10 +112,13 @@ export function useSession(words: string[], options?: UseSessionOptions) {
 
   const trialStartRef = useRef<number>(0);
 
-  const start = useCallback(() => {
-    trialStartRef.current = performance.now();
-    setState(buildState("running"));
-  }, [buildState]);
+  const start = useCallback(
+    (overrides?: StartOverrides) => {
+      trialStartRef.current = performance.now();
+      setState(buildState("running", overrides));
+    },
+    [buildState],
+  );
 
   /** Restore a running session from a draft snapshot. */
   const restore = useCallback((snapshot: SessionSnapshot) => {
@@ -134,7 +149,7 @@ export function useSession(words: string[], options?: UseSessionOptions) {
     ) => {
       const now = performance.now();
       const reactionTimeMs = timedOut
-        ? (trialTimeoutMs ?? now - trialStartRef.current)
+        ? (state.trialTimeoutMs ?? now - trialStartRef.current)
         : now - trialStartRef.current;
 
       setState((prev) => {
@@ -181,7 +196,7 @@ export function useSession(words: string[], options?: UseSessionOptions) {
         };
       });
     },
-    [trialTimeoutMs],
+    [state.trialTimeoutMs],
   );
 
   const submitResponse = useCallback(
