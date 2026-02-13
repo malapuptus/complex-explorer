@@ -9,6 +9,7 @@ interface ProtocolScreenProps {
   wordCount: number;
   practiceCount: number;
   source: string;
+  estimatedMinutes: string;
   onReady: () => void;
   children?: ReactNode;
 }
@@ -25,6 +26,7 @@ export function ProtocolScreen({
   wordCount,
   practiceCount,
   source,
+  estimatedMinutes,
   onReady,
   children,
 }: ProtocolScreenProps) {
@@ -41,6 +43,10 @@ export function ProtocolScreen({
           words, then see{" "}
           <strong className="text-foreground">{wordCount}</strong> scored words.
           For each word, type the first association that comes to mind.
+        </p>
+
+        <p className="text-center text-sm text-muted-foreground">
+          Estimated time: <strong className="text-foreground">{estimatedMinutes}</strong>
         </p>
 
         <ul className="space-y-2 rounded-md border border-border bg-muted/40 p-4">
