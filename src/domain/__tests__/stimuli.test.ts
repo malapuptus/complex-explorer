@@ -5,6 +5,10 @@ import {
   listAvailableStimulusLists,
 } from "../stimuli";
 import type { StimulusList } from "../stimuli";
+import {
+  EXPECTED_HASHES,
+  computeWordsSha256,
+} from "../stimuli/integrity";
 
 const VALID_PROVENANCE = {
   sourceName: "Test Author",
@@ -109,7 +113,29 @@ describe("stimulus registry", () => {
 
   it("returns undefined for unknown list", () => {
     expect(getStimulusList("nope", "1.0.0")).toBeUndefined();
+});
+
+describe("stimulus pack integrity (SHA-256)", () => {
+  it("demo-10 hash matches frozen word list", async () => {
+    const list = getStimulusList("demo-10", "1.0.0")!;
+    const hash = await computeWordsSha256(list.words);
+    expect(hash).toBe(EXPECTED_HASHES["demo-10@1.0.0"]);
   });
+
+  it("kent-rosanoff-1910 hash matches frozen word list", async () => {
+    const list = getStimulusList("kent-rosanoff-1910", "1.0.0")!;
+    const hash = await computeWordsSha256(list.words);
+    expect(hash).toBe(EXPECTED_HASHES["kent-rosanoff-1910@1.0.0"]);
+  });
+
+  it("every registered pack has an expected hash", () => {
+    const available = listAvailableStimulusLists();
+    for (const meta of available) {
+      const key = `${meta.id}@${meta.version}`;
+      expect(EXPECTED_HASHES[key]).toBeDefined();
+    }
+  });
+});
 
   it("lists at least 2 available stimulus lists", () => {
     const available = listAvailableStimulusLists();
