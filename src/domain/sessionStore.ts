@@ -3,7 +3,7 @@
  * Defined in domain so app and infra can depend on it.
  */
 
-import type { SessionResult } from "./types";
+import type { SessionResult, Trial, OrderPolicy } from "./types";
 
 export interface SessionStore {
   /** Save a completed session. */
@@ -18,6 +18,13 @@ export interface SessionStore {
   deleteAll(): Promise<void>;
   /** Export all sessions as a JSON string. */
   exportAll(): Promise<string>;
+
+  /** Save a draft (in-progress session). Only one draft at a time. */
+  saveDraft(draft: DraftSession): Promise<void>;
+  /** Load the current draft (if any). */
+  loadDraft(): Promise<DraftSession | null>;
+  /** Delete the current draft. */
+  deleteDraft(): Promise<void>;
 }
 
 export interface SessionListEntry {
@@ -25,4 +32,18 @@ export interface SessionListEntry {
   readonly completedAt: string;
   readonly totalTrials: number;
   readonly stimulusListId: string;
+}
+
+/** A serializable snapshot of an in-progress session. */
+export interface DraftSession {
+  readonly id: string;
+  readonly stimulusListId: string;
+  readonly stimulusListVersion: string;
+  readonly orderPolicy: OrderPolicy;
+  readonly seedUsed: number | null;
+  readonly wordList: readonly string[];
+  readonly practiceWords: readonly string[];
+  readonly trials: readonly Trial[];
+  readonly currentIndex: number;
+  readonly savedAt: string;
 }

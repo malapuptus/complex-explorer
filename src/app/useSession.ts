@@ -31,13 +31,20 @@ export interface SessionState {
   currentIndex: number;
   trials: Trial[];
   scoring: SessionScoring | null;
-  /** Number of practice words at the start. */
   practiceCount: number;
-  /** The seed used for this session (null if fixed). */
   seedUsed: number | null;
-  /** The realized scored word order (excluding practice). */
   stimulusOrder: string[];
-  /** Per-trial timeout in ms (undefined = no timeout). */
+  trialTimeoutMs?: number;
+}
+
+/** Snapshot for restoring a session from a draft. */
+export interface SessionSnapshot {
+  words: StimulusWord[];
+  currentIndex: number;
+  trials: Trial[];
+  practiceCount: number;
+  seedUsed: number | null;
+  stimulusOrder: string[];
   trialTimeoutMs?: number;
 }
 
@@ -47,7 +54,6 @@ export function useSession(words: string[], options?: UseSessionOptions) {
   const practiceCount = practiceWords.length;
   const trialTimeoutMs = options?.trialTimeoutMs;
 
-  // Memoize the base stimuli list (before any shuffle)
   const baseWords = useMemo(() => [...words], [words]);
 
   const buildState = useCallback(
@@ -98,6 +104,22 @@ export function useSession(words: string[], options?: UseSessionOptions) {
     trialStartRef.current = performance.now();
     setState(buildState("running"));
   }, [buildState]);
+
+  /** Restore a running session from a draft snapshot. */
+  const restore = useCallback((snapshot: SessionSnapshot) => {
+    trialStartRef.current = performance.now();
+    setState({
+      phase: "running",
+      words: snapshot.words,
+      currentIndex: snapshot.currentIndex,
+      trials: [...snapshot.trials],
+      scoring: null,
+      practiceCount: snapshot.practiceCount,
+      seedUsed: snapshot.seedUsed,
+      stimulusOrder: [...snapshot.stimulusOrder],
+      trialTimeoutMs: snapshot.trialTimeoutMs,
+    });
+  }, []);
 
   const advanceTrial = useCallback(
     (
@@ -150,7 +172,6 @@ export function useSession(words: string[], options?: UseSessionOptions) {
           };
         }
 
-        // Reset timer for next trial
         trialStartRef.current = performance.now();
 
         return {
@@ -201,6 +222,7 @@ export function useSession(words: string[], options?: UseSessionOptions) {
         ? state.words[state.currentIndex]
         : null,
     start,
+    restore,
     submitResponse,
     handleTimeout,
     reset,

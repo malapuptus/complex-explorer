@@ -8,9 +8,11 @@ import type {
   SessionListEntry,
   SessionResult,
   AssociationResponse,
+  DraftSession,
 } from "@/domain";
 
 const STORAGE_KEY = "complex-mapper-sessions";
+const DRAFT_KEY = "complex-mapper-draft";
 
 /**
  * Current schema version. Bump when SessionResult shape changes.
@@ -42,7 +44,6 @@ function migrateAssociationV1toV3(
 
 /**
  * Migrate any raw session object to v3 (current).
- * Handles v1 (no metrics), v2 (no provenance), and v3 (current).
  */
 function migrateSessionToV3(raw: Record<string, unknown>): SessionResult {
   const trials = ((raw.trials as Array<Record<string, unknown>>) ?? []).map(
@@ -144,6 +145,26 @@ function writeEnvelope(envelope: StorageEnvelope): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
 }
 
+// ── Draft I/O ────────────────────────────────────────────────────────
+
+function readDraft(): DraftSession | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as DraftSession;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(draft: DraftSession): void {
+  localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+}
+
+function removeDraft(): void {
+  localStorage.removeItem(DRAFT_KEY);
+}
+
 // ── Store implementation ─────────────────────────────────────────────
 
 export const localStorageSessionStore: SessionStore = {
@@ -183,5 +204,17 @@ export const localStorageSessionStore: SessionStore = {
   async exportAll(): Promise<string> {
     const envelope = readEnvelope();
     return JSON.stringify(envelope, null, 2);
+  },
+
+  async saveDraft(draft: DraftSession): Promise<void> {
+    writeDraft(draft);
+  },
+
+  async loadDraft(): Promise<DraftSession | null> {
+    return readDraft();
+  },
+
+  async deleteDraft(): Promise<void> {
+    removeDraft();
   },
 };
