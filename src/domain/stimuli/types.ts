@@ -3,6 +3,18 @@
  * Pure domain — no I/O.
  */
 
+/** Provenance metadata for a stimulus list. */
+export interface StimulusListProvenance {
+  /** Name of the original source (e.g. author, institution). */
+  readonly sourceName: string;
+  /** Year of publication or creation. */
+  readonly sourceYear: string;
+  /** Full citation or reference string. */
+  readonly sourceCitation: string;
+  /** License or usage note (e.g. "public domain", "fair use"). */
+  readonly licenseNote: string;
+}
+
 /** A versioned, attributable stimulus word list. */
 export interface StimulusList {
   /** Unique identifier for this list. */
@@ -11,8 +23,10 @@ export interface StimulusList {
   readonly version: string;
   /** ISO 639-1 language code (e.g. "en", "de"). */
   readonly language: string;
-  /** Attribution / source description. */
+  /** Short attribution / source description (kept for backward compat). */
   readonly source: string;
+  /** Structured provenance metadata. */
+  readonly provenance: StimulusListProvenance;
   /** The ordered list of stimulus words. */
   readonly words: readonly string[];
 }
@@ -42,10 +56,47 @@ export function validateStimulusList(
   if (!list.source || list.source.trim() === "") {
     errors.push({ field: "source", message: "source is required" });
   }
-  if (!Array.isArray(list.words) || list.words.length === 0) {
-    errors.push({ field: "words", message: "words must be a non-empty array" });
+
+  // Provenance validation
+  if (!list.provenance) {
+    errors.push({ field: "provenance", message: "provenance is required" });
   } else {
-    const blanks = list.words.filter((w) => typeof w !== "string" || w.trim() === "");
+    const p = list.provenance;
+    if (!p.sourceName || p.sourceName.trim() === "") {
+      errors.push({
+        field: "provenance.sourceName",
+        message: "provenance.sourceName is required",
+      });
+    }
+    if (!p.sourceYear || p.sourceYear.trim() === "") {
+      errors.push({
+        field: "provenance.sourceYear",
+        message: "provenance.sourceYear is required",
+      });
+    }
+    if (!p.sourceCitation || p.sourceCitation.trim() === "") {
+      errors.push({
+        field: "provenance.sourceCitation",
+        message: "provenance.sourceCitation is required",
+      });
+    }
+    if (!p.licenseNote || p.licenseNote.trim() === "") {
+      errors.push({
+        field: "provenance.licenseNote",
+        message: "provenance.licenseNote is required",
+      });
+    }
+  }
+
+  if (!Array.isArray(list.words) || list.words.length === 0) {
+    errors.push({
+      field: "words",
+      message: "words must be a non-empty array",
+    });
+  } else {
+    const blanks = list.words.filter(
+      (w) => typeof w !== "string" || w.trim() === "",
+    );
     if (blanks.length > 0) {
       errors.push({
         field: "words",
