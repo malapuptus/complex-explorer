@@ -24,7 +24,14 @@
 
 - `node tools/verify.mjs`
 
+**Pre-merge checklist:**
+
+- [ ] All acceptance criteria met
+- [ ] All required oracles pass
+- [ ] **No out-of-scope edits were made.** If any were necessary, a Scope Exception entry was added to `docs/SCOPE_EXCEPTIONS.md` before merging.
+
 ---
 
 > **If you need to touch any other file, STOP and ask for a new ticket.**
 > Output the exact phrase: **`NEEDS FOLLOW-UP TICKET`** with the file(s) and a minimal ticket proposal.
+> Then log the exception in `docs/SCOPE_EXCEPTIONS.md` before continuing.
