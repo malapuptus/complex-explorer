@@ -16,6 +16,7 @@ import { createServer } from "vite";
 /** Only scan these subdirectories of src/ (import-safe layers). */
 const SCAN_DIRS = [resolve("src/domain"), resolve("src/infra")];
 const EXCLUDE_RE = /(\/__tests__\/|__mocks__|\.test\.|\.stories\.|\.d\.ts$)/;
+const BROWSER_ONLY_RE = /\.browser\.(ts|tsx)$/;
 const INCLUDE_RE = /\.(ts|tsx)$/;
 
 /** Recursively walk a directory, returning file paths. */
@@ -46,10 +47,21 @@ async function main() {
   }
 
   // Filter out non-runtime files
-  const modules = files.filter((f) => !EXCLUDE_RE.test(f));
+  const candidates = files.filter((f) => !EXCLUDE_RE.test(f));
+
+  // Separate browser-only modules (*.browser.ts/tsx)
+  const skipped = candidates.filter((f) => BROWSER_ONLY_RE.test(f));
+  const modules = candidates.filter((f) => !BROWSER_ONLY_RE.test(f));
+
+  if (skipped.length > 0) {
+    console.log(`load-smoke: skipping ${skipped.length} browser-only module(s):`);
+    for (const f of skipped) {
+      console.log(`  - ${f}`);
+    }
+  }
 
   if (modules.length === 0) {
-    console.log("load-smoke: PASS — scanned 0 modules (domain+infra)");
+    console.log(`load-smoke: PASS — scanned 0 modules, skipped ${skipped.length} (domain+infra)`);
     process.exit(0);
   }
 
@@ -76,7 +88,7 @@ async function main() {
       }
     }
 
-    console.log(`load-smoke: PASS — scanned ${loaded} modules (domain+infra)`);
+    console.log(`load-smoke: PASS — scanned ${loaded}, skipped ${skipped.length} (domain+infra)`);
   } finally {
     await vite.close();
   }

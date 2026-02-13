@@ -28,7 +28,7 @@ That's it. The script fails fast on the first broken oracle.
 | 3 | Lint | ESLint rules | Unused imports, any-casts |
 | 4 | Typecheck | `tsc --noEmit` | Missing types, interface mismatches |
 | 5 | Boundaries | Domain cannot import infra or app | Wrong import direction |
-| 6 | Load smoke | Vite SSR import of `src/main.tsx` | Node-only APIs used in browser code (e.g., `node:crypto`), missing polyfills |
+| 6 | Load smoke | Vite SSR import of domain + infra modules (skips `*.browser.ts(x)`) | Node-only APIs in browser code; forgot `.browser.ts` suffix on browser-only adapters |
 | 7 | Build | `vite build` production bundle | Same as load-smoke, plus chunk/asset errors |
 | 8 | Tests | `vitest run` | Broken logic, stale snapshots |
 
