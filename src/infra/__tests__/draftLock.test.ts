@@ -39,10 +39,7 @@ describe("draft lock", () => {
       tabId: "tab-1",
       acquiredAtMs: Date.now() - DRAFT_LOCK_TTL_MS - 1,
     };
-    localStorage.setItem(
-      "complex-mapper-draft-lock",
-      JSON.stringify(expired),
-    );
+    localStorage.setItem("complex-mapper-draft-lock", JSON.stringify(expired));
 
     expect(localStorageSessionStore.acquireDraftLock("tab-2")).toBe(true);
   });
@@ -52,10 +49,7 @@ describe("draft lock", () => {
       tabId: "tab-1",
       acquiredAtMs: Date.now() - DRAFT_LOCK_TTL_MS - 1,
     };
-    localStorage.setItem(
-      "complex-mapper-draft-lock",
-      JSON.stringify(expired),
-    );
+    localStorage.setItem("complex-mapper-draft-lock", JSON.stringify(expired));
 
     expect(localStorageSessionStore.isDraftLockedByOther("tab-2")).toBe(false);
   });

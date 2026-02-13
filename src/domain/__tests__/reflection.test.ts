@@ -2,12 +2,7 @@ import { describe, it, expect } from "vitest";
 import { generateReflectionPrompts } from "../reflection";
 import type { Trial, TrialFlag, FlagKind } from "../types";
 
-function makeTrial(
-  word: string,
-  response: string,
-  index: number,
-  isPractice = false,
-): Trial {
+function makeTrial(word: string, response: string, index: number, isPractice = false): Trial {
   return {
     stimulus: { word, index },
     association: {
@@ -54,10 +49,7 @@ describe("generateReflectionPrompts", () => {
   });
 
   it("generates prompt for repeated_response", () => {
-    const trials = [
-      makeTrial("house", "home", 0),
-      makeTrial("cottage", "home", 1),
-    ];
+    const trials = [makeTrial("house", "home", 0), makeTrial("cottage", "home", 1)];
     const flags = makeFlags([[], ["repeated_response"]]);
     const result = generateReflectionPrompts(trials, flags);
     expect(result).toHaveLength(1);
@@ -81,10 +73,7 @@ describe("generateReflectionPrompts", () => {
   });
 
   it("excludes practice trials", () => {
-    const trials = [
-      makeTrial("warmup", "test", 0, true),
-      makeTrial("dark", "night", 1),
-    ];
+    const trials = [makeTrial("warmup", "test", 0, true), makeTrial("dark", "night", 1)];
     const flags = makeFlags([["timing_outlier_slow"]]);
     // After filtering practice, only the scored trial remains — no flag for it
     const result = generateReflectionPrompts(trials, flags);
@@ -93,9 +82,7 @@ describe("generateReflectionPrompts", () => {
   });
 
   it("caps at 8 prompts", () => {
-    const trials = Array.from({ length: 10 }, (_, i) =>
-      makeTrial(`word${i}`, `resp${i}`, i),
-    );
+    const trials = Array.from({ length: 10 }, (_, i) => makeTrial(`word${i}`, `resp${i}`, i));
     const flags = makeFlags(
       trials.map(() => ["timing_outlier_slow", "high_editing"] as FlagKind[]),
     );
@@ -104,10 +91,7 @@ describe("generateReflectionPrompts", () => {
   });
 
   it("is deterministic (same input → same output)", () => {
-    const trials = [
-      makeTrial("dark", "night", 0),
-      makeTrial("fire", "", 1),
-    ];
+    const trials = [makeTrial("dark", "night", 0), makeTrial("fire", "", 1)];
     const flags = makeFlags([["timing_outlier_slow"], ["empty_response"]]);
     const a = generateReflectionPrompts(trials, flags);
     const b = generateReflectionPrompts(trials, flags);
@@ -120,13 +104,12 @@ describe("generateReflectionPrompts", () => {
       makeTrial("fire", "", 1),
       makeTrial("mother", "love", 2),
     ];
-    const flags = makeFlags([
-      ["timing_outlier_slow"],
-      ["empty_response"],
-      ["high_editing"],
-    ]);
+    const flags = makeFlags([["timing_outlier_slow"], ["empty_response"], ["high_editing"]]);
     const result = generateReflectionPrompts(trials, flags);
-    const allText = result.map((r) => r.prompt).join(" ").toLowerCase();
+    const allText = result
+      .map((r) => r.prompt)
+      .join(" ")
+      .toLowerCase();
     expect(allText).not.toContain("complex detected");
     expect(allText).not.toContain("diagnosis");
     expect(allText).not.toContain("disorder");

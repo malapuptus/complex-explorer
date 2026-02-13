@@ -1,14 +1,7 @@
 import { describe, it, expect } from "vitest";
-import {
-  validateStimulusList,
-  getStimulusList,
-  listAvailableStimulusLists,
-} from "../stimuli";
+import { validateStimulusList, getStimulusList, listAvailableStimulusLists } from "../stimuli";
 import type { StimulusList } from "../stimuli";
-import {
-  EXPECTED_HASHES,
-  computeWordsSha256,
-} from "../stimuli/integrity";
+import { EXPECTED_HASHES, computeWordsSha256 } from "../stimuli/integrity";
 
 const VALID_PROVENANCE = {
   sourceName: "Test Author",
@@ -17,9 +10,7 @@ const VALID_PROVENANCE = {
   licenseNote: "Public domain.",
 };
 
-function validList(
-  overrides?: Partial<StimulusList>,
-): Partial<StimulusList> {
+function validList(overrides?: Partial<StimulusList>): Partial<StimulusList> {
   return {
     id: "test",
     version: "1.0.0",
@@ -47,9 +38,7 @@ describe("validateStimulusList", () => {
   });
 
   it("flags blank words in array", () => {
-    const errors = validateStimulusList(
-      validList({ words: ["good", "", "fine"] }),
-    );
+    const errors = validateStimulusList(validList({ words: ["good", "", "fine"] }));
     expect(errors.some((e) => e.field === "words")).toBe(true);
     expect(errors[0].message).toContain("1 blank");
   });
@@ -78,9 +67,7 @@ describe("validateStimulusList", () => {
   });
 
   it("flags missing provenance object entirely", () => {
-    const errors = validateStimulusList(
-      validList({ provenance: undefined }),
-    );
+    const errors = validateStimulusList(validList({ provenance: undefined }));
     expect(errors.some((e) => e.field === "provenance")).toBe(true);
   });
 });
@@ -117,29 +104,29 @@ describe("stimulus registry", () => {
 
   it("returns undefined for unknown list", () => {
     expect(getStimulusList("nope", "1.0.0")).toBeUndefined();
-});
-
-describe("stimulus pack integrity (SHA-256)", () => {
-  it("demo-10 hash matches frozen word list", async () => {
-    const list = getStimulusList("demo-10", "1.0.0")!;
-    const hash = await computeWordsSha256(list.words);
-    expect(hash).toBe(EXPECTED_HASHES["demo-10@1.0.0"]);
   });
 
-  it("kent-rosanoff-1910 hash matches frozen word list", async () => {
-    const list = getStimulusList("kent-rosanoff-1910", "1.0.0")!;
-    const hash = await computeWordsSha256(list.words);
-    expect(hash).toBe(EXPECTED_HASHES["kent-rosanoff-1910@1.0.0"]);
-  });
+  describe("stimulus pack integrity (SHA-256)", () => {
+    it("demo-10 hash matches frozen word list", async () => {
+      const list = getStimulusList("demo-10", "1.0.0")!;
+      const hash = await computeWordsSha256(list.words);
+      expect(hash).toBe(EXPECTED_HASHES["demo-10@1.0.0"]);
+    });
 
-  it("every registered pack has an expected hash", () => {
-    const available = listAvailableStimulusLists();
-    for (const meta of available) {
-      const key = `${meta.id}@${meta.version}`;
-      expect(EXPECTED_HASHES[key]).toBeDefined();
-    }
+    it("kent-rosanoff-1910 hash matches frozen word list", async () => {
+      const list = getStimulusList("kent-rosanoff-1910", "1.0.0")!;
+      const hash = await computeWordsSha256(list.words);
+      expect(hash).toBe(EXPECTED_HASHES["kent-rosanoff-1910@1.0.0"]);
+    });
+
+    it("every registered pack has an expected hash", () => {
+      const available = listAvailableStimulusLists();
+      for (const meta of available) {
+        const key = `${meta.id}@${meta.version}`;
+        expect(EXPECTED_HASHES[key]).toBeDefined();
+      }
+    });
   });
-});
 
   it("lists at least 2 available stimulus lists", () => {
     const available = listAvailableStimulusLists();

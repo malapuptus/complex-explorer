@@ -32,9 +32,7 @@ interface StorageEnvelope {
 
 // ── Migration helpers ────────────────────────────────────────────────
 
-function migrateAssociationV1toV3(
-  a: Record<string, unknown>,
-): AssociationResponse {
+function migrateAssociationV1toV3(a: Record<string, unknown>): AssociationResponse {
   return {
     response: (a.response as string) ?? "",
     reactionTimeMs: (a.reactionTimeMs as number) ?? 0,
@@ -49,15 +47,11 @@ function migrateAssociationV1toV3(
  * Migrate any raw session object to v3 (current).
  */
 function migrateSessionToV3(raw: Record<string, unknown>): SessionResult {
-  const trials = ((raw.trials as Array<Record<string, unknown>>) ?? []).map(
-    (t) => ({
-      stimulus: t.stimulus as SessionResult["trials"][0]["stimulus"],
-      association: migrateAssociationV1toV3(
-        t.association as Record<string, unknown>,
-      ),
-      isPractice: (t.isPractice as boolean) ?? false,
-    }),
-  );
+  const trials = ((raw.trials as Array<Record<string, unknown>>) ?? []).map((t) => ({
+    stimulus: t.stimulus as SessionResult["trials"][0]["stimulus"],
+    association: migrateAssociationV1toV3(t.association as Record<string, unknown>),
+    isPractice: (t.isPractice as boolean) ?? false,
+  }));
 
   const config = (raw.config as Record<string, unknown>) ?? {};
 
@@ -67,9 +61,7 @@ function migrateSessionToV3(raw: Record<string, unknown>): SessionResult {
       stimulusListId: (config.stimulusListId as string) ?? "",
       stimulusListVersion: (config.stimulusListVersion as string) ?? "",
       maxResponseTimeMs: (config.maxResponseTimeMs as number) ?? 0,
-      orderPolicy: ((config.orderPolicy as string) ?? "fixed") as
-        | "fixed"
-        | "seeded",
+      orderPolicy: ((config.orderPolicy as string) ?? "fixed") as "fixed" | "seeded",
       seed: (config.seed as number) ?? null,
     },
     trials,
@@ -80,10 +72,8 @@ function migrateSessionToV3(raw: Record<string, unknown>): SessionResult {
     stimulusOrder:
       (raw.stimulusOrder as string[]) ??
       trials.filter((t) => !t.isPractice).map((t) => t.stimulus.word),
-    provenanceSnapshot:
-      (raw.provenanceSnapshot as SessionResult["provenanceSnapshot"]) ?? null,
-    sessionFingerprint:
-      (raw.sessionFingerprint as string | null) ?? null,
+    provenanceSnapshot: (raw.provenanceSnapshot as SessionResult["provenanceSnapshot"]) ?? null,
+    sessionFingerprint: (raw.sessionFingerprint as string | null) ?? null,
   };
 }
 
@@ -128,10 +118,7 @@ function readEnvelope(): StorageEnvelope {
 
     // Versioned envelope — migrate if needed
     if (parsed.schemaVersion < CURRENT_SCHEMA_VERSION) {
-      const migrated = migrateSessions(
-        parsed.sessions,
-        parsed.schemaVersion,
-      );
+      const migrated = migrateSessions(parsed.sessions, parsed.schemaVersion);
       const envelope: StorageEnvelope = {
         schemaVersion: CURRENT_SCHEMA_VERSION,
         sessions: migrated,

@@ -3,13 +3,7 @@
  * No I/O, no side-effects.
  */
 
-import type {
-  Trial,
-  SessionScoring,
-  TrialFlag,
-  FlagKind,
-  SessionSummary,
-} from "./types";
+import type { Trial, SessionScoring, TrialFlag, FlagKind, SessionSummary } from "./types";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -20,9 +14,7 @@ function sortedCopy(values: number[]): number[] {
 function median(sorted: number[]): number {
   if (sorted.length === 0) return 0;
   const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid];
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 }
 
 function mean(values: number[]): number {
@@ -157,22 +149,13 @@ export function scoreSession(trials: Trial[]): SessionScoring {
     meanReactionTimeMs: round2(mean(allTimes)),
     medianReactionTimeMs: round2(median(sortedTimes)),
     stdDevReactionTimeMs: round2(stdDev(allTimes, mean(allTimes))),
-    emptyResponseCount: trialFlags.filter((f) =>
-      f.flags.includes("empty_response"),
-    ).length,
-    repeatedResponseCount: trialFlags.filter((f) =>
-      f.flags.includes("repeated_response"),
-    ).length,
+    emptyResponseCount: trialFlags.filter((f) => f.flags.includes("empty_response")).length,
+    repeatedResponseCount: trialFlags.filter((f) => f.flags.includes("repeated_response")).length,
     timingOutlierCount: trialFlags.filter(
-      (f) =>
-        f.flags.includes("timing_outlier_slow") ||
-        f.flags.includes("timing_outlier_fast"),
+      (f) => f.flags.includes("timing_outlier_slow") || f.flags.includes("timing_outlier_fast"),
     ).length,
-    highEditingCount: trialFlags.filter((f) =>
-      f.flags.includes("high_editing"),
-    ).length,
-    timeoutCount: trialFlags.filter((f) => f.flags.includes("timeout"))
-      .length,
+    highEditingCount: trialFlags.filter((f) => f.flags.includes("high_editing")).length,
+    timeoutCount: trialFlags.filter((f) => f.flags.includes("timeout")).length,
   };
 
   return { trialFlags, summary };

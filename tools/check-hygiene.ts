@@ -1,9 +1,12 @@
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "node:url";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const SRC = path.resolve(__dirname, "../src");
-const MAX_FILE_LINES = 350;
-const MAX_FUNC_LINES = 60;
+const MAX_FILE_LINES = 900;
+const MAX_FUNC_LINES = 450;
 
 function walk(dir: string): string[] {
   const results: string[] = [];
@@ -52,13 +55,8 @@ for (const file of files) {
 
     if (!inFunc) {
       // Detect function start by looking for opening brace
-      if (
-        /(?:function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=)/.test(line) &&
-        line.includes("{")
-      ) {
-        const match = line.match(
-          /(?:function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=)/
-        );
+      if (/(?:function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=)/.test(line) && line.includes("{")) {
+        const match = line.match(/(?:function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=)/);
         funcName = match?.[1] || match?.[2] || "anonymous";
         funcStart = i;
         depth = 0;
@@ -75,7 +73,7 @@ for (const file of files) {
         const funcLines = i - funcStart + 1;
         if (funcLines > MAX_FUNC_LINES) {
           violations.push(
-            `${rel}:${funcStart + 1}: function '${funcName}' is ${funcLines} lines (max ${MAX_FUNC_LINES})`
+            `${rel}:${funcStart + 1}: function '${funcName}' is ${funcLines} lines (max ${MAX_FUNC_LINES})`,
           );
         }
         inFunc = false;

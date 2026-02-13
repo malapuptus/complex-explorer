@@ -39,9 +39,7 @@ export interface StimulusListValidationError {
 /**
  * Validate a stimulus list. Returns an array of errors (empty = valid).
  */
-export function validateStimulusList(
-  list: Partial<StimulusList>,
-): StimulusListValidationError[] {
+export function validateStimulusList(list: Partial<StimulusList>): StimulusListValidationError[] {
   const errors: StimulusListValidationError[] = [];
 
   if (!list.id || list.id.trim() === "") {
@@ -94,9 +92,7 @@ export function validateStimulusList(
       message: "words must be a non-empty array",
     });
   } else {
-    const blanks = list.words.filter(
-      (w) => typeof w !== "string" || w.trim() === "",
-    );
+    const blanks = list.words.filter((w) => typeof w !== "string" || w.trim() === "");
     if (blanks.length > 0) {
       errors.push({
         field: "words",
