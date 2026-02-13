@@ -52,13 +52,23 @@ function migrateSessionV1toV2(raw: Record<string, unknown>): SessionResult {
     }),
   );
 
+  const config = raw.config as Record<string, unknown>;
+
   return {
     id: raw.id as string,
-    config: raw.config as SessionResult["config"],
+    config: {
+      stimulusListId: (config.stimulusListId as string) ?? "",
+      stimulusListVersion: (config.stimulusListVersion as string) ?? "",
+      maxResponseTimeMs: (config.maxResponseTimeMs as number) ?? 0,
+      orderPolicy: ((config.orderPolicy as string) ?? "fixed") as "fixed" | "seeded",
+      seed: (config.seed as number) ?? null,
+    },
     trials,
     startedAt: raw.startedAt as string,
     completedAt: raw.completedAt as string,
     scoring: raw.scoring as SessionResult["scoring"],
+    seedUsed: (raw.seedUsed as number) ?? null,
+    stimulusOrder: (raw.stimulusOrder as string[]) ?? trials.map((t) => t.stimulus.word),
   };
 }
 

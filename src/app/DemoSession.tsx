@@ -4,13 +4,13 @@
  */
 
 import { getStimulusList } from "@/domain";
-import type { SessionResult } from "@/domain";
+import type { SessionResult, OrderPolicy } from "@/domain";
 import { localStorageSessionStore } from "@/infra";
 import { useSession } from "./useSession";
 import { TrialView } from "./TrialView";
 import { ResultsView } from "./ResultsView";
 import { ProtocolScreen } from "./ProtocolScreen";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -20,8 +20,11 @@ const PRACTICE_WORDS = ["sun", "table", "road"];
 
 export function DemoSession() {
   const list = getStimulusList("demo-10", "1.0.0")!;
+  const [orderPolicy, setOrderPolicy] = useState<OrderPolicy>("fixed");
+
   const session = useSession(list.words as string[], {
     practiceWords: PRACTICE_WORDS,
+    orderPolicy,
   });
   const savedRef = useRef(false);
 
@@ -34,15 +37,19 @@ export function DemoSession() {
           stimulusListId: list.id,
           stimulusListVersion: list.version,
           maxResponseTimeMs: 0,
+          orderPolicy,
+          seed: session.seedUsed,
         },
         trials: session.trials,
         startedAt: new Date().toISOString(),
         completedAt: new Date().toISOString(),
         scoring: session.scoring,
+        seedUsed: session.seedUsed,
+        stimulusOrder: session.stimulusOrder,
       };
       localStorageSessionStore.save(result);
     }
-  }, [session.phase, session.scoring, session.trials, list]);
+  }, [session.phase, session.scoring, session.trials, list, orderPolicy, session.seedUsed, session.stimulusOrder]);
 
   const handleReset = () => {
     savedRef.current = false;
@@ -56,7 +63,19 @@ export function DemoSession() {
         practiceCount={PRACTICE_WORDS.length}
         source={list.source}
         onReady={session.start}
-      />
+      >
+        <div className="flex items-center gap-3">
+          <label className="text-sm text-muted-foreground">Word order:</label>
+          <select
+            value={orderPolicy}
+            onChange={(e) => setOrderPolicy(e.target.value as OrderPolicy)}
+            className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
+          >
+            <option value="fixed">Fixed</option>
+            <option value="seeded">Randomized</option>
+          </select>
+        </div>
+      </ProtocolScreen>
     );
   }
 

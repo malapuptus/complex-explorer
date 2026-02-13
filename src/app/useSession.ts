@@ -3,15 +3,24 @@
  * Pure React state; no persistence, no network.
  */
 
-import { useState, useCallback, useRef } from "react";
-import type { Trial, StimulusWord, SessionScoring } from "@/domain";
-import { scoreSession } from "@/domain";
+import { useState, useCallback, useRef, useMemo } from "react";
+import type {
+  Trial,
+  StimulusWord,
+  SessionScoring,
+  OrderPolicy,
+} from "@/domain";
+import { scoreSession, seededShuffle, randomSeed } from "@/domain";
 
 export type SessionPhase = "idle" | "running" | "done";
 
 export interface UseSessionOptions {
   /** Words used for practice (warm-up), excluded from scoring. */
   practiceWords?: string[];
+  /** Order policy: "fixed" keeps original order, "seeded" shuffles. */
+  orderPolicy?: OrderPolicy;
+  /** Explicit seed for "seeded" policy (auto-generated if omitted). */
+  seed?: number;
 }
 
 export interface SessionState {
@@ -22,44 +31,69 @@ export interface SessionState {
   scoring: SessionScoring | null;
   /** Number of practice words at the start. */
   practiceCount: number;
+  /** The seed used for this session (null if fixed). */
+  seedUsed: number | null;
+  /** The realized scored word order (excluding practice). */
+  stimulusOrder: string[];
 }
 
 export function useSession(words: string[], options?: UseSessionOptions) {
   const practiceWords = options?.practiceWords ?? [];
-  const allWords = [...practiceWords, ...words];
+  const orderPolicy = options?.orderPolicy ?? "fixed";
   const practiceCount = practiceWords.length;
-  const stimuli: StimulusWord[] = allWords.map((word, index) => ({
-    word,
-    index,
-  }));
 
-  const [state, setState] = useState<SessionState>({
-    phase: "idle",
-    words: stimuli,
-    currentIndex: 0,
-    trials: [],
-    scoring: null,
-    practiceCount,
-  });
+  // Memoize the base stimuli list (before any shuffle)
+  const baseWords = useMemo(() => [...words], [words]);
+
+  const buildState = useCallback(
+    (phase: SessionPhase): SessionState => {
+      let scoredWords: string[];
+      let seedUsed: number | null = null;
+
+      if (orderPolicy === "seeded") {
+        seedUsed = options?.seed ?? randomSeed();
+        scoredWords = seededShuffle(baseWords, seedUsed);
+      } else {
+        scoredWords = [...baseWords];
+      }
+
+      const allWords = [...practiceWords, ...scoredWords];
+      const stimuli: StimulusWord[] = allWords.map((word, index) => ({
+        word,
+        index,
+      }));
+
+      return {
+        phase,
+        words: stimuli,
+        currentIndex: 0,
+        trials: [],
+        scoring: null,
+        practiceCount,
+        seedUsed,
+        stimulusOrder: scoredWords,
+      };
+    },
+    [baseWords, practiceWords, practiceCount, orderPolicy, options?.seed],
+  );
+
+  const [state, setState] = useState<SessionState>(() => buildState("idle"));
 
   const trialStartRef = useRef<number>(0);
 
   const start = useCallback(() => {
     trialStartRef.current = performance.now();
-    setState({
-      phase: "running",
-      words: stimuli,
-      currentIndex: 0,
-      trials: [],
-      scoring: null,
-      practiceCount,
-    });
-  }, [stimuli, practiceCount]);
+    setState(buildState("running"));
+  }, [buildState]);
 
   const submitResponse = useCallback(
     (
       response: string,
-      metrics: { tFirstKeyMs: number | null; backspaceCount: number; editCount: number },
+      metrics: {
+        tFirstKeyMs: number | null;
+        backspaceCount: number;
+        editCount: number;
+      },
     ) => {
       const now = performance.now();
       const reactionTimeMs = now - trialStartRef.current;
@@ -73,7 +107,10 @@ export function useSession(words: string[], options?: UseSessionOptions) {
           association: {
             response: response.trim(),
             reactionTimeMs: Math.round(reactionTimeMs),
-            tFirstKeyMs: metrics.tFirstKeyMs !== null ? Math.round(metrics.tFirstKeyMs) : null,
+            tFirstKeyMs:
+              metrics.tFirstKeyMs !== null
+                ? Math.round(metrics.tFirstKeyMs)
+                : null,
             backspaceCount: metrics.backspaceCount,
             editCount: metrics.editCount,
           },
@@ -89,7 +126,7 @@ export function useSession(words: string[], options?: UseSessionOptions) {
             ...prev,
             trials: newTrials,
             currentIndex: nextIndex,
-            phase: "done",
+            phase: "done" as SessionPhase,
             scoring: scoreSession(newTrials),
           };
         }
@@ -108,15 +145,8 @@ export function useSession(words: string[], options?: UseSessionOptions) {
   );
 
   const reset = useCallback(() => {
-    setState({
-      phase: "idle",
-      words: stimuli,
-      currentIndex: 0,
-      trials: [],
-      scoring: null,
-      practiceCount,
-    });
-  }, [stimuli, practiceCount]);
+    setState(buildState("idle"));
+  }, [buildState]);
 
   return {
     ...state,
