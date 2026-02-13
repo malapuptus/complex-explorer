@@ -18,6 +18,7 @@ const INSTRUCTIONS = [
   "Find a quiet environment with minimal distractions.",
   "Respond with the first word that comes to mind — don't overthink it.",
   "Type your response and press Enter to continue.",
+  "Mobile or IME input may reduce timing precision.",
 ] as const;
 
 export function ProtocolScreen({

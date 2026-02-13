@@ -27,7 +27,7 @@ interface StorageEnvelope {
 
 // ── Migration helpers ────────────────────────────────────────────────
 
-function migrateAssociationV1toV2(
+function migrateAssociationV1toV3(
   a: Record<string, unknown>,
 ): AssociationResponse {
   return {
@@ -36,6 +36,7 @@ function migrateAssociationV1toV2(
     tFirstKeyMs: (a.tFirstKeyMs as number | null) ?? null,
     backspaceCount: (a.backspaceCount as number) ?? 0,
     editCount: (a.editCount as number) ?? 0,
+    compositionCount: (a.compositionCount as number) ?? 0,
   };
 }
 
@@ -47,7 +48,7 @@ function migrateSessionToV3(raw: Record<string, unknown>): SessionResult {
   const trials = ((raw.trials as Array<Record<string, unknown>>) ?? []).map(
     (t) => ({
       stimulus: t.stimulus as SessionResult["trials"][0]["stimulus"],
-      association: migrateAssociationV1toV2(
+      association: migrateAssociationV1toV3(
         t.association as Record<string, unknown>,
       ),
       isPractice: (t.isPractice as boolean) ?? false,

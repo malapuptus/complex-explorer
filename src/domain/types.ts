@@ -23,6 +23,8 @@ export interface AssociationResponse {
   readonly backspaceCount: number;
   /** Number of net edits (character insertions + deletions). */
   readonly editCount: number;
+  /** Number of IME composition sessions during the trial. */
+  readonly compositionCount: number;
 }
 
 /** One trial = stimulus + response. */

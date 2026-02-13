@@ -93,6 +93,7 @@ export function useSession(words: string[], options?: UseSessionOptions) {
         tFirstKeyMs: number | null;
         backspaceCount: number;
         editCount: number;
+        compositionCount?: number;
       },
     ) => {
       const now = performance.now();
@@ -113,6 +114,7 @@ export function useSession(words: string[], options?: UseSessionOptions) {
                 : null,
             backspaceCount: metrics.backspaceCount,
             editCount: metrics.editCount,
+            compositionCount: metrics.compositionCount ?? 0,
           },
           isPractice,
         };
