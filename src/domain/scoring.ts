@@ -93,9 +93,9 @@ export function scoreSession(trials: Trial[]): SessionScoring {
     };
   }
 
-  // Collect reaction times for non-empty responses
+  // Collect reaction times for non-empty, non-timeout responses
   const validTimes = scoredTrials
-    .filter((t) => t.association.response.trim() !== "")
+    .filter((t) => t.association.response.trim() !== "" && !t.timedOut)
     .map((t) => t.association.reactionTimeMs);
 
   const sortedValid = sortedCopy(validTimes);
@@ -113,8 +113,11 @@ export function scoreSession(trials: Trial[]): SessionScoring {
     const resp = trial.association.response.trim().toLowerCase();
     const rt = trial.association.reactionTimeMs;
 
-    // Empty response
-    if (resp === "") {
+    // Timeout flag — distinct from empty_response
+    if (trial.timedOut) {
+      flags.push("timeout");
+    } else if (resp === "") {
+      // Empty response (user hit submit with nothing)
       flags.push("empty_response");
     } else {
       // Repeated response
@@ -168,6 +171,8 @@ export function scoreSession(trials: Trial[]): SessionScoring {
     highEditingCount: trialFlags.filter((f) =>
       f.flags.includes("high_editing"),
     ).length,
+    timeoutCount: trialFlags.filter((f) => f.flags.includes("timeout"))
+      .length,
   };
 
   return { trialFlags, summary };
@@ -183,6 +188,7 @@ function emptySummary(): SessionSummary {
     repeatedResponseCount: 0,
     timingOutlierCount: 0,
     highEditingCount: 0,
+    timeoutCount: 0,
   };
 }
 

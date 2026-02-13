@@ -8,7 +8,12 @@ function makeTrial(
   reactionTimeMs: number,
   index = 0,
   isPractice = false,
-  overrides?: { tFirstKeyMs?: number | null; backspaceCount?: number; editCount?: number },
+  overrides?: {
+    tFirstKeyMs?: number | null;
+    backspaceCount?: number;
+    editCount?: number;
+    timedOut?: boolean;
+  },
 ): Trial {
   return {
     stimulus: { word, index },
@@ -21,6 +26,7 @@ function makeTrial(
       compositionCount: 0,
     },
     isPractice,
+    timedOut: overrides?.timedOut,
   };
 }
 
@@ -234,5 +240,54 @@ describe("scoreSession", () => {
     expect(result.summary.totalTrials).toBe(1);
     // Metrics are on trial data, not scoring — just verify scoring doesn't break
     expect(result.trialFlags).toHaveLength(1);
+  });
+
+  it("flags timeout trials with 'timeout' not 'empty_response'", () => {
+    const trials = [
+      makeTrial("a", "x", 500, 0),
+      makeTrial("b", "", 8000, 1, false, { timedOut: true }),
+      makeTrial("c", "z", 600, 2),
+    ];
+    const result = scoreSession(trials);
+    const timeoutFlags = result.trialFlags.filter((f) =>
+      f.flags.includes("timeout"),
+    );
+    const emptyFlags = result.trialFlags.filter((f) =>
+      f.flags.includes("empty_response"),
+    );
+    expect(timeoutFlags).toHaveLength(1);
+    expect(timeoutFlags[0].trialIndex).toBe(1);
+    expect(emptyFlags).toHaveLength(0);
+    expect(result.summary.timeoutCount).toBe(1);
+  });
+
+  it("excludes timed-out trials from outlier RT calculations", () => {
+    const trials = [
+      makeTrial("a", "x", 500, 0),
+      makeTrial("b", "y", 510, 1),
+      makeTrial("c", "z", 490, 2),
+      makeTrial("d", "w", 505, 3),
+      makeTrial("e", "v", 495, 4),
+      makeTrial("f", "", 8000, 5, false, { timedOut: true }),
+    ];
+    const result = scoreSession(trials);
+    // The timeout trial should NOT cause other trials to be flagged as outliers
+    const slow = result.trialFlags.filter((f) =>
+      f.flags.includes("timing_outlier_slow"),
+    );
+    expect(slow).toHaveLength(0);
+  });
+
+  it("user-submitted empty is empty_response, not timeout", () => {
+    const trials = [
+      makeTrial("a", "", 500, 0, false),
+      makeTrial("b", "y", 600, 1),
+    ];
+    const result = scoreSession(trials);
+    expect(
+      result.trialFlags[0].flags.includes("empty_response"),
+    ).toBe(true);
+    expect(result.trialFlags[0].flags.includes("timeout")).toBe(false);
+    expect(result.summary.timeoutCount).toBe(0);
   });
 });

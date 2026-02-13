@@ -26,6 +26,8 @@ const FLAG_TEMPLATES: Record<FlagKind, (words: string) => string> = {
     `You gave the same response for "${w}" as an earlier word. What connection do you notice between them?`,
   high_editing: (w) =>
     `You edited your response to "${w}" several times. What were you weighing?`,
+  timeout: (w) =>
+    `Time ran out on "${w}" before you responded. What was going through your mind?`,
 };
 
 /**
