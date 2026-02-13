@@ -1,6 +1,35 @@
 import { useMemo, useCallback, useState } from "react";
-import type { Trial, TrialFlag, OrderPolicy } from "@/domain";
+import type { Trial, TrialFlag, OrderPolicy, SessionScoring } from "@/domain";
 import { generateReflectionPrompts, sessionTrialsToCsv } from "@/domain";
+
+/** Self-contained research bundle for offline reproducibility. */
+interface ResearchBundle {
+  sessionResult: {
+    id: string;
+    config: {
+      stimulusListId: string;
+      stimulusListVersion: string;
+      orderPolicy: string;
+      seed: number | null;
+      trialTimeoutMs?: number;
+      breakEveryN?: number;
+    };
+    trials: Trial[];
+    scoring: {
+      trialFlags: TrialFlag[];
+      summary: { meanReactionTimeMs: number; medianReactionTimeMs: number };
+    };
+    sessionFingerprint: string | null;
+  };
+  protocolDocVersion: string;
+  appVersion: string | null;
+  scoringAlgorithm: string;
+  exportedAt: string;
+}
+
+const PROTOCOL_DOC_VERSION = "PROTOCOL.md@2026-02-13";
+const SCORING_ALGORITHM =
+  "MAD-modified-z@3.5 + fast<200ms + timeout excluded";
 
 interface Props {
   trials: Trial[];
@@ -212,25 +241,76 @@ export function ResultsView({
         </div>
       )}
 
-      <div className="mt-6 flex gap-3">
+      <div className="mt-6 flex flex-wrap gap-3">
         {csvMeta && (
-          <button
-            onClick={() => {
-              const csv = sessionTrialsToCsv(
-                trials,
-                trialFlags,
-                csvMeta.sessionId,
-                csvMeta.packId,
-                csvMeta.packVersion,
-                csvMeta.seed,
-                csvMeta.sessionFingerprint,
-              );
-              downloadFile(csv, "text/csv", `session-${csvMeta.sessionId}.csv`);
-            }}
-            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
-          >
-            Export CSV
-          </button>
+          <>
+            <button
+              onClick={() => {
+                const csv = sessionTrialsToCsv(
+                  trials,
+                  trialFlags,
+                  csvMeta.sessionId,
+                  csvMeta.packId,
+                  csvMeta.packVersion,
+                  csvMeta.seed,
+                  csvMeta.sessionFingerprint,
+                );
+                downloadFile(csv, "text/csv", `session-${csvMeta.sessionId}.csv`);
+              }}
+              className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+            >
+              Export CSV
+            </button>
+            <button
+              onClick={() => {
+                const bundle: ResearchBundle = {
+                  sessionResult: {
+                    id: csvMeta.sessionId,
+                    config: {
+                      stimulusListId: csvMeta.packId,
+                      stimulusListVersion: csvMeta.packVersion,
+                      orderPolicy: csvMeta.orderPolicy ?? "fixed",
+                      seed: csvMeta.seed,
+                      ...(csvMeta.trialTimeoutMs !== undefined && {
+                        trialTimeoutMs: csvMeta.trialTimeoutMs,
+                      }),
+                      ...(csvMeta.breakEveryN !== undefined && {
+                        breakEveryN: csvMeta.breakEveryN,
+                      }),
+                    },
+                    trials,
+                    scoring: {
+                      trialFlags,
+                      summary: { meanReactionTimeMs, medianReactionTimeMs },
+                    },
+                    sessionFingerprint: csvMeta.sessionFingerprint ?? null,
+                  },
+                  protocolDocVersion: PROTOCOL_DOC_VERSION,
+                  appVersion: null,
+                  scoringAlgorithm: SCORING_ALGORITHM,
+                  exportedAt: new Date().toISOString(),
+                };
+                const fp = csvMeta.sessionFingerprint?.slice(0, 8) ?? "";
+                const seedPart = csvMeta.seed != null ? `seed${csvMeta.seed}` : "noseed";
+                const datePart = new Date().toISOString().slice(0, 10);
+                const filename = [
+                  "bundle",
+                  datePart,
+                  csvMeta.packId,
+                  seedPart,
+                  ...(fp ? [fp] : []),
+                ].join("-") + ".json";
+                downloadFile(
+                  JSON.stringify(bundle, null, 2),
+                  "application/json",
+                  filename,
+                );
+              }}
+              className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+            >
+              Export Research Bundle
+            </button>
+          </>
         )}
         <button
           onClick={onReset}
