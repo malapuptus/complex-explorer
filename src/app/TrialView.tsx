@@ -4,10 +4,19 @@ interface Props {
   word: string;
   index: number;
   total: number;
+  isPractice?: boolean;
+  practiceCount?: number;
   onSubmit: (response: string) => void;
 }
 
-export function TrialView({ word, index, total, onSubmit }: Props) {
+export function TrialView({
+  word,
+  index,
+  total,
+  isPractice,
+  practiceCount = 0,
+  onSubmit,
+}: Props) {
   const [value, setValue] = useState("");
 
   const handleSubmit = (e: FormEvent) => {
@@ -16,11 +25,20 @@ export function TrialView({ word, index, total, onSubmit }: Props) {
     setValue("");
   };
 
+  const displayIndex = isPractice
+    ? `Practice ${index + 1} / ${practiceCount}`
+    : `${index - practiceCount + 1} / ${total - practiceCount}`;
+
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8">
-      <p className="text-sm text-muted-foreground">
-        {index + 1} / {total}
-      </p>
+      <div className="flex flex-col items-center gap-1">
+        {isPractice && (
+          <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Warm-up
+          </span>
+        )}
+        <p className="text-sm text-muted-foreground">{displayIndex}</p>
+      </div>
       <h2 className="text-5xl font-bold tracking-tight text-foreground">
         {word}
       </h2>

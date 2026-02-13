@@ -16,9 +16,13 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+const PRACTICE_WORDS = ["sun", "table", "road"];
+
 export function DemoSession() {
   const list = getStimulusList("demo-10", "1.0.0")!;
-  const session = useSession(list.words as string[]);
+  const session = useSession(list.words as string[], {
+    practiceWords: PRACTICE_WORDS,
+  });
   const savedRef = useRef(false);
 
   useEffect(() => {
@@ -49,6 +53,7 @@ export function DemoSession() {
     return (
       <ProtocolScreen
         wordCount={list.words.length}
+        practiceCount={PRACTICE_WORDS.length}
         source={list.source}
         onReady={session.start}
       />
@@ -56,20 +61,24 @@ export function DemoSession() {
   }
 
   if (session.phase === "running" && session.currentWord) {
+    const isPractice = session.currentIndex < session.practiceCount;
     return (
       <TrialView
         word={session.currentWord.word}
         index={session.currentIndex}
         total={session.words.length}
+        isPractice={isPractice}
+        practiceCount={session.practiceCount}
         onSubmit={session.submitResponse}
       />
     );
   }
 
   if (session.phase === "done" && session.scoring) {
+    const scoredTrials = session.trials.filter((t) => !t.isPractice);
     return (
       <ResultsView
-        trials={session.trials}
+        trials={scoredTrials}
         trialFlags={session.scoring.trialFlags}
         meanReactionTimeMs={session.scoring.summary.meanReactionTimeMs}
         medianReactionTimeMs={session.scoring.summary.medianReactionTimeMs}

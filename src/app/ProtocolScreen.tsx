@@ -5,6 +5,7 @@
 
 interface ProtocolScreenProps {
   wordCount: number;
+  practiceCount: number;
   source: string;
   onReady: () => void;
 }
@@ -18,6 +19,7 @@ const INSTRUCTIONS = [
 
 export function ProtocolScreen({
   wordCount,
+  practiceCount,
   source,
   onReady,
 }: ProtocolScreenProps) {
@@ -29,9 +31,11 @@ export function ProtocolScreen({
 
       <div className="max-w-lg space-y-4">
         <p className="text-center text-muted-foreground">
-          You'll see <strong className="text-foreground">{wordCount}</strong>{" "}
-          words, one at a time. For each word, type the first association that
-          comes to mind.
+          You'll start with{" "}
+          <strong className="text-foreground">{practiceCount}</strong> warm-up
+          words, then see{" "}
+          <strong className="text-foreground">{wordCount}</strong> scored words.
+          For each word, type the first association that comes to mind.
         </p>
 
         <ul className="space-y-2 rounded-md border border-border bg-muted/40 p-4">

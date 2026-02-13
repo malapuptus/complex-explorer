@@ -7,10 +7,12 @@ function makeTrial(
   response: string,
   reactionTimeMs: number,
   index = 0,
+  isPractice = false,
 ): Trial {
   return {
     stimulus: { word, index },
     association: { response, reactionTimeMs },
+    isPractice,
   };
 }
 
@@ -103,5 +105,41 @@ describe("scoreSession", () => {
     const r1 = scoreSession(trials);
     const r2 = scoreSession(trials);
     expect(r1).toEqual(r2);
+  });
+
+  it("excludes practice trials from scoring", () => {
+    const trials = [
+      makeTrial("sun", "bright", 800, 0, true),
+      makeTrial("table", "chair", 900, 1, true),
+      makeTrial("road", "car", 1000, 2, true),
+      makeTrial("tree", "leaf", 500, 3, false),
+      makeTrial("house", "home", 600, 4, false),
+    ];
+    const result = scoreSession(trials);
+    expect(result.summary.totalTrials).toBe(2);
+    expect(result.trialFlags).toHaveLength(2);
+  });
+
+  it("returns empty scoring when all trials are practice", () => {
+    const trials = [
+      makeTrial("sun", "bright", 500, 0, true),
+      makeTrial("table", "chair", 600, 1, true),
+    ];
+    const result = scoreSession(trials);
+    expect(result.summary.totalTrials).toBe(0);
+    expect(result.trialFlags).toHaveLength(0);
+  });
+
+  it("does not flag practice trial repeats in scored trials", () => {
+    const trials = [
+      makeTrial("sun", "green", 500, 0, true),
+      makeTrial("tree", "green", 500, 1, false),
+      makeTrial("house", "blue", 600, 2, false),
+    ];
+    const result = scoreSession(trials);
+    const repeated = result.trialFlags.filter((f) =>
+      f.flags.includes("repeated_response"),
+    );
+    expect(repeated).toHaveLength(0);
   });
 });
