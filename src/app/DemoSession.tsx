@@ -208,7 +208,9 @@ export function DemoSession() {
         total={session.words.length}
         isPractice={isPractice}
         practiceCount={session.practiceCount}
+        trialTimeoutMs={session.trialTimeoutMs}
         onSubmit={session.submitResponse}
+        onTimeout={session.handleTimeout}
       />
     );
   }

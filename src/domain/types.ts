@@ -33,6 +33,8 @@ export interface Trial {
   readonly association: AssociationResponse;
   /** If true, this trial is a warm-up and excluded from scoring. */
   readonly isPractice: boolean;
+  /** If true, the trial ended via timeout rather than user submission. */
+  readonly timedOut?: boolean;
 }
 
 /** Order policy for stimulus presentation. */
@@ -98,7 +100,8 @@ export type FlagKind =
   | "timing_outlier_fast"
   | "empty_response"
   | "repeated_response"
-  | "high_editing";
+  | "high_editing"
+  | "timeout";
 
 export interface SessionSummary {
   readonly totalTrials: number;
@@ -109,4 +112,5 @@ export interface SessionSummary {
   readonly repeatedResponseCount: number;
   readonly timingOutlierCount: number;
   readonly highEditingCount: number;
+  readonly timeoutCount: number;
 }

@@ -1,4 +1,11 @@
-import { useState, useRef, useCallback, type FormEvent, type KeyboardEvent } from "react";
+import {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 
 export interface TrialMetrics {
   tFirstKeyMs: number | null;
@@ -13,7 +20,11 @@ interface Props {
   total: number;
   isPractice?: boolean;
   practiceCount?: number;
+  /** Per-trial timeout in ms. Undefined = no timeout. */
+  trialTimeoutMs?: number;
   onSubmit: (response: string, metrics: TrialMetrics) => void;
+  /** Called when timeout fires instead of user submit. */
+  onTimeout?: (metrics: TrialMetrics) => void;
 }
 
 export function TrialView({
@@ -22,7 +33,9 @@ export function TrialView({
   total,
   isPractice,
   practiceCount = 0,
+  trialTimeoutMs,
   onSubmit,
+  onTimeout,
 }: Props) {
   const [value, setValue] = useState("");
   const tFirstKeyRef = useRef<number | null>(null);
@@ -44,6 +57,24 @@ export function TrialView({
     trialStartRef.current = performance.now();
   }
 
+  // Timeout effect
+  useEffect(() => {
+    if (!trialTimeoutMs || !onTimeout) return;
+    const timer = setTimeout(() => {
+      const metrics: TrialMetrics = {
+        tFirstKeyMs: tFirstKeyRef.current,
+        backspaceCount: backspaceRef.current,
+        editCount: editRef.current,
+        compositionCount: compositionRef.current,
+      };
+      onTimeout(metrics);
+      setValue("");
+    }, trialTimeoutMs);
+    return () => clearTimeout(timer);
+    // Re-run when word changes (new trial)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [word, trialTimeoutMs, onTimeout]);
+
   const markFirstInput = useCallback(() => {
     if (tFirstKeyRef.current === null) {
       tFirstKeyRef.current = performance.now() - trialStartRef.current;
@@ -53,7 +84,6 @@ export function TrialView({
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Enter") return;
-      // During IME composition, keydown fires synthetic events — skip timing
       if (!composingRef.current) {
         markFirstInput();
       }
@@ -66,7 +96,6 @@ export function TrialView({
   );
 
   const handleBeforeInput = useCallback(() => {
-    // beforeinput fires for real text insertion even when keydown doesn't (mobile/IME)
     markFirstInput();
   }, [markFirstInput]);
 
@@ -118,7 +147,9 @@ export function TrialView({
           <div className="mt-1 h-1.5 w-48 overflow-hidden rounded-full bg-muted">
             <div
               className="h-full rounded-full bg-primary transition-all duration-200"
-              style={{ width: `${((scoredIndex ?? 0) / scoredTotal) * 100}%` }}
+              style={{
+                width: `${((scoredIndex ?? 0) / scoredTotal) * 100}%`,
+              }}
             />
           </div>
         )}
@@ -126,7 +157,10 @@ export function TrialView({
       <h2 className="text-5xl font-bold tracking-tight text-foreground">
         {word}
       </h2>
-      <form onSubmit={handleSubmit} className="flex flex-col items-center gap-4">
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col items-center gap-4"
+      >
         <input
           autoFocus
           type="text"

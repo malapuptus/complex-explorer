@@ -21,6 +21,8 @@ export interface UseSessionOptions {
   orderPolicy?: OrderPolicy;
   /** Explicit seed for "seeded" policy (auto-generated if omitted). */
   seed?: number;
+  /** Per-trial timeout in ms. Undefined = no timeout. */
+  trialTimeoutMs?: number;
 }
 
 export interface SessionState {
@@ -35,12 +37,15 @@ export interface SessionState {
   seedUsed: number | null;
   /** The realized scored word order (excluding practice). */
   stimulusOrder: string[];
+  /** Per-trial timeout in ms (undefined = no timeout). */
+  trialTimeoutMs?: number;
 }
 
 export function useSession(words: string[], options?: UseSessionOptions) {
   const practiceWords = options?.practiceWords ?? [];
   const orderPolicy = options?.orderPolicy ?? "fixed";
   const practiceCount = practiceWords.length;
+  const trialTimeoutMs = options?.trialTimeoutMs;
 
   // Memoize the base stimuli list (before any shuffle)
   const baseWords = useMemo(() => [...words], [words]);
@@ -72,9 +77,17 @@ export function useSession(words: string[], options?: UseSessionOptions) {
         practiceCount,
         seedUsed,
         stimulusOrder: scoredWords,
+        trialTimeoutMs,
       };
     },
-    [baseWords, practiceWords, practiceCount, orderPolicy, options?.seed],
+    [
+      baseWords,
+      practiceWords,
+      practiceCount,
+      orderPolicy,
+      options?.seed,
+      trialTimeoutMs,
+    ],
   );
 
   const [state, setState] = useState<SessionState>(() => buildState("idle"));
@@ -86,7 +99,7 @@ export function useSession(words: string[], options?: UseSessionOptions) {
     setState(buildState("running"));
   }, [buildState]);
 
-  const submitResponse = useCallback(
+  const advanceTrial = useCallback(
     (
       response: string,
       metrics: {
@@ -95,9 +108,12 @@ export function useSession(words: string[], options?: UseSessionOptions) {
         editCount: number;
         compositionCount?: number;
       },
+      timedOut: boolean,
     ) => {
       const now = performance.now();
-      const reactionTimeMs = now - trialStartRef.current;
+      const reactionTimeMs = timedOut
+        ? (trialTimeoutMs ?? now - trialStartRef.current)
+        : now - trialStartRef.current;
 
       setState((prev) => {
         if (prev.phase !== "running") return prev;
@@ -117,6 +133,7 @@ export function useSession(words: string[], options?: UseSessionOptions) {
             compositionCount: metrics.compositionCount ?? 0,
           },
           isPractice,
+          timedOut: timedOut || undefined,
         };
 
         const newTrials = [...prev.trials, trial];
@@ -143,7 +160,34 @@ export function useSession(words: string[], options?: UseSessionOptions) {
         };
       });
     },
-    [],
+    [trialTimeoutMs],
+  );
+
+  const submitResponse = useCallback(
+    (
+      response: string,
+      metrics: {
+        tFirstKeyMs: number | null;
+        backspaceCount: number;
+        editCount: number;
+        compositionCount?: number;
+      },
+    ) => {
+      advanceTrial(response, metrics, false);
+    },
+    [advanceTrial],
+  );
+
+  const handleTimeout = useCallback(
+    (metrics: {
+      tFirstKeyMs: number | null;
+      backspaceCount: number;
+      editCount: number;
+      compositionCount?: number;
+    }) => {
+      advanceTrial("", metrics, true);
+    },
+    [advanceTrial],
   );
 
   const reset = useCallback(() => {
@@ -158,6 +202,7 @@ export function useSession(words: string[], options?: UseSessionOptions) {
         : null,
     start,
     submitResponse,
+    handleTimeout,
     reset,
   };
 }
