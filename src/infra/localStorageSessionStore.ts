@@ -9,10 +9,13 @@ import type {
   SessionResult,
   AssociationResponse,
   DraftSession,
+  DraftLock,
 } from "@/domain";
+import { DRAFT_LOCK_TTL_MS } from "@/domain";
 
 const STORAGE_KEY = "complex-mapper-sessions";
 const DRAFT_KEY = "complex-mapper-draft";
+const DRAFT_LOCK_KEY = "complex-mapper-draft-lock";
 
 /**
  * Current schema version. Bump when SessionResult shape changes.
@@ -186,6 +189,30 @@ function removeDraft(): void {
   localStorage.removeItem(DRAFT_KEY);
 }
 
+// ── Draft lock I/O ───────────────────────────────────────────────────
+
+function readLock(): DraftLock | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_LOCK_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as DraftLock;
+  } catch {
+    return null;
+  }
+}
+
+function writeLock(lock: DraftLock): void {
+  localStorage.setItem(DRAFT_LOCK_KEY, JSON.stringify(lock));
+}
+
+function removeLock(): void {
+  localStorage.removeItem(DRAFT_LOCK_KEY);
+}
+
+function isLockExpired(lock: DraftLock): boolean {
+  return Date.now() - lock.acquiredAtMs >= DRAFT_LOCK_TTL_MS;
+}
+
 // ── Store implementation ─────────────────────────────────────────────
 
 export const localStorageSessionStore: SessionStore = {
@@ -237,5 +264,28 @@ export const localStorageSessionStore: SessionStore = {
 
   async deleteDraft(): Promise<void> {
     removeDraft();
+  },
+
+  acquireDraftLock(tabId: string): boolean {
+    const existing = readLock();
+    if (!existing || existing.tabId === tabId || isLockExpired(existing)) {
+      writeLock({ tabId, acquiredAtMs: Date.now() });
+      return true;
+    }
+    return false;
+  },
+
+  releaseDraftLock(tabId: string): void {
+    const existing = readLock();
+    if (existing && existing.tabId === tabId) {
+      removeLock();
+    }
+  },
+
+  isDraftLockedByOther(tabId: string): boolean {
+    const existing = readLock();
+    if (!existing) return false;
+    if (existing.tabId === tabId) return false;
+    return !isLockExpired(existing);
   },
 };

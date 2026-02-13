@@ -17,10 +17,14 @@ import { ResultsView } from "./ResultsView";
 import { ProtocolScreen } from "./ProtocolScreen";
 import type { AdvancedConfig } from "./ProtocolScreen";
 import { BreakScreen } from "./BreakScreen";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function generateTabId(): string {
+  return `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 const PRACTICE_WORDS = ["sun", "table", "road"];
@@ -66,7 +70,9 @@ export function DemoSession() {
   const lastBreakAtRef = useRef(0);
   const [pendingDraft, setPendingDraft] = useState<DraftSession | null>(null);
   const [draftChecked, setDraftChecked] = useState(false);
+  const [draftLocked, setDraftLocked] = useState(false);
   const draftIdRef = useRef(generateId());
+  const tabIdRef = useRef(generateTabId());
 
   const selectedOption = packOptions.find(
     (p) => `${p.id}@${p.version}` === selectedPackKey,
@@ -116,6 +122,8 @@ export function DemoSession() {
       breakEveryN,
     };
     localStorageSessionStore.saveDraft(draft);
+    // Refresh lock TTL on each autosave
+    localStorageSessionStore.acquireDraftLock(tabIdRef.current);
   }, [
     session.phase,
     session.trials,
@@ -133,6 +141,7 @@ export function DemoSession() {
     if (session.phase === "done" && session.scoring && !savedRef.current) {
       savedRef.current = true;
       localStorageSessionStore.deleteDraft();
+      localStorageSessionStore.releaseDraftLock(tabIdRef.current);
       const provSnapshot: ProvenanceSnapshot = {
         listId: list.id,
         listVersion: list.version,
@@ -179,6 +188,13 @@ export function DemoSession() {
 
   const handleResume = useCallback(() => {
     if (!pendingDraft) return;
+
+    // Acquire lock before resuming
+    const acquired = localStorageSessionStore.acquireDraftLock(tabIdRef.current);
+    if (!acquired) {
+      setDraftLocked(true);
+      return;
+    }
     const draftList = getStimulusList(
       pendingDraft.stimulusListId,
       pendingDraft.stimulusListVersion,
@@ -219,11 +235,19 @@ export function DemoSession() {
 
   const handleDiscard = useCallback(() => {
     localStorageSessionStore.deleteDraft();
+    localStorageSessionStore.releaseDraftLock(tabIdRef.current);
     setPendingDraft(null);
+    setDraftLocked(false);
   }, []);
 
   const handleStart = useCallback(
     (config: AdvancedConfig) => {
+      // Acquire lock before starting
+      const acquired = localStorageSessionStore.acquireDraftLock(tabIdRef.current);
+      if (!acquired) {
+        setDraftLocked(true);
+        return;
+      }
       setActiveConfig(config);
       const overrides: StartOverrides = {
         orderPolicy: config.orderPolicy,
@@ -242,8 +266,18 @@ export function DemoSession() {
     draftIdRef.current = generateId();
     setOnBreak(false);
     setActiveConfig(null);
+    setDraftLocked(false);
+    localStorageSessionStore.releaseDraftLock(tabIdRef.current);
     session.reset();
   };
+
+  // Release lock on unmount
+  useEffect(() => {
+    const tabId = tabIdRef.current;
+    return () => {
+      localStorageSessionStore.releaseDraftLock(tabId);
+    };
+  }, []);
 
   if (!draftChecked) return null;
 
@@ -273,6 +307,12 @@ export function DemoSession() {
             )}
           </p>
         </div>
+        {draftLocked && (
+          <p className="max-w-md text-center text-sm text-destructive">
+            A session is active in another tab. Close it or wait 2
+            minutes.
+          </p>
+        )}
         <div className="flex gap-3">
           <button
             onClick={handleResume}
@@ -302,6 +342,12 @@ export function DemoSession() {
         isLongPack={isLongPack}
         onReady={handleStart}
       >
+        {draftLocked && (
+          <p className="text-center text-sm text-destructive">
+            A session is active in another tab. Close it or wait 2
+            minutes.
+          </p>
+        )}
         <div className="flex flex-col items-center gap-3">
           <div className="flex items-center gap-3">
             <label className="text-sm text-muted-foreground">
