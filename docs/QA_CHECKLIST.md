@@ -82,6 +82,7 @@
 | 7.4 | Click **Export CSV** (all sessions) | CSV contains rows from all stored sessions |
 | 7.5 | Verify no diagnostic language in exports | No clinical terms, no interpretation text |
 | 7.6 | On results screen, verify reproducibility bundle shows fingerprint, pack, seed, order policy | All values match the export JSON; Copy button copies the bundle text |
+| 7.7 | Click **Export Research Bundle** on results screen | JSON file downloads; contains `sessionResult`, `protocolDocVersion`, `scoringAlgorithm`, `exportedAt`; fingerprint and repro fields match the UI |
 
 ## 8. Delete My Data
 
