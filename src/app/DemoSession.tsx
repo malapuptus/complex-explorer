@@ -368,6 +368,12 @@ export function DemoSession() {
           session.scoring.summary.medianReactionTimeMs
         }
         onReset={handleReset}
+        csvMeta={{
+          sessionId: draftIdRef.current,
+          packId: list.id,
+          packVersion: list.version,
+          seed: session.seedUsed,
+        }}
       />
     );
   }

@@ -16,6 +16,8 @@ export type { SessionStore, SessionListEntry, DraftSession } from "./sessionStor
 
 export { scoreSession } from "./scoring";
 
+export { sessionTrialsToCsv, sessionResultsToCsv } from "./csvExport";
+
 export type { ReflectionPrompt } from "./reflection";
 export { generateReflectionPrompts } from "./reflection";
 

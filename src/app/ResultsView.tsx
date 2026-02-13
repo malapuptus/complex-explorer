@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import type { Trial, TrialFlag } from "@/domain";
-import { generateReflectionPrompts } from "@/domain";
+import { generateReflectionPrompts, sessionTrialsToCsv } from "@/domain";
 
 interface Props {
   trials: Trial[];
@@ -8,6 +8,13 @@ interface Props {
   meanReactionTimeMs: number;
   medianReactionTimeMs: number;
   onReset: () => void;
+  /** Metadata needed for CSV export. If omitted, CSV button is hidden. */
+  csvMeta?: {
+    sessionId: string;
+    packId: string;
+    packVersion: string;
+    seed: number | null;
+  };
 }
 
 export function ResultsView({
@@ -16,6 +23,7 @@ export function ResultsView({
   meanReactionTimeMs,
   medianReactionTimeMs,
   onReset,
+  csvMeta,
 }: Props) {
   const reflectionPrompts = useMemo(
     () => generateReflectionPrompts(trials, trialFlags),
@@ -112,12 +120,42 @@ export function ResultsView({
         </div>
       )}
 
-      <button
-        onClick={onReset}
-        className="mt-6 rounded-md bg-primary px-6 py-2 text-primary-foreground hover:opacity-90"
-      >
-        Start Over
-      </button>
+      <div className="mt-6 flex gap-3">
+        {csvMeta && (
+          <button
+            onClick={() => {
+              const csv = sessionTrialsToCsv(
+                trials,
+                trialFlags,
+                csvMeta.sessionId,
+                csvMeta.packId,
+                csvMeta.packVersion,
+                csvMeta.seed,
+              );
+              downloadFile(csv, "text/csv", `session-${csvMeta.sessionId}.csv`);
+            }}
+            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+          >
+            Export CSV
+          </button>
+        )}
+        <button
+          onClick={onReset}
+          className="rounded-md bg-primary px-6 py-2 text-primary-foreground hover:opacity-90"
+        >
+          Start Over
+        </button>
+      </div>
     </div>
   );
+}
+
+function downloadFile(content: string, mime: string, filename: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
