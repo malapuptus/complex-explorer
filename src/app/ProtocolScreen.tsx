@@ -3,11 +3,14 @@
  * Ensures consistent measurement conditions before trials begin.
  */
 
+import type { ReactNode } from "react";
+
 interface ProtocolScreenProps {
   wordCount: number;
   practiceCount: number;
   source: string;
   onReady: () => void;
+  children?: ReactNode;
 }
 
 const INSTRUCTIONS = [
@@ -22,6 +25,7 @@ export function ProtocolScreen({
   practiceCount,
   source,
   onReady,
+  children,
 }: ProtocolScreenProps) {
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8 px-4">
@@ -58,6 +62,8 @@ export function ProtocolScreen({
           Source: {source}
         </p>
       </div>
+
+      {children}
 
       <button
         onClick={onReady}

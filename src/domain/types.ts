@@ -33,12 +33,19 @@ export interface Trial {
   readonly isPractice: boolean;
 }
 
+/** Order policy for stimulus presentation. */
+export type OrderPolicy = "fixed" | "seeded";
+
 /** Configuration for a session run. */
 export interface SessionConfig {
   readonly stimulusListId: string;
   readonly stimulusListVersion: string;
   /** Maximum time allowed per word in ms (0 = unlimited). */
   readonly maxResponseTimeMs: number;
+  /** How stimulus words are ordered. */
+  readonly orderPolicy: OrderPolicy;
+  /** Seed for deterministic shuffle (only used when orderPolicy = "seeded"). */
+  readonly seed: number | null;
 }
 
 /** A completed session with all trials. */
@@ -49,6 +56,10 @@ export interface SessionResult {
   readonly startedAt: string; // ISO-8601
   readonly completedAt: string; // ISO-8601
   readonly scoring: SessionScoring;
+  /** The seed actually used (null if fixed order). */
+  readonly seedUsed: number | null;
+  /** The exact scored stimulus order (excluding practice words). */
+  readonly stimulusOrder: readonly string[];
 }
 
 /** Flags and summaries produced by scoreSession. */
