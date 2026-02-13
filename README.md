@@ -79,6 +79,8 @@ The `tools/verify` script runs these checks in order (fails fast):
 
 > **Note:** GitHub Actions CI gating is deferred to a future ticket. For now, `tools/verify` is the sole enforcement gate, run locally or inside Lovable.
 
+For manual integration testing, see [docs/QA_CHECKLIST.md](docs/QA_CHECKLIST.md).
+
 ## How to Run Tickets Safely in Lovable
 
 Every ticket lists an **Allowed edits** section with explicit file paths. When working inside Lovable (or any AI agent):
