@@ -98,9 +98,8 @@ export function TrialView({
     trialStartRef.current = performance.now();
   };
 
-  const displayIndex = isPractice
-    ? `Practice ${index + 1} / ${practiceCount}`
-    : `${index - practiceCount + 1} / ${total - practiceCount}`;
+  const scoredIndex = isPractice ? null : index - practiceCount + 1;
+  const scoredTotal = total - practiceCount;
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8">
@@ -110,7 +109,19 @@ export function TrialView({
             Warm-up
           </span>
         )}
-        <p className="text-sm text-muted-foreground">{displayIndex}</p>
+        <p className="text-sm text-muted-foreground">
+          {isPractice
+            ? `Practice ${index + 1} / ${practiceCount}`
+            : `Word ${scoredIndex} of ${scoredTotal}`}
+        </p>
+        {!isPractice && (
+          <div className="mt-1 h-1.5 w-48 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-200"
+              style={{ width: `${((scoredIndex ?? 0) / scoredTotal) * 100}%` }}
+            />
+          </div>
+        )}
       </div>
       <h2 className="text-5xl font-bold tracking-tight text-foreground">
         {word}
