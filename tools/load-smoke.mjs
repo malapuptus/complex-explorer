@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * tools/load-smoke.mjs — Import/load smoke test via Vite SSR.
- * Discovers all modules under src/**\/*.{ts,tsx}, excludes tests/mocks/declarations,
- * and loads each one through Vite's SSR transform. Fails fast on first broken module.
+ * Scans only import-safe layers (src/domain/**, src/infra/**) — NOT src/app/**,
+ * which may reference browser-only globals. The build step covers app layer correctness.
  *
  * Works on Node 18/20+ (no glob from node:fs/promises).
  *
@@ -13,7 +13,8 @@ import { readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createServer } from "vite";
 
-const SRC = resolve("src");
+/** Only scan these subdirectories of src/ (import-safe layers). */
+const SCAN_DIRS = [resolve("src/domain"), resolve("src/infra")];
 const EXCLUDE_RE = /(\/__tests__\/|__mocks__|\.test\.|\.stories\.|\.d\.ts$)/;
 const INCLUDE_RE = /\.(ts|tsx)$/;
 
@@ -33,23 +34,22 @@ async function walk(dir) {
 }
 
 async function main() {
-  // Discover modules
-  let files;
-  try {
-    files = await walk(SRC);
-  } catch (err) {
-    if (err.code === "ENOENT") {
-      console.log("load-smoke: PASS (loaded 0 modules)");
-      process.exit(0);
+  // Discover modules from import-safe layers only
+  let files = [];
+  for (const dir of SCAN_DIRS) {
+    try {
+      files.push(...(await walk(dir)));
+    } catch (err) {
+      if (err.code !== "ENOENT") throw err;
+      // directory doesn't exist yet — that's fine
     }
-    throw err;
   }
 
   // Filter out non-runtime files
   const modules = files.filter((f) => !EXCLUDE_RE.test(f));
 
   if (modules.length === 0) {
-    console.log("load-smoke: PASS (loaded 0 modules)");
+    console.log("load-smoke: PASS — scanned 0 modules (domain+infra)");
     process.exit(0);
   }
 
@@ -76,7 +76,7 @@ async function main() {
       }
     }
 
-    console.log(`load-smoke: PASS (loaded ${loaded} modules)`);
+    console.log(`load-smoke: PASS — scanned ${loaded} modules (domain+infra)`);
   } finally {
     await vite.close();
   }
