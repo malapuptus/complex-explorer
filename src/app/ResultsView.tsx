@@ -14,6 +14,7 @@ interface Props {
     packId: string;
     packVersion: string;
     seed: number | null;
+    sessionFingerprint?: string | null;
   };
 }
 
@@ -38,6 +39,15 @@ export function ResultsView({
       <p className="mb-6 text-sm text-muted-foreground">
         Mean RT: {meanReactionTimeMs} ms &middot; Median RT:{" "}
         {medianReactionTimeMs} ms
+        {csvMeta?.sessionFingerprint && (
+          <>
+            {" "}
+            &middot; Fingerprint:{" "}
+            <span className="font-mono">
+              {csvMeta.sessionFingerprint.slice(0, 12)}…
+            </span>
+          </>
+        )}
       </p>
 
       <div className="overflow-x-auto rounded-md border border-border">
@@ -131,6 +141,7 @@ export function ResultsView({
                 csvMeta.packId,
                 csvMeta.packVersion,
                 csvMeta.seed,
+                csvMeta.sessionFingerprint,
               );
               downloadFile(csv, "text/csv", `session-${csvMeta.sessionId}.csv`);
             }}
