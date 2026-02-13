@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 /**
- * tools/verify.mjs — Cross-platform Node wrapper for the canonical verify pipeline.
+ * tools/verify.mjs — Canonical verification pipeline (single source of truth).
  * Usage: node tools/verify.mjs
- *
- * Runs the same 7 oracles as tools/verify (bash), but works on Windows too.
+ *        bash tools/verify  (delegates here)
  */
 
 import { execSync } from "child_process";
@@ -11,11 +10,11 @@ import { execSync } from "child_process";
 const steps = [
   { name: "Repo hygiene", cmd: "npx tsx tools/check-hygiene.ts" },
   { name: "Format check", cmd: 'npx prettier --check "src/**/*.{ts,tsx}"' },
-  { name: "Lint", cmd: "npx eslint ." },
+  { name: "Lint", cmd: "npm run lint" },
   { name: "Typecheck", cmd: "npx tsc --noEmit" },
   { name: "Boundary check", cmd: "npx tsx tools/check-boundaries.ts" },
-  { name: "Build (load smoke)", cmd: "npx vite build" },
-  { name: "Unit tests", cmd: "npx vitest run" },
+  { name: "Build (load smoke)", cmd: "npm run build" },
+  { name: "Unit tests", cmd: "npm run test" },
 ];
 
 let step = 0;

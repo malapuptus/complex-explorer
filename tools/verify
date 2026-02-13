@@ -1,34 +1,3 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-echo "=== [1/7] Repo hygiene ==="
-npx tsx tools/check-hygiene.ts
-echo ""
-
-echo "=== [2/7] Format check ==="
-npx prettier --check "src/**/*.{ts,tsx}"
-echo ""
-
-echo "=== [3/7] Lint ==="
-npm run lint
-echo ""
-
-echo "=== [4/7] Typecheck ==="
-npx tsc --noEmit
-echo ""
-
-echo "=== [5/7] Boundary check ==="
-npx tsx tools/check-boundaries.ts
-echo ""
-
-echo "=== [6/7] Build (load smoke) ==="
-npm run build
-echo ""
-
-echo "=== [7/7] Unit tests ==="
-npm run test
-echo ""
-
-echo "==============================="
-echo "VERIFY: ALL CHECKS PASSED"
-echo "==============================="
+node tools/verify.mjs
