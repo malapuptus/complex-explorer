@@ -1,9 +1,10 @@
 import { useState, useRef, useCallback, type FormEvent, type KeyboardEvent } from "react";
 
-interface TrialMetrics {
+export interface TrialMetrics {
   tFirstKeyMs: number | null;
   backspaceCount: number;
   editCount: number;
+  compositionCount: number;
 }
 
 interface Props {
@@ -27,6 +28,8 @@ export function TrialView({
   const tFirstKeyRef = useRef<number | null>(null);
   const backspaceRef = useRef(0);
   const editRef = useRef(0);
+  const compositionRef = useRef(0);
+  const composingRef = useRef(false);
   const trialStartRef = useRef(performance.now());
 
   // Reset refs when word changes (new trial)
@@ -36,18 +39,45 @@ export function TrialView({
     tFirstKeyRef.current = null;
     backspaceRef.current = 0;
     editRef.current = 0;
+    compositionRef.current = 0;
+    composingRef.current = false;
     trialStartRef.current = performance.now();
   }
 
-  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") return;
+  const markFirstInput = useCallback(() => {
     if (tFirstKeyRef.current === null) {
       tFirstKeyRef.current = performance.now() - trialStartRef.current;
     }
-    if (e.key === "Backspace" || e.key === "Delete") {
-      backspaceRef.current++;
-    }
-    editRef.current++;
+  }, []);
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") return;
+      // During IME composition, keydown fires synthetic events — skip timing
+      if (!composingRef.current) {
+        markFirstInput();
+      }
+      if (e.key === "Backspace" || e.key === "Delete") {
+        backspaceRef.current++;
+      }
+      editRef.current++;
+    },
+    [markFirstInput],
+  );
+
+  const handleBeforeInput = useCallback(() => {
+    // beforeinput fires for real text insertion even when keydown doesn't (mobile/IME)
+    markFirstInput();
+  }, [markFirstInput]);
+
+  const handleCompositionStart = useCallback(() => {
+    composingRef.current = true;
+    compositionRef.current++;
+    markFirstInput();
+  }, [markFirstInput]);
+
+  const handleCompositionEnd = useCallback(() => {
+    composingRef.current = false;
   }, []);
 
   const handleSubmit = (e: FormEvent) => {
@@ -56,12 +86,15 @@ export function TrialView({
       tFirstKeyMs: tFirstKeyRef.current,
       backspaceCount: backspaceRef.current,
       editCount: editRef.current,
+      compositionCount: compositionRef.current,
     };
     onSubmit(value, metrics);
     setValue("");
     tFirstKeyRef.current = null;
     backspaceRef.current = 0;
     editRef.current = 0;
+    compositionRef.current = 0;
+    composingRef.current = false;
     trialStartRef.current = performance.now();
   };
 
@@ -89,6 +122,9 @@ export function TrialView({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
+          onBeforeInput={handleBeforeInput}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
           placeholder="Type the first word that comes to mind…"
           className="w-80 rounded-md border border-input bg-background px-4 py-2 text-center text-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         />

@@ -18,6 +18,7 @@ function makeTrial(
       tFirstKeyMs: overrides?.tFirstKeyMs ?? null,
       backspaceCount: overrides?.backspaceCount ?? 0,
       editCount: overrides?.editCount ?? 0,
+      compositionCount: 0,
     },
     isPractice,
   };
