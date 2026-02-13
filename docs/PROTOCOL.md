@@ -158,8 +158,7 @@ The session summary includes:
   association in insanity." *American Journal of Insanity*, 67(1),
   37–96 (Part I); 67(2), 317–390 (Part II).
 - **Verification:** Word list and canonical ordering confirmed against
-  frequency tables in Rosanoff, A. J., *Manual of Psychiatry*,
-  Appendix VI.
+  multiple secondary reproductions of the original 1910 publication.
 - **Purpose:** Standardized free association test designed to elicit
   associations without emotional loading.
 - **License:** Public domain (published 1910, US copyright expired).
@@ -214,6 +213,3 @@ personal reflection, education, and exploratory research only.
 - Kent, G. H., & Rosanoff, A. J. (1910). A study of association in
   insanity. *American Journal of Insanity*, 67(1), 37–96 (Part I);
   67(2), 317–390 (Part II).
-- Rosanoff, A. J. *Manual of Psychiatry*. Appendix VI: Free
-  Association Test (Kent–Rosanoff). [Frequency tables used for word
-  list verification.]
