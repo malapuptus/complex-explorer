@@ -60,6 +60,21 @@ export interface SessionResult {
   readonly seedUsed: number | null;
   /** The exact scored stimulus order (excluding practice words). */
   readonly stimulusOrder: readonly string[];
+  /** Snapshot of the stimulus pack provenance at time of session. */
+  readonly provenanceSnapshot: ProvenanceSnapshot | null;
+}
+
+/** Frozen copy of stimulus pack metadata at time of session. */
+export interface ProvenanceSnapshot {
+  readonly listId: string;
+  readonly listVersion: string;
+  readonly language: string;
+  readonly source: string;
+  readonly sourceName: string;
+  readonly sourceYear: string;
+  readonly sourceCitation: string;
+  readonly licenseNote: string;
+  readonly wordCount: number;
 }
 
 /** Flags and summaries produced by scoreSession. */

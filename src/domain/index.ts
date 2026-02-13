@@ -9,6 +9,7 @@ export type {
   FlagKind,
   SessionSummary,
   OrderPolicy,
+  ProvenanceSnapshot,
 } from "./types";
 
 export type { SessionStore, SessionListEntry } from "./sessionStore";

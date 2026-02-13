@@ -4,7 +4,7 @@
  */
 
 import { getStimulusList } from "@/domain";
-import type { SessionResult, OrderPolicy } from "@/domain";
+import type { SessionResult, OrderPolicy, ProvenanceSnapshot } from "@/domain";
 import { localStorageSessionStore } from "@/infra";
 import { useSession } from "./useSession";
 import { TrialView } from "./TrialView";
@@ -31,6 +31,17 @@ export function DemoSession() {
   useEffect(() => {
     if (session.phase === "done" && session.scoring && !savedRef.current) {
       savedRef.current = true;
+      const provSnapshot: ProvenanceSnapshot = {
+        listId: list.id,
+        listVersion: list.version,
+        language: list.language,
+        source: list.source,
+        sourceName: list.provenance.sourceName,
+        sourceYear: list.provenance.sourceYear,
+        sourceCitation: list.provenance.sourceCitation,
+        licenseNote: list.provenance.licenseNote,
+        wordCount: list.words.length,
+      };
       const result: SessionResult = {
         id: generateId(),
         config: {
@@ -46,6 +57,7 @@ export function DemoSession() {
         scoring: session.scoring,
         seedUsed: session.seedUsed,
         stimulusOrder: session.stimulusOrder,
+        provenanceSnapshot: provSnapshot,
       };
       localStorageSessionStore.save(result);
     }

@@ -14,21 +14,19 @@ const STORAGE_KEY = "complex-mapper-sessions";
 
 /**
  * Current schema version. Bump when SessionResult shape changes.
- *  v1 — original (no tFirstKeyMs/backspaceCount/editCount on AssociationResponse)
- *  v2 — added tFirstKeyMs, backspaceCount, editCount, isPractice, high_editing flag
+ *  v1 — original (no tFirstKeyMs/backspaceCount/editCount)
+ *  v2 — added timing metrics, isPractice, orderPolicy, seed, stimulusOrder
+ *  v3 — added provenanceSnapshot for reproducibility
  */
-const CURRENT_SCHEMA_VERSION = 2;
+const CURRENT_SCHEMA_VERSION = 3;
 
 interface StorageEnvelope {
   schemaVersion: number;
   sessions: Record<string, SessionResult>;
 }
 
-// ── Migration ────────────────────────────────────────────────────────
+// ── Migration helpers ────────────────────────────────────────────────
 
-/**
- * Migrate a v1 AssociationResponse (missing new fields) to v2.
- */
 function migrateAssociationV1toV2(
   a: Record<string, unknown>,
 ): AssociationResponse {
@@ -41,7 +39,11 @@ function migrateAssociationV1toV2(
   };
 }
 
-function migrateSessionV1toV2(raw: Record<string, unknown>): SessionResult {
+/**
+ * Migrate any raw session object to v3 (current).
+ * Handles v1 (no metrics), v2 (no provenance), and v3 (current).
+ */
+function migrateSessionToV3(raw: Record<string, unknown>): SessionResult {
   const trials = ((raw.trials as Array<Record<string, unknown>>) ?? []).map(
     (t) => ({
       stimulus: t.stimulus as SessionResult["trials"][0]["stimulus"],
@@ -52,7 +54,7 @@ function migrateSessionV1toV2(raw: Record<string, unknown>): SessionResult {
     }),
   );
 
-  const config = raw.config as Record<string, unknown>;
+  const config = (raw.config as Record<string, unknown>) ?? {};
 
   return {
     id: raw.id as string,
@@ -60,7 +62,9 @@ function migrateSessionV1toV2(raw: Record<string, unknown>): SessionResult {
       stimulusListId: (config.stimulusListId as string) ?? "",
       stimulusListVersion: (config.stimulusListVersion as string) ?? "",
       maxResponseTimeMs: (config.maxResponseTimeMs as number) ?? 0,
-      orderPolicy: ((config.orderPolicy as string) ?? "fixed") as "fixed" | "seeded",
+      orderPolicy: ((config.orderPolicy as string) ?? "fixed") as
+        | "fixed"
+        | "seeded",
       seed: (config.seed as number) ?? null,
     },
     trials,
@@ -68,7 +72,11 @@ function migrateSessionV1toV2(raw: Record<string, unknown>): SessionResult {
     completedAt: raw.completedAt as string,
     scoring: raw.scoring as SessionResult["scoring"],
     seedUsed: (raw.seedUsed as number) ?? null,
-    stimulusOrder: (raw.stimulusOrder as string[]) ?? trials.map((t) => t.stimulus.word),
+    stimulusOrder:
+      (raw.stimulusOrder as string[]) ??
+      trials.filter((t) => !t.isPractice).map((t) => t.stimulus.word),
+    provenanceSnapshot:
+      (raw.provenanceSnapshot as SessionResult["provenanceSnapshot"]) ?? null,
   };
 }
 
@@ -83,7 +91,7 @@ function migrateSessions(
   const migrated: Record<string, SessionResult> = {};
   for (const [id, raw] of Object.entries(sessions)) {
     try {
-      migrated[id] = migrateSessionV1toV2(raw as Record<string, unknown>);
+      migrated[id] = migrateSessionToV3(raw as Record<string, unknown>);
     } catch {
       // Skip sessions that can't be migrated
     }
@@ -100,7 +108,7 @@ function readEnvelope(): StorageEnvelope {
 
     const parsed = JSON.parse(raw);
 
-    // Legacy format: plain Record<string, SessionResult> without envelope
+    // Legacy format: plain Record without envelope wrapper
     if (!parsed.schemaVersion) {
       const migrated = migrateSessions(parsed, 1);
       const envelope: StorageEnvelope = {
