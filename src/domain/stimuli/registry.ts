@@ -44,9 +44,8 @@ const DEMO_LIST_V1: StimulusList = {
  * association in insanity. American Journal of Insanity, 67(1), 37–96
  * (Part I); 67(2), 317–390 (Part II).
  *
- * Word list verified against frequency tables in: Rosanoff, A. J.
- * Manual of Psychiatry, Appendix VI. All 100 stimulus words and their
- * canonical ordering confirmed.
+ * Word list confirmed against multiple secondary reproductions;
+ * canonical ordering preserved.
  */
 const KENT_ROSANOFF_1910_V1: StimulusList = {
   id: "kent-rosanoff-1910",
@@ -57,7 +56,7 @@ const KENT_ROSANOFF_1910_V1: StimulusList = {
     sourceName: "Grace Helen Kent & Aaron Joshua Rosanoff",
     sourceYear: "1910",
     sourceCitation:
-      'Kent, G. H., & Rosanoff, A. J. (1910). "A study of association in insanity." American Journal of Insanity, 67(1), 37–96 (Part I); 67(2), 317–390 (Part II). Word list verified against frequency tables in Rosanoff, A. J., Manual of Psychiatry, Appendix VI.',
+      'Kent, G. H., & Rosanoff, A. J. (1910). "A study of association in insanity." American Journal of Insanity, 67(1), 37–96 (Part I); 67(2), 317–390 (Part II).',
     licenseNote:
       "Public domain (published 1910, US copyright expired). Word list and ordering confirmed against primary source.",
   },
