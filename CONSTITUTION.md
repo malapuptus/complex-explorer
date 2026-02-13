@@ -39,7 +39,7 @@ Architecture: `app/ui → domain → infra`. No reverse imports.
 
 ### 4. Verification Pipeline
 
-All checks run via CI (`.github/workflows/verify.yml`) on every push and PR:
+The canonical enforcement gate is `tools/verify` (bash) or `tools/verify.mjs` (cross-platform fallback). All checks run in order and fail fast:
 
 1. Repo hygiene (`check-hygiene`)
 2. Format check (`prettier --check`)
@@ -48,6 +48,8 @@ All checks run via CI (`.github/workflows/verify.yml`) on every push and PR:
 5. Boundary check (`check-boundaries`)
 6. Build smoke (`vite build`)
 7. Unit tests (`vitest`)
+
+> **GitHub Actions / CI gating is deferred** to a future ticket. Until then, `tools/verify` is the sole gate, run locally or inside Lovable.
 
 ### 5. Output Requirements
 
