@@ -105,6 +105,69 @@
 
 ---
 
+## Scenario L1: 100-Word Long Session (Kent–Rosanoff)
+
+> **Purpose:** End-to-end verification of breaks, timeout, autosave/resume, and export integrity in a single realistic run.
+
+### Settings
+
+| Setting | Value |
+|---------|-------|
+| Pack | Kent–Rosanoff 1910 (100 words) |
+| Order | Seeded (accept default seed) |
+| Timeout | 5 000 ms |
+| Break every | 20 trials |
+
+### Script
+
+| Step | Action | Expected Outcome |
+|------|--------|------------------|
+| L1.1 | Select Kent–Rosanoff pack, configure settings per table above, click **Begin** | Protocol screen shows pack info; session starts |
+| L1.2 | Complete trials 1–5 normally (type a word, press Enter) | Trials advance; progress updates |
+| L1.3 | On trial 6, **do not type anything**; wait for the 5 s timeout | Trial auto-advances; input clears for next trial |
+| L1.4 | On trial 7, type a response, press Backspace 3 times, retype, then submit | Trial records normally |
+| L1.5 | Complete trials 8–19 normally | Progress reaches 19/100 |
+| L1.6 | After trial 20, break screen appears | "Take a Break" screen with **Continue** button |
+| L1.7 | Click **Continue** | Trial 21 appears; break did not count as a trial |
+| L1.8 | Complete trials 21–30 normally | Progress reaches 30/100 |
+| L1.9 | **Refresh the browser** (F5 / Cmd+R) | App reloads; "Resume Session?" prompt appears |
+| L1.10 | Click **Resume** | Session continues from trial 31 (not from the beginning) |
+| L1.11 | Verify word order is unchanged from before refresh | Remaining words appear in the same seeded order |
+| L1.12 | Complete trials 31–100 (fast-forward: type any single letter + Enter) | Remaining breaks appear at trials 40, 60, 80; session completes after trial 100 |
+| L1.13 | Results screen appears | **Session Results** heading visible |
+
+### Expected Outcomes — Results View
+
+| Check | Expected |
+|-------|----------|
+| Trial count | 100 scored trials (practice excluded) |
+| Timeout flag | Exactly 1 trial flagged `timeout` (trial 6) |
+| Backspace count | Trial 7 shows `BS ≥ 3` |
+| Reproducibility Bundle | Fingerprint (64-char hex), seed (numeric), pack `kent-rosanoff-1910@1.0.0`, order `seeded`, scoring version visible |
+| Mean/Median RT | Values displayed; timeout trial excluded from aggregates |
+
+### Expected Outcomes — CSV Export
+
+| Check | Expected |
+|-------|----------|
+| Click **Export CSV** | File downloads with name containing session ID |
+| Row count | 103 data rows (3 practice + 100 scored) |
+| Timeout trial row | `timed_out` = `true`, `response` = `""`, `flags` contains `timeout` |
+| Backspace trial row | `backspaces` ≥ 3 |
+| Headers include | `session_id`, `session_fingerprint`, `scoring_version`, `pack_id`, `seed`, `timed_out`, `flags` |
+| Fingerprint column | Same value on every row; matches Reproducibility Bundle display |
+
+### Expected Outcomes — Research Bundle
+
+| Check | Expected |
+|-------|----------|
+| Click **Export Research Bundle** | JSON file downloads; filename contains date, pack id, seed, fingerprint prefix |
+| `sessionResult.trials` | 100 entries (scored only) |
+| `scoringAlgorithm` | `MAD-modified-z@3.5 + fast<200ms + timeout excluded` |
+| `sessionResult.sessionFingerprint` | Matches CSV and UI |
+
+---
+
 ## Notes
 
 - **Browser matrix:** This checklist assumes Chromium. Safari and Firefox may differ for IME handling — a follow-up ticket should cover cross-browser testing.
