@@ -1,5 +1,6 @@
 /**
  * PreviousSessions — lists saved sessions with delete/export controls.
+ * Shows provenance and reproducibility metadata when viewing a session.
  */
 
 import { useEffect, useState, useCallback } from "react";
@@ -39,6 +40,7 @@ export function PreviousSessions() {
 
   if (selected) {
     const scoredTrials = selected.trials.filter((t) => !t.isPractice);
+    const prov = selected.provenanceSnapshot;
     return (
       <div>
         <button
@@ -47,6 +49,26 @@ export function PreviousSessions() {
         >
           ← Back to list
         </button>
+
+        {prov && (
+          <div className="mx-auto mb-4 max-w-3xl rounded-md border border-border bg-muted/30 px-4 py-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              Stimulus pack: {prov.listId}@{prov.listVersion} · {prov.wordCount} words · {prov.language}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {prov.sourceCitation}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground italic">
+              {prov.licenseNote}
+            </p>
+            {selected.seedUsed !== null && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Order: seeded (seed={selected.seedUsed})
+              </p>
+            )}
+          </div>
+        )}
+
         <ResultsView
           trials={scoredTrials}
           trialFlags={selected.scoring.trialFlags}
