@@ -6,16 +6,16 @@
 import { getStimulusList, listAvailableStimulusLists } from "@/domain";
 import type {
   SessionResult,
-  OrderPolicy,
   ProvenanceSnapshot,
   DraftSession,
 } from "@/domain";
 import { localStorageSessionStore } from "@/infra";
 import { useSession } from "./useSession";
-import type { SessionSnapshot } from "./useSession";
+import type { SessionSnapshot, StartOverrides } from "./useSession";
 import { TrialView } from "./TrialView";
 import { ResultsView } from "./ResultsView";
 import { ProtocolScreen } from "./ProtocolScreen";
+import type { AdvancedConfig } from "./ProtocolScreen";
 import { BreakScreen } from "./BreakScreen";
 import { useEffect, useRef, useState, useCallback } from "react";
 
@@ -24,7 +24,7 @@ function generateId(): string {
 }
 
 const PRACTICE_WORDS = ["sun", "table", "road"];
-const BREAK_EVERY = 20;
+const DEFAULT_BREAK_EVERY = 20;
 
 interface PackOption {
   id: string;
@@ -59,7 +59,9 @@ export function DemoSession() {
   const [selectedPackKey, setSelectedPackKey] = useState(
     `${packOptions[0].id}@${packOptions[0].version}`,
   );
-  const [orderPolicy, setOrderPolicy] = useState<OrderPolicy>("fixed");
+  const [activeConfig, setActiveConfig] = useState<AdvancedConfig | null>(
+    null,
+  );
   const [onBreak, setOnBreak] = useState(false);
   const lastBreakAtRef = useRef(0);
   const [pendingDraft, setPendingDraft] = useState<DraftSession | null>(null);
@@ -70,12 +72,16 @@ export function DemoSession() {
     (p) => `${p.id}@${p.version}` === selectedPackKey,
   )!;
   const list = getStimulusList(selectedOption.id, selectedOption.version)!;
+  const isLongPack = list.words.length > 10;
 
   const session = useSession(list.words as string[], {
     practiceWords: PRACTICE_WORDS,
-    orderPolicy,
   });
   const savedRef = useRef(false);
+
+  const breakEveryN =
+    activeConfig?.breakEveryN ?? DEFAULT_BREAK_EVERY;
+  const orderPolicy = activeConfig?.orderPolicy ?? "fixed";
 
   // Check for existing draft on mount
   useEffect(() => {
@@ -94,8 +100,6 @@ export function DemoSession() {
     if (session.trials.length === prevTrialCount.current) return;
     prevTrialCount.current = session.trials.length;
 
-    // Only autosave after scored trials (skip practice-only updates
-    // for very small overhead, but save anyway for safety)
     const draft: DraftSession = {
       id: draftIdRef.current,
       stimulusListId: list.id,
@@ -109,7 +113,7 @@ export function DemoSession() {
       currentIndex: session.currentIndex,
       savedAt: new Date().toISOString(),
       trialTimeoutMs: session.trialTimeoutMs,
-      breakEveryN: BREAK_EVERY,
+      breakEveryN,
     };
     localStorageSessionStore.saveDraft(draft);
   }, [
@@ -117,8 +121,11 @@ export function DemoSession() {
     session.trials,
     session.currentIndex,
     session.seedUsed,
+    session.stimulusOrder,
+    session.trialTimeoutMs,
     list,
     orderPolicy,
+    breakEveryN,
   ]);
 
   // Clear draft when session completes
@@ -145,6 +152,8 @@ export function DemoSession() {
           maxResponseTimeMs: 0,
           orderPolicy,
           seed: session.seedUsed,
+          trialTimeoutMs: session.trialTimeoutMs,
+          breakEveryN,
         },
         trials: session.trials,
         startedAt: new Date().toISOString(),
@@ -164,6 +173,8 @@ export function DemoSession() {
     orderPolicy,
     session.seedUsed,
     session.stimulusOrder,
+    session.trialTimeoutMs,
+    breakEveryN,
   ]);
 
   const handleResume = useCallback(() => {
@@ -173,13 +184,11 @@ export function DemoSession() {
       pendingDraft.stimulusListVersion,
     );
     if (!draftList) {
-      // Pack no longer exists — discard
       localStorageSessionStore.deleteDraft();
       setPendingDraft(null);
       return;
     }
 
-    // Rebuild word list using realized stimulusOrder (not raw wordList)
     const allWords = [
       ...pendingDraft.practiceWords,
       ...pendingDraft.stimulusOrder,
@@ -198,7 +207,12 @@ export function DemoSession() {
     setSelectedPackKey(
       `${pendingDraft.stimulusListId}@${pendingDraft.stimulusListVersion}`,
     );
-    setOrderPolicy(pendingDraft.orderPolicy);
+    setActiveConfig({
+      orderPolicy: pendingDraft.orderPolicy,
+      seed: pendingDraft.seedUsed,
+      breakEveryN: pendingDraft.breakEveryN ?? DEFAULT_BREAK_EVERY,
+      trialTimeoutMs: pendingDraft.trialTimeoutMs,
+    });
     session.restore(snapshot);
     setPendingDraft(null);
   }, [pendingDraft, session]);
@@ -208,19 +222,32 @@ export function DemoSession() {
     setPendingDraft(null);
   }, []);
 
+  const handleStart = useCallback(
+    (config: AdvancedConfig) => {
+      setActiveConfig(config);
+      const overrides: StartOverrides = {
+        orderPolicy: config.orderPolicy,
+        seed: config.seed,
+        trialTimeoutMs: config.trialTimeoutMs,
+      };
+      session.start(overrides);
+    },
+    [session],
+  );
+
   const handleReset = () => {
     savedRef.current = false;
     lastBreakAtRef.current = 0;
     prevTrialCount.current = 0;
     draftIdRef.current = generateId();
     setOnBreak(false);
+    setActiveConfig(null);
     session.reset();
   };
 
-  // Wait for draft check before rendering
   if (!draftChecked) return null;
 
-  // Show resume prompt if draft exists and session is idle
+  // Resume prompt
   if (pendingDraft && session.phase === "idle") {
     const scoredDone = pendingDraft.trials.filter(
       (t) => !t.isPractice,
@@ -264,6 +291,7 @@ export function DemoSession() {
     );
   }
 
+  // Protocol / config screen
   if (session.phase === "idle") {
     return (
       <ProtocolScreen
@@ -271,7 +299,8 @@ export function DemoSession() {
         practiceCount={PRACTICE_WORDS.length}
         source={list.source}
         estimatedMinutes={selectedOption.estimate}
-        onReady={session.start}
+        isLongPack={isLongPack}
+        onReady={handleStart}
       >
         <div className="flex flex-col items-center gap-3">
           <div className="flex items-center gap-3">
@@ -293,26 +322,12 @@ export function DemoSession() {
               ))}
             </select>
           </div>
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-muted-foreground">
-              Word order:
-            </label>
-            <select
-              value={orderPolicy}
-              onChange={(e) =>
-                setOrderPolicy(e.target.value as OrderPolicy)
-              }
-              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
-            >
-              <option value="fixed">Fixed</option>
-              <option value="seeded">Randomized</option>
-            </select>
-          </div>
         </div>
       </ProtocolScreen>
     );
   }
 
+  // Running phase
   if (session.phase === "running" && session.currentWord) {
     const isPractice = session.currentIndex < session.practiceCount;
     const scoredCompleted = isPractice
@@ -320,10 +335,12 @@ export function DemoSession() {
       : session.currentIndex - session.practiceCount;
     const totalScored = session.words.length - session.practiceCount;
 
+    // Break logic (only when breakEveryN > 0)
     if (
+      breakEveryN > 0 &&
       !isPractice &&
       scoredCompleted > 0 &&
-      scoredCompleted % BREAK_EVERY === 0 &&
+      scoredCompleted % breakEveryN === 0 &&
       scoredCompleted !== lastBreakAtRef.current &&
       onBreak
     ) {
@@ -340,26 +357,38 @@ export function DemoSession() {
     }
 
     if (
+      breakEveryN > 0 &&
       !isPractice &&
       scoredCompleted > 0 &&
-      scoredCompleted % BREAK_EVERY === 0 &&
+      scoredCompleted % breakEveryN === 0 &&
       scoredCompleted !== lastBreakAtRef.current &&
       !onBreak
     ) {
       setOnBreak(true);
     }
 
+    // Show seedUsed banner on first scored trial
+    const showSeedBanner =
+      session.seedUsed !== null && scoredCompleted === 0 && !isPractice;
+
     return (
-      <TrialView
-        word={session.currentWord.word}
-        index={session.currentIndex}
-        total={session.words.length}
-        isPractice={isPractice}
-        practiceCount={session.practiceCount}
-        trialTimeoutMs={session.trialTimeoutMs}
-        onSubmit={session.submitResponse}
-        onTimeout={session.handleTimeout}
-      />
+      <div className="flex flex-col items-center">
+        {showSeedBanner && (
+          <p className="mb-2 text-xs text-muted-foreground">
+            Seed: {session.seedUsed}
+          </p>
+        )}
+        <TrialView
+          word={session.currentWord.word}
+          index={session.currentIndex}
+          total={session.words.length}
+          isPractice={isPractice}
+          practiceCount={session.practiceCount}
+          trialTimeoutMs={session.trialTimeoutMs}
+          onSubmit={session.submitResponse}
+          onTimeout={session.handleTimeout}
+        />
+      </div>
     );
   }
 

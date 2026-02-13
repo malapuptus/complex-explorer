@@ -50,6 +50,10 @@ export interface SessionConfig {
   readonly orderPolicy: OrderPolicy;
   /** Seed for deterministic shuffle (only used when orderPolicy = "seeded"). */
   readonly seed: number | null;
+  /** Per-trial timeout in ms (undefined = no timeout). */
+  readonly trialTimeoutMs?: number;
+  /** Break every N scored trials (undefined = no breaks). */
+  readonly breakEveryN?: number;
 }
 
 /** A completed session with all trials. */
