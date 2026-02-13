@@ -79,6 +79,17 @@ The `tools/verify` script runs these checks in order (fails fast):
 
 > **Note:** GitHub Actions CI gating is deferred to a future ticket. For now, `tools/verify` is the sole enforcement gate, run locally or inside Lovable.
 
+## How to Run Tickets Safely in Lovable
+
+Every ticket lists an **Allowed edits** section with explicit file paths. When working inside Lovable (or any AI agent):
+
+1. **Only edit files named in Allowed edits.** No exceptions.
+2. If you discover a file outside that list needs changing, **STOP** and output `NEEDS FOLLOW-UP TICKET` with the file list and a minimal ticket proposal.
+3. Resume work on in-scope files only.
+4. After finishing, confirm the set of changed files matches the allowed list.
+
+This prevents scope creep — the most common source of regressions.
+
 ## What technologies are used for this project?
 
 This project is built with:

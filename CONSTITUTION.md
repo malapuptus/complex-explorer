@@ -44,6 +44,19 @@ Boundary violation: <file> (<layer> layer) imports from <target> layer via "<imp
 - If a needed file isn't listed, **STOP** and propose a new ticket naming it.
 - Every ticket must pass the verification pipeline before merging.
 
+### 3a. Process Guard — No Out-of-Scope Edits
+
+If an agent (AI or human) determines during implementation that a file **not listed in the ticket's Allowed edits** must be changed, the agent **MUST**:
+
+1. **STOP** immediately — do not make the edit.
+2. Output the exact phrase: **`NEEDS FOLLOW-UP TICKET`**
+3. Include:
+   - The file(s) that need changing and why.
+   - A minimal proposed ticket (Goal + Allowed edits + Must NOT).
+4. Resume work on the current ticket **only for in-scope files**.
+
+> **Rationale:** Scope creep is the #1 failure mode. This rule makes the boundary explicit and auditable.
+
 ### 4. Verification Pipeline
 
 The canonical enforcement gate is `tools/verify` (bash) or `tools/verify.mjs` (cross-platform fallback). All checks run in order and fail fast:
