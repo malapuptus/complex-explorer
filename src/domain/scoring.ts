@@ -13,6 +13,10 @@ import type {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
+function sortedCopy(values: number[]): number[] {
+  return [...values].sort((a, b) => a - b);
+}
+
 function median(sorted: number[]): number {
   if (sorted.length === 0) return 0;
   const mid = Math.floor(sorted.length / 2);
@@ -32,6 +36,17 @@ function stdDev(values: number[], avg: number): number {
   return Math.sqrt(sumSq / values.length);
 }
 
+/**
+ * Median Absolute Deviation (MAD).
+ * A robust measure of spread that is resistant to outliers.
+ * For normally distributed data, MAD ≈ 0.6745 × σ.
+ */
+function mad(values: number[], med: number): number {
+  if (values.length < 2) return 0;
+  const deviations = sortedCopy(values.map((v) => Math.abs(v - med)));
+  return median(deviations);
+}
+
 // ── Scoring ──────────────────────────────────────────────────────────
 
 /** Threshold: responses faster than this (ms) are flagged. */
@@ -41,10 +56,29 @@ const FAST_THRESHOLD_MS = 200;
 const HIGH_EDITING_THRESHOLD = 3;
 
 /**
+ * Modified Z-score multiplier for MAD-based outlier detection.
+ * A value beyond ±3.5 modified Z-scores is considered an outlier.
+ * This is the Iglewicz & Hoaglin (1993) recommendation.
+ *
+ * Modified Z = 0.6745 × (x - median) / MAD
+ * Outlier if |Modified Z| > 3.5
+ *
+ * For small samples (n < 5), we skip outlier detection entirely
+ * since robust statistics need a minimum sample size.
+ */
+const MODIFIED_Z_THRESHOLD = 3.5;
+const MAD_TO_Z_FACTOR = 0.6745;
+const MIN_SAMPLE_FOR_OUTLIERS = 5;
+
+/**
  * Score a completed set of trials.
  *
- * Timing outlier detection uses ±2 standard deviations from the mean
- * reaction time (only among non-empty responses).
+ * Timing outlier detection uses MAD (Median Absolute Deviation) based
+ * modified Z-scores, which are robust to small sample sizes and resistant
+ * to the influence of outliers themselves (unlike mean ± 2σ).
+ *
+ * Reference: Iglewicz & Hoaglin, "Volume 16: How to Detect and Handle
+ * Outliers" (1993).
  *
  * @returns Deterministic scoring output — same input always same output.
  */
@@ -64,9 +98,9 @@ export function scoreSession(trials: Trial[]): SessionScoring {
     .filter((t) => t.association.response.trim() !== "")
     .map((t) => t.association.reactionTimeMs);
 
-  const avgTime = mean(validTimes);
-  const sd = stdDev(validTimes, avgTime);
-  const slowThreshold = avgTime + 2 * sd;
+  const sortedValid = sortedCopy(validTimes);
+  const med = median(sortedValid);
+  const madValue = mad(validTimes, med);
 
   // Track repeated responses (only among scored trials)
   const seenResponses = new Map<string, number>();
@@ -90,14 +124,17 @@ export function scoreSession(trials: Trial[]): SessionScoring {
       }
       seenResponses.set(resp, i);
 
-      // Timing outliers (only for non-empty responses with enough data)
-      if (validTimes.length >= 3) {
-        if (rt > slowThreshold) {
+      // Timing outliers using MAD-based modified Z-scores.
+      // Only flag when we have enough data and MAD > 0 (non-degenerate).
+      if (validTimes.length >= MIN_SAMPLE_FOR_OUTLIERS && madValue > 0) {
+        const modifiedZ = (MAD_TO_Z_FACTOR * (rt - med)) / madValue;
+        if (modifiedZ > MODIFIED_Z_THRESHOLD) {
           flags.push("timing_outlier_slow");
         }
-        if (rt < FAST_THRESHOLD_MS) {
-          flags.push("timing_outlier_fast");
-        }
+      }
+      // Absolute fast threshold — always applied regardless of sample size
+      if (rt < FAST_THRESHOLD_MS) {
+        flags.push("timing_outlier_fast");
       }
     }
 

@@ -59,14 +59,13 @@ describe("scoreSession", () => {
     expect(result.summary.repeatedResponseCount).toBe(2);
   });
 
-  it("detects timing outliers (slow)", () => {
-    // Create trials with a very extreme outlier
+  it("detects timing outliers (slow) via MAD with n=7", () => {
     const trials = [
       makeTrial("a", "x", 500, 0),
-      makeTrial("b", "y", 500, 1),
-      makeTrial("c", "z", 500, 2),
-      makeTrial("d", "w", 500, 3),
-      makeTrial("e", "v", 500, 4),
+      makeTrial("b", "y", 510, 1),
+      makeTrial("c", "z", 490, 2),
+      makeTrial("d", "w", 505, 3),
+      makeTrial("e", "v", 495, 4),
       makeTrial("f", "u", 500, 5),
       makeTrial("g", "t", 15000, 6), // extreme outlier
     ];
@@ -74,11 +73,25 @@ describe("scoreSession", () => {
     const slow = result.trialFlags.filter((f) =>
       f.flags.includes("timing_outlier_slow"),
     );
-    expect(slow.length).toBeGreaterThanOrEqual(1);
-    expect(slow.some((s) => s.trialIndex === 6)).toBe(true);
+    expect(slow.length).toBe(1);
+    expect(slow[0].trialIndex).toBe(6);
   });
 
-  it("detects timing outliers (fast)", () => {
+  it("does not flag slow outliers with n < 5 (too few samples)", () => {
+    const trials = [
+      makeTrial("a", "x", 500, 0),
+      makeTrial("b", "y", 500, 1),
+      makeTrial("c", "z", 500, 2),
+      makeTrial("d", "w", 5000, 3), // would be outlier with more data
+    ];
+    const result = scoreSession(trials);
+    const slow = result.trialFlags.filter((f) =>
+      f.flags.includes("timing_outlier_slow"),
+    );
+    expect(slow).toHaveLength(0);
+  });
+
+  it("detects timing outliers (fast) via absolute threshold", () => {
     const trials = [
       makeTrial("a", "x", 500, 0),
       makeTrial("b", "y", 520, 1),
@@ -89,7 +102,43 @@ describe("scoreSession", () => {
     const fast = result.trialFlags.filter((f) =>
       f.flags.includes("timing_outlier_fast"),
     );
-    expect(fast.length).toBeGreaterThanOrEqual(1);
+    expect(fast.length).toBe(1);
+    expect(fast[0].trialIndex).toBe(3);
+  });
+
+  it("handles uniform times without false outliers (MAD=0)", () => {
+    // All identical times → MAD = 0 → skip outlier detection
+    const trials = [
+      makeTrial("a", "x", 500, 0),
+      makeTrial("b", "y", 500, 1),
+      makeTrial("c", "z", 500, 2),
+      makeTrial("d", "w", 500, 3),
+      makeTrial("e", "v", 500, 4),
+    ];
+    const result = scoreSession(trials);
+    const outliers = result.trialFlags.filter(
+      (f) =>
+        f.flags.includes("timing_outlier_slow") ||
+        f.flags.includes("timing_outlier_fast"),
+    );
+    expect(outliers).toHaveLength(0);
+  });
+
+  it("correctly flags outlier in n=5 sample", () => {
+    // Tight cluster + one clear outlier
+    const trials = [
+      makeTrial("a", "x", 600, 0),
+      makeTrial("b", "y", 610, 1),
+      makeTrial("c", "z", 590, 2),
+      makeTrial("d", "w", 605, 3),
+      makeTrial("e", "v", 5000, 4), // outlier
+    ];
+    const result = scoreSession(trials);
+    const slow = result.trialFlags.filter((f) =>
+      f.flags.includes("timing_outlier_slow"),
+    );
+    expect(slow.length).toBe(1);
+    expect(slow[0].trialIndex).toBe(4);
   });
 
   it("computes correct summary stats", () => {
