@@ -6,6 +6,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import type { SessionListEntry, SessionResult } from "@/domain";
+import { sessionResultsToCsv } from "@/domain";
 import { localStorageSessionStore } from "@/infra";
 import { ResultsView } from "./ResultsView";
 
@@ -34,6 +35,23 @@ export function PreviousSessions() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `complex-mapper-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportCsv = async () => {
+    const allEntries = await localStorageSessionStore.list();
+    const sessions: SessionResult[] = [];
+    for (const entry of allEntries) {
+      const s = await localStorageSessionStore.load(entry.id);
+      if (s) sessions.push(s);
+    }
+    const csv = sessionResultsToCsv(sessions);
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `complex-mapper-export-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -75,6 +93,12 @@ export function PreviousSessions() {
           meanReactionTimeMs={selected.scoring.summary.meanReactionTimeMs}
           medianReactionTimeMs={selected.scoring.summary.medianReactionTimeMs}
           onReset={() => setSelected(null)}
+          csvMeta={{
+            sessionId: selected.id,
+            packId: selected.config.stimulusListId,
+            packVersion: selected.config.stimulusListVersion,
+            seed: selected.seedUsed,
+          }}
         />
       </div>
     );
@@ -126,6 +150,12 @@ export function PreviousSessions() {
               className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
             >
               Export JSON
+            </button>
+            <button
+              onClick={handleExportCsv}
+              className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+            >
+              Export CSV
             </button>
             <button
               onClick={handleDeleteAll}
