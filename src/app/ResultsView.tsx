@@ -28,6 +28,7 @@ interface ResearchBundle {
 }
 
 const PROTOCOL_DOC_VERSION = "PROTOCOL.md@2026-02-13";
+const SCORING_VERSION = "scoring_v2_mad_3.5";
 const SCORING_ALGORITHM =
   "MAD-modified-z@3.5 + fast<200ms + timeout excluded";
 
@@ -100,6 +101,7 @@ export function ResultsView({
       `Pack: ${csvMeta.packId}@${csvMeta.packVersion}`,
       `Seed: ${csvMeta.seed ?? "none"}`,
       `Order: ${csvMeta.orderPolicy ?? "unknown"}`,
+      `Scoring: ${SCORING_VERSION}`,
     ];
     if (csvMeta.trialTimeoutMs !== undefined) {
       lines.push(`Timeout: ${csvMeta.trialTimeoutMs}ms`);
@@ -144,6 +146,10 @@ export function ResultsView({
             <dt className="text-muted-foreground">Order</dt>
             <dd className="text-foreground">
               {csvMeta.orderPolicy ?? "unknown"}
+            </dd>
+            <dt className="text-muted-foreground">Scoring</dt>
+            <dd className="font-mono text-foreground">
+              {SCORING_VERSION}
             </dd>
             {csvMeta.trialTimeoutMs !== undefined && (
               <>
@@ -254,6 +260,7 @@ export function ResultsView({
                   csvMeta.packVersion,
                   csvMeta.seed,
                   csvMeta.sessionFingerprint,
+                  SCORING_VERSION,
                 );
                 downloadFile(csv, "text/csv", `session-${csvMeta.sessionId}.csv`);
               }}

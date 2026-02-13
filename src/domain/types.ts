@@ -72,6 +72,8 @@ export interface SessionResult {
   readonly provenanceSnapshot: ProvenanceSnapshot | null;
   /** Deterministic SHA-256 fingerprint of config + order (null for legacy sessions). */
   readonly sessionFingerprint: string | null;
+  /** Scoring algorithm version string (null for legacy sessions, undefined if not yet set). */
+  readonly scoringVersion?: string | null;
 }
 
 /** Frozen copy of stimulus pack metadata at time of session. */
