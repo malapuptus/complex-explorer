@@ -1,17 +1,23 @@
 /**
  * DemoSession — runs a word-association session with pack selection.
- * Saves completed sessions via SessionStore adapter.
+ * Autosaves draft after each scored trial; offers resume on reload.
  */
 
 import { getStimulusList, listAvailableStimulusLists } from "@/domain";
-import type { SessionResult, OrderPolicy, ProvenanceSnapshot } from "@/domain";
+import type {
+  SessionResult,
+  OrderPolicy,
+  ProvenanceSnapshot,
+  DraftSession,
+} from "@/domain";
 import { localStorageSessionStore } from "@/infra";
 import { useSession } from "./useSession";
+import type { SessionSnapshot } from "./useSession";
 import { TrialView } from "./TrialView";
 import { ResultsView } from "./ResultsView";
 import { ProtocolScreen } from "./ProtocolScreen";
 import { BreakScreen } from "./BreakScreen";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -41,7 +47,6 @@ function buildPackOptions(): PackOption[] {
   }));
 }
 
-/** Rough duration estimate: 3–7 s per word on average. */
 function estimateDuration(wordCount: number): string {
   const loMin = Math.max(1, Math.round((wordCount * 3) / 60));
   const hiMin = Math.max(1, Math.round((wordCount * 7) / 60));
@@ -57,6 +62,9 @@ export function DemoSession() {
   const [orderPolicy, setOrderPolicy] = useState<OrderPolicy>("fixed");
   const [onBreak, setOnBreak] = useState(false);
   const lastBreakAtRef = useRef(0);
+  const [pendingDraft, setPendingDraft] = useState<DraftSession | null>(null);
+  const [draftChecked, setDraftChecked] = useState(false);
+  const draftIdRef = useRef(generateId());
 
   const selectedOption = packOptions.find(
     (p) => `${p.id}@${p.version}` === selectedPackKey,
@@ -69,9 +77,52 @@ export function DemoSession() {
   });
   const savedRef = useRef(false);
 
+  // Check for existing draft on mount
+  useEffect(() => {
+    localStorageSessionStore.loadDraft().then((draft) => {
+      if (draft) {
+        setPendingDraft(draft);
+      }
+      setDraftChecked(true);
+    });
+  }, []);
+
+  // Autosave draft after each trial during running phase
+  const prevTrialCount = useRef(0);
+  useEffect(() => {
+    if (session.phase !== "running") return;
+    if (session.trials.length === prevTrialCount.current) return;
+    prevTrialCount.current = session.trials.length;
+
+    // Only autosave after scored trials (skip practice-only updates
+    // for very small overhead, but save anyway for safety)
+    const draft: DraftSession = {
+      id: draftIdRef.current,
+      stimulusListId: list.id,
+      stimulusListVersion: list.version,
+      orderPolicy,
+      seedUsed: session.seedUsed,
+      wordList: list.words as string[],
+      practiceWords: PRACTICE_WORDS,
+      trials: session.trials,
+      currentIndex: session.currentIndex,
+      savedAt: new Date().toISOString(),
+    };
+    localStorageSessionStore.saveDraft(draft);
+  }, [
+    session.phase,
+    session.trials,
+    session.currentIndex,
+    session.seedUsed,
+    list,
+    orderPolicy,
+  ]);
+
+  // Clear draft when session completes
   useEffect(() => {
     if (session.phase === "done" && session.scoring && !savedRef.current) {
       savedRef.current = true;
+      localStorageSessionStore.deleteDraft();
       const provSnapshot: ProvenanceSnapshot = {
         listId: list.id,
         listVersion: list.version,
@@ -84,7 +135,7 @@ export function DemoSession() {
         wordCount: list.words.length,
       };
       const result: SessionResult = {
-        id: generateId(),
+        id: draftIdRef.current,
         config: {
           stimulusListId: list.id,
           stimulusListVersion: list.version,
@@ -112,12 +163,100 @@ export function DemoSession() {
     session.stimulusOrder,
   ]);
 
+  const handleResume = useCallback(() => {
+    if (!pendingDraft) return;
+    const draftList = getStimulusList(
+      pendingDraft.stimulusListId,
+      pendingDraft.stimulusListVersion,
+    );
+    if (!draftList) {
+      // Pack no longer exists — discard
+      localStorageSessionStore.deleteDraft();
+      setPendingDraft(null);
+      return;
+    }
+
+    // Rebuild the word list as StimulusWord[]
+    const allWords = [
+      ...pendingDraft.practiceWords,
+      ...pendingDraft.wordList,
+    ];
+    const snapshot: SessionSnapshot = {
+      words: allWords.map((word, index) => ({ word, index })),
+      currentIndex: pendingDraft.currentIndex,
+      trials: [...pendingDraft.trials],
+      practiceCount: pendingDraft.practiceWords.length,
+      seedUsed: pendingDraft.seedUsed,
+      stimulusOrder: pendingDraft.wordList as string[],
+      trialTimeoutMs: session.trialTimeoutMs,
+    };
+
+    draftIdRef.current = pendingDraft.id;
+    setSelectedPackKey(
+      `${pendingDraft.stimulusListId}@${pendingDraft.stimulusListVersion}`,
+    );
+    setOrderPolicy(pendingDraft.orderPolicy);
+    session.restore(snapshot);
+    setPendingDraft(null);
+  }, [pendingDraft, session]);
+
+  const handleDiscard = useCallback(() => {
+    localStorageSessionStore.deleteDraft();
+    setPendingDraft(null);
+  }, []);
+
   const handleReset = () => {
     savedRef.current = false;
     lastBreakAtRef.current = 0;
+    prevTrialCount.current = 0;
+    draftIdRef.current = generateId();
     setOnBreak(false);
     session.reset();
   };
+
+  // Wait for draft check before rendering
+  if (!draftChecked) return null;
+
+  // Show resume prompt if draft exists and session is idle
+  if (pendingDraft && session.phase === "idle") {
+    const scoredDone = pendingDraft.trials.filter(
+      (t) => !t.isPractice,
+    ).length;
+    const savedDate = new Date(pendingDraft.savedAt);
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-4">
+        <h2 className="text-2xl font-bold text-foreground">
+          Resume Session?
+        </h2>
+        <div className="max-w-md space-y-2 text-center">
+          <p className="text-muted-foreground">
+            You have an unfinished session from{" "}
+            <strong className="text-foreground">
+              {savedDate.toLocaleString()}
+            </strong>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Pack: {pendingDraft.stimulusListId} · {scoredDone} words
+            completed
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={handleResume}
+            className="rounded-md bg-primary px-6 py-2 text-primary-foreground hover:opacity-90"
+          >
+            Resume
+          </button>
+          <button
+            onClick={handleDiscard}
+            className="rounded-md border border-border px-6 py-2 text-foreground hover:bg-muted"
+          >
+            Discard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (session.phase === "idle") {
     return (
@@ -139,7 +278,10 @@ export function DemoSession() {
               className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
             >
               {packOptions.map((p) => (
-                <option key={`${p.id}@${p.version}`} value={`${p.id}@${p.version}`}>
+                <option
+                  key={`${p.id}@${p.version}`}
+                  value={`${p.id}@${p.version}`}
+                >
                   {p.label}
                 </option>
               ))}
@@ -151,7 +293,9 @@ export function DemoSession() {
             </label>
             <select
               value={orderPolicy}
-              onChange={(e) => setOrderPolicy(e.target.value as OrderPolicy)}
+              onChange={(e) =>
+                setOrderPolicy(e.target.value as OrderPolicy)
+              }
               className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
             >
               <option value="fixed">Fixed</option>
@@ -170,7 +314,6 @@ export function DemoSession() {
       : session.currentIndex - session.practiceCount;
     const totalScored = session.words.length - session.practiceCount;
 
-    // Check if we should show a break
     if (
       !isPractice &&
       scoredCompleted > 0 &&
@@ -190,7 +333,6 @@ export function DemoSession() {
       );
     }
 
-    // Trigger break on next render when boundary is hit
     if (
       !isPractice &&
       scoredCompleted > 0 &&
@@ -222,7 +364,9 @@ export function DemoSession() {
         trials={scoredTrials}
         trialFlags={session.scoring.trialFlags}
         meanReactionTimeMs={session.scoring.summary.meanReactionTimeMs}
-        medianReactionTimeMs={session.scoring.summary.medianReactionTimeMs}
+        medianReactionTimeMs={
+          session.scoring.summary.medianReactionTimeMs
+        }
         onReset={handleReset}
       />
     );

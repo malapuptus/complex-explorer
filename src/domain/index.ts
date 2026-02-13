@@ -12,7 +12,7 @@ export type {
   ProvenanceSnapshot,
 } from "./types";
 
-export type { SessionStore, SessionListEntry } from "./sessionStore";
+export type { SessionStore, SessionListEntry, DraftSession } from "./sessionStore";
 
 export { scoreSession } from "./scoring";
 
