@@ -56,6 +56,8 @@ If an agent (AI or human) determines during implementation that a file **not lis
 4. Resume work on the current ticket **only for in-scope files**.
 
 > **Rationale:** Scope creep is the #1 failure mode. This rule makes the boundary explicit and auditable.
+>
+> All scope exceptions must be recorded in [`docs/SCOPE_EXCEPTIONS.md`](docs/SCOPE_EXCEPTIONS.md) — this is the canonical ledger.
 
 ### 4. Verification Pipeline
 

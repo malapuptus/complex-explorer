@@ -90,6 +90,9 @@ Every ticket lists an **Allowed edits** section with explicit file paths. When w
 
 This prevents scope creep — the most common source of regressions.
 
+For the reusable ticket format, see [docs/TICKET_TEMPLATE.md](docs/TICKET_TEMPLATE.md).
+Any scope exceptions are logged in [docs/SCOPE_EXCEPTIONS.md](docs/SCOPE_EXCEPTIONS.md).
+
 ## What technologies are used for this project?
 
 This project is built with:
