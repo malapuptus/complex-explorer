@@ -14,6 +14,10 @@ export interface SessionStore {
   list(): Promise<SessionListEntry[]>;
   /** Delete a session by ID. */
   delete(id: string): Promise<void>;
+  /** Delete all saved sessions. */
+  deleteAll(): Promise<void>;
+  /** Export all sessions as a JSON string. */
+  exportAll(): Promise<string>;
 }
 
 export interface SessionListEntry {

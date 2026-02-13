@@ -1,8 +1,8 @@
 /**
- * PreviousSessions — lists saved sessions and allows opening one.
+ * PreviousSessions — lists saved sessions with delete/export controls.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import type { SessionListEntry, SessionResult } from "@/domain";
 import { localStorageSessionStore } from "@/infra";
@@ -12,11 +12,33 @@ export function PreviousSessions() {
   const [entries, setEntries] = useState<SessionListEntry[]>([]);
   const [selected, setSelected] = useState<SessionResult | null>(null);
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     localStorageSessionStore.list().then(setEntries);
   }, []);
 
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const handleDeleteAll = async () => {
+    await localStorageSessionStore.deleteAll();
+    setSelected(null);
+    refresh();
+  };
+
+  const handleExport = async () => {
+    const json = await localStorageSessionStore.exportAll();
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `complex-mapper-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (selected) {
+    const scoredTrials = selected.trials.filter((t) => !t.isPractice);
     return (
       <div>
         <button
@@ -26,7 +48,7 @@ export function PreviousSessions() {
           ← Back to list
         </button>
         <ResultsView
-          trials={selected.trials}
+          trials={scoredTrials}
           trialFlags={selected.scoring.trialFlags}
           meanReactionTimeMs={selected.scoring.summary.meanReactionTimeMs}
           medianReactionTimeMs={selected.scoring.summary.medianReactionTimeMs}
@@ -53,27 +75,44 @@ export function PreviousSessions() {
           </Link>
         </div>
       ) : (
-        <ul className="space-y-2">
-          {entries.map((entry) => (
-            <li key={entry.id}>
-              <button
-                onClick={async () => {
-                  const s = await localStorageSessionStore.load(entry.id);
-                  if (s) setSelected(s);
-                }}
-                className="w-full rounded-md border border-border px-4 py-3 text-left hover:bg-muted"
-              >
-                <span className="font-medium text-foreground">
-                  {entry.stimulusListId}
-                </span>
-                <span className="ml-4 text-sm text-muted-foreground">
-                  {entry.totalTrials} trials &middot;{" "}
-                  {new Date(entry.completedAt).toLocaleString()}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="space-y-2">
+            {entries.map((entry) => (
+              <li key={entry.id}>
+                <button
+                  onClick={async () => {
+                    const s = await localStorageSessionStore.load(entry.id);
+                    if (s) setSelected(s);
+                  }}
+                  className="w-full rounded-md border border-border px-4 py-3 text-left hover:bg-muted"
+                >
+                  <span className="font-medium text-foreground">
+                    {entry.stimulusListId}
+                  </span>
+                  <span className="ml-4 text-sm text-muted-foreground">
+                    {entry.totalTrials} trials &middot;{" "}
+                    {new Date(entry.completedAt).toLocaleString()}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-8 flex gap-3">
+            <button
+              onClick={handleExport}
+              className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+            >
+              Export JSON
+            </button>
+            <button
+              onClick={handleDeleteAll}
+              className="rounded-md border border-destructive px-4 py-2 text-sm text-destructive hover:bg-destructive/10"
+            >
+              Delete all local data
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
