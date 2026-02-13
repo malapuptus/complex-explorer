@@ -1,4 +1,10 @@
-import { useState, type FormEvent } from "react";
+import { useState, useRef, useCallback, type FormEvent, type KeyboardEvent } from "react";
+
+interface TrialMetrics {
+  tFirstKeyMs: number | null;
+  backspaceCount: number;
+  editCount: number;
+}
 
 interface Props {
   word: string;
@@ -6,7 +12,7 @@ interface Props {
   total: number;
   isPractice?: boolean;
   practiceCount?: number;
-  onSubmit: (response: string) => void;
+  onSubmit: (response: string, metrics: TrialMetrics) => void;
 }
 
 export function TrialView({
@@ -18,11 +24,45 @@ export function TrialView({
   onSubmit,
 }: Props) {
   const [value, setValue] = useState("");
+  const tFirstKeyRef = useRef<number | null>(null);
+  const backspaceRef = useRef(0);
+  const editRef = useRef(0);
+  const trialStartRef = useRef(performance.now());
+
+  // Reset refs when word changes (new trial)
+  const lastWordRef = useRef(word);
+  if (lastWordRef.current !== word) {
+    lastWordRef.current = word;
+    tFirstKeyRef.current = null;
+    backspaceRef.current = 0;
+    editRef.current = 0;
+    trialStartRef.current = performance.now();
+  }
+
+  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") return;
+    if (tFirstKeyRef.current === null) {
+      tFirstKeyRef.current = performance.now() - trialStartRef.current;
+    }
+    if (e.key === "Backspace" || e.key === "Delete") {
+      backspaceRef.current++;
+    }
+    editRef.current++;
+  }, []);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    onSubmit(value);
+    const metrics: TrialMetrics = {
+      tFirstKeyMs: tFirstKeyRef.current,
+      backspaceCount: backspaceRef.current,
+      editCount: editRef.current,
+    };
+    onSubmit(value, metrics);
     setValue("");
+    tFirstKeyRef.current = null;
+    backspaceRef.current = 0;
+    editRef.current = 0;
+    trialStartRef.current = performance.now();
   };
 
   const displayIndex = isPractice
@@ -48,6 +88,7 @@ export function TrialView({
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder="Type the first word that comes to mind…"
           className="w-80 rounded-md border border-input bg-background px-4 py-2 text-center text-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         />

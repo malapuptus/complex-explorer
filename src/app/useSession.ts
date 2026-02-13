@@ -57,7 +57,10 @@ export function useSession(words: string[], options?: UseSessionOptions) {
   }, [stimuli, practiceCount]);
 
   const submitResponse = useCallback(
-    (response: string) => {
+    (
+      response: string,
+      metrics: { tFirstKeyMs: number | null; backspaceCount: number; editCount: number },
+    ) => {
       const now = performance.now();
       const reactionTimeMs = now - trialStartRef.current;
 
@@ -70,6 +73,9 @@ export function useSession(words: string[], options?: UseSessionOptions) {
           association: {
             response: response.trim(),
             reactionTimeMs: Math.round(reactionTimeMs),
+            tFirstKeyMs: metrics.tFirstKeyMs !== null ? Math.round(metrics.tFirstKeyMs) : null,
+            backspaceCount: metrics.backspaceCount,
+            editCount: metrics.editCount,
           },
           isPractice,
         };

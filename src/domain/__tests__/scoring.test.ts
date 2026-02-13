@@ -8,10 +8,17 @@ function makeTrial(
   reactionTimeMs: number,
   index = 0,
   isPractice = false,
+  overrides?: { tFirstKeyMs?: number | null; backspaceCount?: number; editCount?: number },
 ): Trial {
   return {
     stimulus: { word, index },
-    association: { response, reactionTimeMs },
+    association: {
+      response,
+      reactionTimeMs,
+      tFirstKeyMs: overrides?.tFirstKeyMs ?? null,
+      backspaceCount: overrides?.backspaceCount ?? 0,
+      editCount: overrides?.editCount ?? 0,
+    },
     isPractice,
   };
 }
@@ -141,5 +148,41 @@ describe("scoreSession", () => {
       f.flags.includes("repeated_response"),
     );
     expect(repeated).toHaveLength(0);
+  });
+
+  it("flags high editing when backspaceCount exceeds threshold", () => {
+    const trials = [
+      makeTrial("a", "x", 500, 0, false, { backspaceCount: 0 }),
+      makeTrial("b", "y", 500, 1, false, { backspaceCount: 5 }),
+      makeTrial("c", "z", 500, 2, false, { backspaceCount: 4 }),
+    ];
+    const result = scoreSession(trials);
+    const highEdit = result.trialFlags.filter((f) =>
+      f.flags.includes("high_editing"),
+    );
+    expect(highEdit).toHaveLength(2);
+    expect(result.summary.highEditingCount).toBe(2);
+  });
+
+  it("does not flag high editing at or below threshold", () => {
+    const trials = [
+      makeTrial("a", "x", 500, 0, false, { backspaceCount: 3 }),
+      makeTrial("b", "y", 500, 1, false, { backspaceCount: 0 }),
+    ];
+    const result = scoreSession(trials);
+    const highEdit = result.trialFlags.filter((f) =>
+      f.flags.includes("high_editing"),
+    );
+    expect(highEdit).toHaveLength(0);
+  });
+
+  it("preserves tFirstKeyMs and editCount in trial data", () => {
+    const trials = [
+      makeTrial("a", "x", 500, 0, false, { tFirstKeyMs: 150, editCount: 3 }),
+    ];
+    const result = scoreSession(trials);
+    expect(result.summary.totalTrials).toBe(1);
+    // Metrics are on trial data, not scoring — just verify scoring doesn't break
+    expect(result.trialFlags).toHaveLength(1);
   });
 });

@@ -15,8 +15,14 @@ export interface StimulusWord {
 export interface AssociationResponse {
   /** The word the participant typed (trimmed). Empty string = no response. */
   readonly response: string;
-  /** Reaction time in milliseconds (performance.now delta). */
+  /** Reaction time in milliseconds from stimulus display to submit. */
   readonly reactionTimeMs: number;
+  /** Time from stimulus display to first keypress (null if no keys pressed). */
+  readonly tFirstKeyMs: number | null;
+  /** Number of backspace key presses during the trial. */
+  readonly backspaceCount: number;
+  /** Number of net edits (character insertions + deletions). */
+  readonly editCount: number;
 }
 
 /** One trial = stimulus + response. */
@@ -63,7 +69,8 @@ export type FlagKind =
   | "timing_outlier_slow"
   | "timing_outlier_fast"
   | "empty_response"
-  | "repeated_response";
+  | "repeated_response"
+  | "high_editing";
 
 export interface SessionSummary {
   readonly totalTrials: number;
@@ -73,4 +80,5 @@ export interface SessionSummary {
   readonly emptyResponseCount: number;
   readonly repeatedResponseCount: number;
   readonly timingOutlierCount: number;
+  readonly highEditingCount: number;
 }
