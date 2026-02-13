@@ -10,6 +10,7 @@ import { useSession } from "./useSession";
 import { TrialView } from "./TrialView";
 import { ResultsView } from "./ResultsView";
 import { ProtocolScreen } from "./ProtocolScreen";
+import { BreakScreen } from "./BreakScreen";
 import { useEffect, useRef, useState } from "react";
 
 function generateId(): string {
@@ -17,6 +18,7 @@ function generateId(): string {
 }
 
 const PRACTICE_WORDS = ["sun", "table", "road"];
+const BREAK_EVERY = 20;
 
 interface PackOption {
   id: string;
@@ -53,6 +55,8 @@ export function DemoSession() {
     `${packOptions[0].id}@${packOptions[0].version}`,
   );
   const [orderPolicy, setOrderPolicy] = useState<OrderPolicy>("fixed");
+  const [onBreak, setOnBreak] = useState(false);
+  const lastBreakAtRef = useRef(0);
 
   const selectedOption = packOptions.find(
     (p) => `${p.id}@${p.version}` === selectedPackKey,
@@ -110,6 +114,8 @@ export function DemoSession() {
 
   const handleReset = () => {
     savedRef.current = false;
+    lastBreakAtRef.current = 0;
+    setOnBreak(false);
     session.reset();
   };
 
@@ -159,6 +165,42 @@ export function DemoSession() {
 
   if (session.phase === "running" && session.currentWord) {
     const isPractice = session.currentIndex < session.practiceCount;
+    const scoredCompleted = isPractice
+      ? 0
+      : session.currentIndex - session.practiceCount;
+    const totalScored = session.words.length - session.practiceCount;
+
+    // Check if we should show a break
+    if (
+      !isPractice &&
+      scoredCompleted > 0 &&
+      scoredCompleted % BREAK_EVERY === 0 &&
+      scoredCompleted !== lastBreakAtRef.current &&
+      onBreak
+    ) {
+      return (
+        <BreakScreen
+          completedScored={scoredCompleted}
+          totalScored={totalScored}
+          onContinue={() => {
+            lastBreakAtRef.current = scoredCompleted;
+            setOnBreak(false);
+          }}
+        />
+      );
+    }
+
+    // Trigger break on next render when boundary is hit
+    if (
+      !isPractice &&
+      scoredCompleted > 0 &&
+      scoredCompleted % BREAK_EVERY === 0 &&
+      scoredCompleted !== lastBreakAtRef.current &&
+      !onBreak
+    ) {
+      setOnBreak(true);
+    }
+
     return (
       <TrialView
         word={session.currentWord.word}
