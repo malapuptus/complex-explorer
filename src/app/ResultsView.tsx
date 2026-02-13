@@ -1,5 +1,5 @@
-import { useMemo, useCallback } from "react";
-import type { Trial, TrialFlag } from "@/domain";
+import { useMemo, useCallback, useState } from "react";
+import type { Trial, TrialFlag, OrderPolicy } from "@/domain";
 import { generateReflectionPrompts, sessionTrialsToCsv } from "@/domain";
 
 interface Props {
@@ -15,7 +15,40 @@ interface Props {
     packVersion: string;
     seed: number | null;
     sessionFingerprint?: string | null;
+    orderPolicy?: OrderPolicy;
+    trialTimeoutMs?: number;
+    breakEveryN?: number;
   };
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback: select the text so user can Ctrl+C
+      const el = document.createElement("textarea");
+      el.value = text;
+      el.style.position = "fixed";
+      el.style.left = "-9999px";
+      document.body.appendChild(el);
+      el.select();
+      document.body.removeChild(el);
+    }
+  }, [text]);
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="ml-2 rounded border border-border px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted"
+    >
+      {copied ? "Copied!" : "Copy"}
+    </button>
+  );
 }
 
 export function ResultsView({
@@ -31,6 +64,23 @@ export function ResultsView({
     [trials, trialFlags],
   );
 
+  const reproBundle = useMemo(() => {
+    if (!csvMeta) return null;
+    const lines = [
+      `Fingerprint: ${csvMeta.sessionFingerprint ?? "n/a"}`,
+      `Pack: ${csvMeta.packId}@${csvMeta.packVersion}`,
+      `Seed: ${csvMeta.seed ?? "none"}`,
+      `Order: ${csvMeta.orderPolicy ?? "unknown"}`,
+    ];
+    if (csvMeta.trialTimeoutMs !== undefined) {
+      lines.push(`Timeout: ${csvMeta.trialTimeoutMs}ms`);
+    }
+    if (csvMeta.breakEveryN !== undefined) {
+      lines.push(`Break every: ${csvMeta.breakEveryN}`);
+    }
+    return lines.join("\n");
+  }, [csvMeta]);
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <h2 className="mb-2 text-2xl font-bold text-foreground">
@@ -39,16 +89,48 @@ export function ResultsView({
       <p className="mb-6 text-sm text-muted-foreground">
         Mean RT: {meanReactionTimeMs} ms &middot; Median RT:{" "}
         {medianReactionTimeMs} ms
-        {csvMeta?.sessionFingerprint && (
-          <>
-            {" "}
-            &middot; Fingerprint:{" "}
-            <span className="font-mono">
-              {csvMeta.sessionFingerprint.slice(0, 12)}…
-            </span>
-          </>
-        )}
       </p>
+
+      {csvMeta && reproBundle && (
+        <div className="mb-6 rounded-md border border-border bg-muted/30 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-foreground">
+              Reproducibility Bundle
+            </h3>
+            <CopyButton text={reproBundle} />
+          </div>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+            <dt className="text-muted-foreground">Fingerprint</dt>
+            <dd className="font-mono text-foreground break-all">
+              {csvMeta.sessionFingerprint ?? "n/a"}
+            </dd>
+            <dt className="text-muted-foreground">Pack</dt>
+            <dd className="text-foreground">
+              {csvMeta.packId}@{csvMeta.packVersion}
+            </dd>
+            <dt className="text-muted-foreground">Seed</dt>
+            <dd className="font-mono text-foreground">
+              {csvMeta.seed ?? "none"}
+            </dd>
+            <dt className="text-muted-foreground">Order</dt>
+            <dd className="text-foreground">
+              {csvMeta.orderPolicy ?? "unknown"}
+            </dd>
+            {csvMeta.trialTimeoutMs !== undefined && (
+              <>
+                <dt className="text-muted-foreground">Timeout</dt>
+                <dd className="text-foreground">{csvMeta.trialTimeoutMs}ms</dd>
+              </>
+            )}
+            {csvMeta.breakEveryN !== undefined && (
+              <>
+                <dt className="text-muted-foreground">Break every</dt>
+                <dd className="text-foreground">{csvMeta.breakEveryN} trials</dd>
+              </>
+            )}
+          </dl>
+        </div>
+      )}
 
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full text-left text-sm">

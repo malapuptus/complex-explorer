@@ -471,6 +471,9 @@ export function DemoSession() {
           packVersion: list.version,
           seed: session.seedUsed,
           sessionFingerprint,
+          orderPolicy,
+          trialTimeoutMs: activeConfig?.trialTimeoutMs,
+          breakEveryN: isLongPack ? breakEveryN : undefined,
         }}
       />
     );
