@@ -3,8 +3,24 @@ import * as path from "path";
 
 const SRC = path.resolve(__dirname, "../src");
 
+/**
+ * Layer model (must match CONSTITUTION.md):
+ *
+ * | Layer  | Directory    | May import from        |
+ * |--------|-------------|------------------------|
+ * | app    | src/app/    | domain, infra, external|
+ * | domain | src/domain/ | external only (pure)   |
+ * | infra  | src/infra/  | domain, external       |
+ *
+ * Legacy UI directories (src/components/, src/pages/, src/hooks/)
+ * are treated as "app" layer for backward compatibility.
+ */
+
+type Layer = "app" | "domain" | "infra";
+
 function walk(dir: string): string[] {
   const results: string[] = [];
+  if (!fs.existsSync(dir)) return results;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
@@ -16,11 +32,15 @@ function walk(dir: string): string[] {
   return results;
 }
 
-function getLayer(filePath: string): "domain" | "infra" | "ui" | null {
+function getLayer(filePath: string): Layer | null {
   const rel = path.relative(SRC, filePath).replace(/\\/g, "/");
+  if (rel.startsWith("app/")) return "app";
   if (rel.startsWith("domain/")) return "domain";
   if (rel.startsWith("infra/")) return "infra";
-  if (rel.startsWith("components/") || rel.startsWith("pages/")) return "ui";
+  // Legacy directories → app layer
+  if (rel.startsWith("components/") || rel.startsWith("pages/") || rel.startsWith("hooks/")) {
+    return "app";
+  }
   return null;
 }
 
@@ -34,10 +54,7 @@ function extractImports(content: string): string[] {
   return imports;
 }
 
-function resolveImportLayer(
-  importPath: string,
-  fromFile: string
-): "domain" | "infra" | "ui" | null {
+function resolveImportLayer(importPath: string, fromFile: string): Layer | null {
   if (!importPath.startsWith(".") && !importPath.startsWith("@/")) return null;
 
   let resolved: string;
@@ -50,9 +67,10 @@ function resolveImportLayer(
   return getLayer(resolved);
 }
 
-const ILLEGAL: Record<string, string[]> = {
-  domain: ["infra", "ui"],
-  infra: ["ui"],
+/** Illegal import targets per layer. */
+const ILLEGAL: Record<string, Layer[]> = {
+  domain: ["infra", "app"],
+  infra: ["app"],
 };
 
 let violations = 0;
@@ -70,7 +88,7 @@ for (const file of files) {
     if (targetLayer && ILLEGAL[layer].includes(targetLayer)) {
       const rel = path.relative(SRC, file);
       console.error(
-        `Boundaries: FAIL - ${rel}: illegal import from ${layer} -> ${targetLayer} (${imp})`
+        `Boundary violation: ${rel} (${layer} layer) imports from ${targetLayer} layer via "${imp}" — rule: ${layer} cannot import ${targetLayer}`
       );
       violations++;
     }
@@ -78,6 +96,7 @@ for (const file of files) {
 }
 
 if (violations > 0) {
+  console.error(`\nBoundaries: FAIL (${violations} violation${violations > 1 ? "s" : ""})`);
   process.exit(1);
 } else {
   console.log("Boundaries: PASS");

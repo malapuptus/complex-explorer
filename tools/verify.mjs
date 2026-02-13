@@ -61,11 +61,12 @@ if (process.env.CANARY === "1") {
 const steps = [
   { name: "Repo hygiene", cmd: "npx tsx tools/check-hygiene.ts" },
   { name: "Format check", cmd: 'npx prettier --check "src/**/*.{ts,tsx}"' },
-  { name: "Lint", cmd: "npm run lint" },
+  { name: "Lint", cmd: "npx eslint ." },
   { name: "Typecheck", cmd: "npx tsc --noEmit" },
   { name: "Boundary check", cmd: "npx tsx tools/check-boundaries.ts" },
   { name: "Load smoke", cmd: "node tools/load-smoke.mjs" },
-  { name: "Unit tests", cmd: "npm run test" },
+  { name: "Build", cmd: "npx vite build" },
+  { name: "Unit tests", cmd: "npx vitest run" },
 ];
 
 let step = 0;
