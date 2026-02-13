@@ -23,6 +23,8 @@ export interface AssociationResponse {
 export interface Trial {
   readonly stimulus: StimulusWord;
   readonly association: AssociationResponse;
+  /** If true, this trial is a warm-up and excluded from scoring. */
+  readonly isPractice: boolean;
 }
 
 /** Configuration for a session run. */
