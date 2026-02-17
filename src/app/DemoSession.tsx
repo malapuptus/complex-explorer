@@ -1,13 +1,14 @@
 /**
  * DemoSession — runs a word-association session with pack selection.
  * Autosaves draft after each scored trial; offers resume on reload.
+ * Quota recovery workflow added (0230).
  */
 
 declare const __APP_VERSION__: string;
 
 import type { SessionResult, ProvenanceSnapshot, DraftSession, StimulusPackSnapshot, OrderPolicy } from "@/domain";
-import { computeSessionFingerprint, getStimulusList } from "@/domain";
-import { localStorageSessionStore } from "@/infra";
+import { computeSessionFingerprint, getStimulusList, sessionTrialsToCsv } from "@/domain";
+import { localStorageSessionStore, localStorageStimulusStore } from "@/infra";
 import { useSession } from "./useSession";
 import type { SessionSnapshot, StartOverrides } from "./useSession";
 import { ResultsView } from "./ResultsView";
@@ -18,6 +19,87 @@ import { RunningTrial } from "./RunningTrial";
 import { generateId, generateTabId, PRACTICE_WORDS, DEFAULT_BREAK_EVERY } from "./DemoSessionHelpers";
 import { usePackSelection } from "./usePackSelection";
 import { useEffect, useRef, useState, useCallback } from "react";
+
+/** Quota recovery dialog state. */
+interface QuotaError {
+  operation: "draft" | "session";
+  message: string;
+}
+
+function QuotaRecoveryDialog({
+  error, trials, trialFlags, csvMeta, onRetry, onDismiss,
+}: {
+  error: QuotaError;
+  trials: { trial: unknown }[];
+  trialFlags: unknown[];
+  csvMeta: { sessionId: string; packId: string; packVersion: string; seed: number | null; sessionFingerprint: string | null };
+  onRetry: () => void;
+  onDismiss: () => void;
+}) {
+  const [orphanResult, setOrphanResult] = useState<string | null>(null);
+
+  const handleExport = () => {
+    const csv = sessionTrialsToCsv(
+      trials as never[], trialFlags as never[],
+      csvMeta.sessionId, csvMeta.packId, csvMeta.packVersion,
+      csvMeta.seed, csvMeta.sessionFingerprint, "scoring_v2_mad_3.5",
+      { redactResponses: true },
+    );
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `emergency-export-${csvMeta.sessionId}-redacted.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCleanup = async () => {
+    const refs = await localStorageSessionStore.referencedPacks();
+    const packs = localStorageStimulusStore.list();
+    let deleted = 0;
+    for (const p of packs) {
+      if (!refs.has(`${p.id}@${p.version}`)) {
+        localStorageStimulusStore.delete(p.id, p.version);
+        deleted++;
+      }
+    }
+    setOrphanResult(deleted > 0 ? `Deleted ${deleted} orphan pack(s).` : "No orphan packs found.");
+  };
+
+  return (
+    <div className="mx-auto max-w-lg rounded-md border border-destructive bg-destructive/10 p-6 space-y-4">
+      <h3 className="text-lg font-bold text-destructive">Storage Full</h3>
+      <p className="text-sm text-foreground">
+        {error.operation === "draft" ? "Draft" : "Session"} could not be saved — browser storage quota exceeded.
+      </p>
+      <p className="text-xs text-muted-foreground">{error.message}</p>
+      <div className="flex flex-wrap gap-3">
+        <button onClick={handleExport}
+          className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+        >
+          Export CSV (Redacted)
+        </button>
+        <button onClick={handleCleanup}
+          className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+        >
+          Delete orphan packs
+        </button>
+        <button onClick={onRetry}
+          className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:opacity-90"
+        >
+          Retry save
+        </button>
+        <button onClick={onDismiss}
+          className="rounded-md border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-muted"
+        >
+          Dismiss
+        </button>
+      </div>
+      {orphanResult && <p className="text-xs text-muted-foreground">{orphanResult}</p>}
+    </div>
+  );
+}
 
 export function DemoSession() {
   const {
@@ -32,6 +114,7 @@ export function DemoSession() {
   const [draftChecked, setDraftChecked] = useState(false);
   const [draftLocked, setDraftLocked] = useState(false);
   const [sessionFingerprint, setSessionFingerprint] = useState<string | null>(null);
+  const [quotaError, setQuotaError] = useState<QuotaError | null>(null);
   const draftIdRef = useRef(generateId());
   const tabIdRef = useRef(generateTabId());
   const startedAtRef = useRef<string | null>(null);
@@ -52,6 +135,23 @@ export function DemoSession() {
     });
   }, []);
 
+  const buildDraft = useCallback((): DraftSession => ({
+    id: draftIdRef.current,
+    stimulusListId: list.id,
+    stimulusListVersion: list.version,
+    orderPolicy,
+    seedUsed: session.seedUsed,
+    wordList: list.words as string[],
+    practiceWords: PRACTICE_WORDS,
+    stimulusOrder: session.stimulusOrder,
+    trials: session.trials,
+    currentIndex: session.currentIndex,
+    savedAt: new Date().toISOString(),
+    startedAt: startedAtRef.current ?? undefined,
+    trialTimeoutMs: session.trialTimeoutMs,
+    breakEveryN,
+  }), [list, orderPolicy, session, breakEveryN]);
+
   // Autosave draft after each trial during running phase
   const prevTrialCount = useRef(0);
   useEffect(() => {
@@ -59,34 +159,19 @@ export function DemoSession() {
     if (session.trials.length === prevTrialCount.current) return;
     prevTrialCount.current = session.trials.length;
 
-    const draft: DraftSession = {
-      id: draftIdRef.current,
-      stimulusListId: list.id,
-      stimulusListVersion: list.version,
-      orderPolicy,
-      seedUsed: session.seedUsed,
-      wordList: list.words as string[],
-      practiceWords: PRACTICE_WORDS,
-      stimulusOrder: session.stimulusOrder,
-      trials: session.trials,
-      currentIndex: session.currentIndex,
-      savedAt: new Date().toISOString(),
-      startedAt: startedAtRef.current ?? undefined,
-      trialTimeoutMs: session.trialTimeoutMs,
-      breakEveryN,
-    };
+    const draft = buildDraft();
     try {
       localStorageSessionStore.saveDraft(draft);
     } catch (e) {
       if (e instanceof DOMException && e.name === "QuotaExceededError") {
-        alert("Storage full — draft could not be saved. Export your data and delete old sessions or orphan packs to free space.");
+        setQuotaError({ operation: "draft", message: String(e.message) });
       }
     }
     localStorageSessionStore.acquireDraftLock(tabIdRef.current);
   }, [
     session.phase, session.trials, session.currentIndex,
     session.seedUsed, session.stimulusOrder, session.trialTimeoutMs,
-    list, orderPolicy, breakEveryN,
+    list, orderPolicy, breakEveryN, buildDraft,
   ]);
 
   // Clear draft when session completes
@@ -142,7 +227,7 @@ export function DemoSession() {
         await localStorageSessionStore.save(result);
       } catch (e) {
         if (e instanceof DOMException && e.name === "QuotaExceededError") {
-          alert("Storage full — session could not be saved. Export the bundle below, then delete old sessions or orphan packs to free space.");
+          setQuotaError({ operation: "session", message: String(e.message) });
         }
       }
       setSessionFingerprint(fingerprint);
@@ -152,6 +237,22 @@ export function DemoSession() {
     orderPolicy, session.seedUsed, session.stimulusOrder,
     session.trialTimeoutMs, breakEveryN,
   ]);
+
+  const handleRetryQuota = useCallback(() => {
+    if (quotaError?.operation === "draft") {
+      try {
+        localStorageSessionStore.saveDraft(buildDraft());
+        setQuotaError(null);
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "QuotaExceededError") {
+          setQuotaError({ operation: "draft", message: String(e.message) });
+        }
+      }
+    } else {
+      // For session saves, just dismiss — session will be in results view
+      setQuotaError(null);
+    }
+  }, [quotaError, buildDraft]);
 
   const handleResume = useCallback(() => {
     if (!pendingDraft) return;
@@ -214,6 +315,7 @@ export function DemoSession() {
     setActiveConfig(null);
     setDraftLocked(false);
     setSessionFingerprint(null);
+    setQuotaError(null);
     localStorageSessionStore.releaseDraftLock(tabIdRef.current);
     session.reset();
   }, [session]);
@@ -245,6 +347,26 @@ export function DemoSession() {
   }, []);
 
   if (!draftChecked) return null;
+
+  // Quota recovery overlay (0230)
+  if (quotaError) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-8">
+        <QuotaRecoveryDialog
+          error={quotaError}
+          trials={session.trials as never[]}
+          trialFlags={session.scoring?.trialFlags ?? []}
+          csvMeta={{
+            sessionId: draftIdRef.current, packId: list.id,
+            packVersion: list.version, seed: session.seedUsed,
+            sessionFingerprint,
+          }}
+          onRetry={handleRetryQuota}
+          onDismiss={() => setQuotaError(null)}
+        />
+      </div>
+    );
+  }
 
   if (pendingDraft && session.phase === "idle") {
     return (
