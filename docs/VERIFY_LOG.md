@@ -4,6 +4,27 @@
 
 ---
 
+## Tickets 0244–0248 — Import Preview Extraction, Diagnostics, Pack Extract, importedFrom, Collision Safety, Gating
+
+**Date:** 2026-02-17 | **Oracle:** `npx vitest run src` → **276/276 PASS**
+
+| # | Check | Result |
+|---|-------|--------|
+| 1 | All tests pass | ✅ 276/276 |
+| 2 | `ImportPreviewPanel` extracted (~290 lines, within 350 budget) | ✅ |
+| 3 | `ProtocolScreen.tsx` shrinks 533→387 lines (−146) | ✅ |
+| 4 | FAIL shows `Expected hash` + `Computed hash` rows | ✅ |
+| 5 | `Copy diagnostics` clipboard payload `{code, expectedHash, computedHash, packageVersion}` | ✅ |
+| 6 | `Extract Pack` only when `type=package && wordCount>0 && PASS` | ✅ |
+| 7 | `importedFrom` round-trips; legacy migrates to `null` | ✅ |
+| 8 | `exists()` + collision ID `__import_<hash[0:8]>`; neither import overwrites | ✅ |
+
+**Canary (FAIL case):** `Integrity: FAIL — ERR_INTEGRITY_MISMATCH` · `Expected hash: aabbcc` · `Computed hash: ddeeff` · `Available actions: Blocked: Integrity mismatch` · `[Copy diagnostics] [Cancel]`
+
+**Canary (PASS full):** `Integrity: PASS ✓` · `Available actions: Import as Session, Extract Pack` · `[Import as Session] [Extract Pack] [Copy diagnostics] [Cancel]`
+
+---
+
 ## Template
 
 Copy this block for each new entry:

@@ -78,6 +78,14 @@ export interface SessionResult {
   readonly appVersion?: string | null;
   /** Snapshot of the stimulus pack used (hash + provenance + schema version). Null for legacy. */
   readonly stimulusPackSnapshot?: StimulusPackSnapshot | null;
+  /**
+   * Source package metadata for imported sessions (0246).
+   * Null for sessions created locally. Undefined in legacy data (migrated to null).
+   */
+  readonly importedFrom?: {
+    readonly packageVersion: string;
+    readonly packageHash: string;
+  } | null;
 }
 
 /** Frozen snapshot of stimulus pack metadata for reproducibility. */

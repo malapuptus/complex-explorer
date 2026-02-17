@@ -41,6 +41,9 @@ export interface SessionStore {
 
   /** Return all pack references (id@version) used by saved sessions. */
   referencedPacks(): Promise<Set<string>>;
+
+  /** Check if a session with this ID exists (0247 collision safety). */
+  exists(id: string): Promise<boolean>;
 }
 
 export interface SessionListEntry {

@@ -4,6 +4,7 @@
  * Supports custom pack import/export with collision detection.
  * Supports importing from Research Bundle JSON (auto-detects rb_v3+ payload).
  * Import preview + confirmation gate added (0232).
+ * ImportPreviewPanel extracted (0244); importedFrom + collision safety (0246, 0247).
  */
 
 import { useState, useRef } from "react";
@@ -13,6 +14,12 @@ import { validateStimulusList, STIMULUS_SCHEMA_VERSION, computeWordsSha256 } fro
 import type { StimulusList } from "@/domain";
 import { localStorageStimulusStore, localStorageSessionStore } from "@/infra";
 import { verifyPackageIntegrity } from "./ResultsExportActions";
+import {
+  ImportPreviewPanel,
+  analyzeImport,
+  formatKB,
+} from "./ImportPreviewPanel";
+import type { ImportPreview } from "./ImportPreviewPanel";
 
 /** Human-readable messages for validation error codes. */
 const ERROR_CODE_MESSAGES: Record<ValidationErrorCode, string> = {
@@ -63,159 +70,6 @@ const INSTRUCTIONS = [
 
 const DEFAULT_BREAK_EVERY = 20;
 
-function formatKB(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  return `${(bytes / 1024).toFixed(1)} KB`;
-}
-
-/**
- * Try to extract a pack from a Research Bundle JSON (rb_v3+).
- * Returns null if the JSON is not a bundle or lacks pack payload.
- */
-function extractPackFromBundle(parsed: Record<string, unknown>): Partial<StimulusList> | null {
-  if (typeof parsed.exportSchemaVersion !== "string") return null;
-  const snapshot = parsed.stimulusPackSnapshot as Record<string, unknown> | undefined;
-  if (!snapshot) return null;
-  const words = snapshot.words as string[] | undefined;
-  const prov = snapshot.provenance as Record<string, unknown> | undefined;
-  if (!Array.isArray(words) || words.length === 0 || !prov) return null;
-  return {
-    id: prov.listId as string,
-    version: prov.listVersion as string,
-    language: prov.language as string,
-    source: prov.source as string,
-    provenance: {
-      sourceName: prov.sourceName as string,
-      sourceYear: prov.sourceYear as string,
-      sourceCitation: prov.sourceCitation as string,
-      licenseNote: prov.licenseNote as string,
-    },
-    words,
-    stimulusSchemaVersion: snapshot.stimulusSchemaVersion as string | undefined,
-    stimulusListHash: snapshot.stimulusListHash as string | undefined,
-  };
-}
-
-/** Detected import type for preview. */
-type ImportType = "pack" | "bundle" | "package";
-
-/** Import preview data shown before confirmation. */
-interface ImportPreview {
-  type: ImportType;
-  packData: Partial<StimulusList>;
-  wordCount: number;
-  hash: string | null;
-  schemaVersion: string | null;
-  sizeBytes: number;
-  rawJson: string;
-  /** For pkg_v1: integrity check result. */
-  integrityResult?: { valid: boolean; expected: string; actual: string } | null;
-  /** For pkg_v1: the full session result to import. */
-  sessionToImport?: SessionResult | null;
-}
-
-/** Detect type and extract pack data for preview. */
-function analyzeImport(parsed: Record<string, unknown>, rawJson: string): ImportPreview | null {
-  let type: ImportType = "pack";
-  let packData: Partial<StimulusList> | null = null;
-
-  // Session package?
-  if (typeof parsed.packageVersion === "string" && parsed.bundle) {
-    type = "package";
-    const bundle = parsed.bundle as Record<string, unknown>;
-    packData = extractPackFromBundle(bundle);
-  }
-  // Research bundle?
-  else if (typeof parsed.exportSchemaVersion === "string") {
-    type = "bundle";
-    packData = extractPackFromBundle(parsed);
-  }
-  // Direct pack JSON
-  else {
-    packData = parsed as Partial<StimulusList>;
-  }
-
-  if (!packData) return null;
-
-  return {
-    type,
-    packData,
-    wordCount: Array.isArray(packData.words) ? packData.words.length : 0,
-    hash: (packData.stimulusListHash as string) ?? null,
-    schemaVersion: (packData.stimulusSchemaVersion as string) ?? null,
-    sizeBytes: rawJson.length,
-  } as ImportPreview;
-}
-
-function ImportPreviewPanel({
-  preview, onConfirm, onCancel, onImportSession,
-}: {
-  preview: ImportPreview;
-  onConfirm: () => void;
-  onCancel: () => void;
-  onImportSession?: () => void;
-}) {
-  const typeLabel = preview.type === "pack" ? "Pack JSON" : preview.type === "bundle" ? "Research Bundle" : "Session Package";
-  const integrityFailed = preview.integrityResult && !preview.integrityResult.valid;
-  const hasSession = !!preview.sessionToImport;
-  return (
-    <div className="w-full max-w-md rounded-md border border-border bg-muted/30 p-4 space-y-2" role="region" aria-label="Import preview">
-      <h4 className="text-sm font-semibold text-foreground">Import Preview</h4>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-        <dt className="text-muted-foreground">Detected type</dt>
-        <dd className="text-foreground">{typeLabel}</dd>
-        <dt className="text-muted-foreground">Pack ID</dt>
-        <dd className="font-mono text-foreground">{(preview.packData.id as string) ?? "unknown"}</dd>
-        <dt className="text-muted-foreground">Version</dt>
-        <dd className="font-mono text-foreground">{(preview.packData.version as string) ?? "unknown"}</dd>
-        <dt className="text-muted-foreground">Word count</dt>
-        <dd className="text-foreground">{preview.wordCount}</dd>
-        <dt className="text-muted-foreground">Hash</dt>
-        <dd className="font-mono text-foreground break-all">{preview.hash ?? "n/a"}</dd>
-        <dt className="text-muted-foreground">Schema</dt>
-        <dd className="font-mono text-foreground">{preview.schemaVersion ?? "n/a"}</dd>
-        <dt className="text-muted-foreground">File size</dt>
-        <dd className="text-foreground">{formatKB(preview.sizeBytes)}</dd>
-        {preview.integrityResult && (
-          <>
-            <dt className="text-muted-foreground">Integrity</dt>
-            <dd className={integrityFailed ? "text-destructive font-semibold" : "text-primary font-semibold"}>
-              {integrityFailed ? "FAIL — ERR_INTEGRITY_MISMATCH" : "PASS ✓"}
-            </dd>
-          </>
-        )}
-      </dl>
-      {integrityFailed && (
-        <p className="text-xs text-destructive">
-          Package hash mismatch. The file may be corrupted or tampered. Import is blocked.
-        </p>
-      )}
-      <div className="flex flex-wrap gap-3 pt-2">
-        <button onClick={onConfirm}
-          disabled={!!integrityFailed}
-          aria-disabled={!!integrityFailed}
-          className="rounded-md bg-primary px-4 py-1.5 text-sm text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Import Pack
-        </button>
-        {hasSession && onImportSession && (
-          <button onClick={onImportSession}
-            disabled={!!integrityFailed}
-            aria-disabled={!!integrityFailed}
-            className="rounded-md border border-primary px-4 py-1.5 text-sm text-primary hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Import as Session
-          </button>
-        )}
-        <button onClick={onCancel}
-          className="rounded-md border border-border px-4 py-1.5 text-sm text-muted-foreground hover:bg-muted"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-}
 
 export function ProtocolScreen({
   wordCount, practiceCount, source, estimatedMinutes,
@@ -401,19 +255,47 @@ export function ProtocolScreen({
         )}
       </div>
 
-      {/* Import preview (0232, 0233, 0234) */}
+      {/* Import preview (0232, 0233, 0234, 0244–0248) */}
       {importPreview && (
         <ImportPreviewPanel
           preview={importPreview}
           onConfirm={handleConfirmImport}
           onCancel={() => setImportPreview(null)}
-          onImportSession={() => {
+          onExtractPack={
+            importPreview.packData && Object.keys(importPreview.packData).length > 0
+              ? () => doImport(importPreview.packData)
+              : undefined
+          }
+          onImportSession={async () => {
             if (!importPreview.sessionToImport) return;
             const session = importPreview.sessionToImport;
-            // Save as imported session (with _imported flag)
-            const imported = { ...session, _imported: true } as SessionResult & { _imported: boolean };
-            void localStorageSessionStore.save(imported).then(() => {
-              setImportSuccess(`Session "${session.id}" imported to Previous Sessions.`);
+            const packageHash = importPreview.packageHash ?? "";
+            const packageVersion = importPreview.packageVersion ?? "pkg_v1";
+
+            // 0246: attach importedFrom provenance
+            const withProvenance = {
+              ...session,
+              _imported: true,
+              importedFrom: { packageVersion, packageHash },
+            } as SessionResult & { _imported: boolean };
+
+            // 0247: collision safety — rewrite ID if already exists
+            let finalId = withProvenance.id;
+            let collisionWarning = "";
+            if (await localStorageSessionStore.exists(finalId)) {
+              const baseId = finalId;
+              finalId = `${baseId}__import_${packageHash.slice(0, 8)}`;
+              let attempt = 2;
+              while (await localStorageSessionStore.exists(finalId) && attempt <= 10) {
+                finalId = `${baseId}__import_${packageHash.slice(0, 8)}__${attempt}`;
+                attempt++;
+              }
+              collisionWarning = ` (ID collision — imported as ${finalId})`;
+            }
+
+            const toSave = { ...withProvenance, id: finalId };
+            void localStorageSessionStore.save(toSave).then(() => {
+              setImportSuccess(`Session "${finalId}" imported to Previous Sessions.${collisionWarning}`);
               setImportPreview(null);
             }).catch((err) => {
               setImportError(`Failed to import session: ${String(err)}`);
