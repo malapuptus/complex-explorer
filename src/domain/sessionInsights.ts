@@ -2,9 +2,13 @@
  * sessionInsights — pure analysis layer for a completed SessionResult.
  * No I/O, no React, no side-effects. Deterministic.
  * Ticket 0264. Updated 0271 (trialFields), 0272 (flagCounts, responseClusters).
+ * Updated 0277 (ciByTrial, ciCounts).
  */
 
 import type { SessionResult, FlagKind } from "./types";
+import type { CiCode } from "./ciCodes";
+import { computeCiCodesForTrial, aggregateCiCounts } from "./ciCodes";
+
 import {
   getResponseText,
   getResponseLen,
@@ -85,6 +89,10 @@ export interface SessionInsights {
     words: string[];
     sessionTrialIndices: number[];
   }>;
+
+  // 0277: CI codes
+  ciByTrial: Map<number, CiCode[]>;
+  ciCounts: Partial<Record<CiCode, number>>;
 
   // Drilldown lookup
   trialRefs: TrialRef[];
@@ -293,6 +301,18 @@ export function buildSessionInsights(session: SessionResult): SessionInsights {
       sessionTrialIndices: v.indices,
     }));
 
+  // 8. 0277: CI codes — computed per-trial after trialRefs are built
+  const ciByTrial = new Map<number, CiCode[]>();
+  const allTrialCiCodes: CiCode[][] = [];
+  for (const ref of trialRefs) {
+    const trial = trials[ref.sessionTrialIndex];
+    const flags = ref.flags;
+    const codes = computeCiCodesForTrial(trial, flags, ref.word);
+    ciByTrial.set(ref.sessionTrialIndex, codes);
+    allTrialCiCodes.push(codes);
+  }
+  const ciCounts = aggregateCiCounts(allTrialCiCodes);
+
   return {
     trialCount: trials.length,
     scoredCount,
@@ -318,6 +338,8 @@ export function buildSessionInsights(session: SessionResult): SessionInsights {
     histogram,
     flagCounts,
     responseClusters,
+    ciByTrial,
+    ciCounts,
     trialRefs,
     trialRefBySessionTrialIndex,
   };

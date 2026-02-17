@@ -8,8 +8,8 @@
 
 import { useState, useMemo } from "react";
 import type { Trial, TrialFlag, OrderPolicy, SessionResult, StimulusPackSnapshot, StimulusList } from "@/domain";
-import { sessionTrialsToCsv, getStimulusList } from "@/domain";
-import { localStorageStimulusStore } from "@/infra";
+import { sessionTrialsToCsv, getStimulusList, buildSessionInsights } from "@/domain";
+import { localStorageStimulusStore, trialAnnotations } from "@/infra";
 import { bundleFilename, packageFilename, csvFilename, packFilename } from "@/domain/exportFilenames";
 
 declare const __APP_VERSION__: string;
@@ -33,6 +33,10 @@ export interface ResearchBundle {
   exportedAt: string;
   stimulusPackSnapshot?: (StimulusPackSnapshot & { words?: readonly string[] }) | null;
   privacy: PrivacyManifest;
+  /** 0280: Computed CI counts for the session (deterministic). */
+  ciCounts?: Record<string, number>;
+  /** 0280: Self-tag summary (human-judgment codes, local-only). */
+  annotationsSummary?: Record<string, number>;
 }
 
 export const EXPORT_SCHEMA_VERSION = "rb_v3";
@@ -297,6 +301,22 @@ export function buildBundleObject(
     identifiersAnonymized: anonymize,
   };
 
+  // 0280: Compute CI counts (deterministic, from session data)
+  let ciCounts: Record<string, number> | undefined;
+  let annotationsSummary: Record<string, number> | undefined;
+  if (sessionResult) {
+    const ins = buildSessionInsights(sessionResult);
+    ciCounts = Object.fromEntries(
+      Object.entries(ins.ciCounts).map(([k, v]) => [k, v ?? 0]),
+    );
+    const rawSummary = trialAnnotations.getAnnotationSummary(sessionResult.id);
+    if (Object.keys(rawSummary).length > 0) {
+      annotationsSummary = Object.fromEntries(
+        Object.entries(rawSummary).map(([k, v]) => [k, v ?? 0]),
+      );
+    }
+  }
+
   return {
     exportSchemaVersion: EXPORT_SCHEMA_VERSION,
     exportedAt,
@@ -306,6 +326,8 @@ export function buildBundleObject(
     privacy,
     sessionResult: bundleSession,
     stimulusPackSnapshot: snapshot,
+    ...(ciCounts !== undefined && Object.keys(ciCounts).length > 0 ? { ciCounts } : {}),
+    ...(annotationsSummary ? { annotationsSummary } : {}),
   };
 }
 

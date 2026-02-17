@@ -1,9 +1,10 @@
 /**
  * ResultsTableControls — filter chips + search + RT bar for the session results table.
- * Ticket 0273.
+ * Tickets 0273, 0278 (CI chips).
  */
 
-import type { FlagKind } from "@/domain";
+import type { FlagKind, CiCode } from "@/domain";
+import { CI_CODE_LABELS, CI_CODE_ORDER } from "@/domain";
 
 export type FilterChip =
   | "all"
@@ -21,6 +22,11 @@ interface Props {
   searchQuery: string;
   onFilterChange: (filter: FilterChip) => void;
   onSearchChange: (query: string) => void;
+  /** 0278: active CI code filter (null = none) */
+  activeCiCode?: CiCode | null;
+  onCiCodeChange?: (code: CiCode | null) => void;
+  /** 0278: CI counts for displaying relevant chips */
+  ciCounts?: Partial<Record<CiCode, number>>;
 }
 
 const CHIP_LABELS: Record<FilterChip, string> = {
@@ -50,18 +56,23 @@ export function ResultsTableControls({
   searchQuery,
   onFilterChange,
   onSearchChange,
+  activeCiCode,
+  onCiCodeChange,
+  ciCounts,
 }: Props) {
+  const ciChips = CI_CODE_ORDER.filter((c) => (ciCounts?.[c] ?? 0) > 0);
+
   return (
     <div className="mb-3 space-y-2" data-testid="results-table-controls">
-      {/* Filter chips */}
+      {/* Flag filter chips */}
       <div className="flex flex-wrap gap-1.5">
         {CHIPS.map((chip) => (
           <button
             key={chip}
             data-testid={`filter-chip-${chip}`}
-            onClick={() => onFilterChange(chip)}
+            onClick={() => { onFilterChange(chip); onCiCodeChange?.(null); }}
             className={`rounded-full px-3 py-0.5 text-xs font-medium transition-colors ${
-              activeFilter === chip
+              activeFilter === chip && !activeCiCode
                 ? "bg-primary text-primary-foreground"
                 : "border border-border bg-card text-muted-foreground hover:bg-muted"
             }`}
@@ -70,6 +81,32 @@ export function ResultsTableControls({
           </button>
         ))}
       </div>
+
+      {/* CI code chips (0278) — only shown if any exist */}
+      {ciChips.length > 0 && (
+        <div className="flex flex-wrap gap-1.5" data-testid="ci-chips-row">
+          <span className="self-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            CI:
+          </span>
+          {ciChips.map((code) => (
+            <button
+              key={code}
+              data-testid={`ci-chip-${code}`}
+              onClick={() => {
+                onFilterChange("all");
+                onCiCodeChange?.(activeCiCode === code ? null : code);
+              }}
+              className={`rounded-full px-3 py-0.5 text-xs font-medium transition-colors ${
+                activeCiCode === code
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-border bg-card text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {code} · {ciCounts?.[code] ?? 0}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Search + count */}
       <div className="flex items-center gap-3">
@@ -92,7 +129,7 @@ export function ResultsTableControls({
   );
 }
 
-/** Returns true if the row matches the active filter and search query. */
+/** Returns true if the row matches the active filter, CI filter, and search query. */
 export function rowMatchesFilter(
   word: string,
   response: string,
@@ -100,18 +137,27 @@ export function rowMatchesFilter(
   timedOut: boolean,
   filter: FilterChip,
   searchQuery: string,
+  /** 0278: optional CI code filter */
+  activeCiCode?: CiCode | null,
+  /** 0278: CI codes computed for this trial */
+  trialCiCodes?: CiCode[],
 ): boolean {
-  // Apply filter
-  if (filter !== "all") {
-    if (filter === "flagged" && flags.length === 0) return false;
-    if (filter === "empty" && response !== "") return false;
-    if (filter === "timeout" && !timedOut) return false;
-    if (
-      filter === "repeated_response" ||
-      filter === "timing_outlier_slow" ||
-      filter === "timing_outlier_fast"
-    ) {
-      if (!flags.includes(filter as FlagKind)) return false;
+  // Apply CI code filter (0278) — takes precedence over flag filter
+  if (activeCiCode != null) {
+    if (!(trialCiCodes ?? []).includes(activeCiCode)) return false;
+  } else {
+    // Apply flag filter
+    if (filter !== "all") {
+      if (filter === "flagged" && flags.length === 0) return false;
+      if (filter === "empty" && response !== "") return false;
+      if (filter === "timeout" && !timedOut) return false;
+      if (
+        filter === "repeated_response" ||
+        filter === "timing_outlier_slow" ||
+        filter === "timing_outlier_fast"
+      ) {
+        if (!flags.includes(filter as FlagKind)) return false;
+      }
     }
   }
 

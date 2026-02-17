@@ -1,13 +1,14 @@
 import { useMemo, useCallback, useState, useEffect } from "react";
-import type { Trial, TrialFlag, OrderPolicy, SessionResult, StimulusPackSnapshot } from "@/domain";
+import type { Trial, TrialFlag, OrderPolicy, SessionResult, StimulusPackSnapshot, CiCode } from "@/domain";
 import { generateReflectionPrompts, getStimulusList, buildSessionInsights, getResponseText, getTimedOut } from "@/domain";
-import { localStorageStimulusStore, localStorageSessionStore, uiPrefs } from "@/infra";
+import { localStorageStimulusStore, localStorageSessionStore, uiPrefs, trialAnnotations } from "@/infra";
 import { SessionSummaryCard } from "./SessionSummaryCard";
 import { ExportActions, SCORING_VERSION, APP_VERSION } from "./ResultsExportActions";
 import { ResultsDashboardPanel } from "./ResultsDashboardPanel";
 import { SessionsDrawer } from "./SessionsDrawer";
 import { ResultsTableControls, RtBar, rowMatchesFilter } from "./ResultsTableControls";
 import type { FilterChip } from "./ResultsTableControls";
+
 
 interface Props {
   trials: Trial[];
@@ -159,6 +160,9 @@ export function ResultsView({
   // 0273: Table filter/search state
   const [activeFilter, setActiveFilter] = useState<FilterChip>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  // 0278: CI filter state
+  const [activeCiCode, setActiveCiCode] = useState<CiCode | null>(null);
+
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -204,6 +208,7 @@ export function ResultsView({
             insights={insights}
             sessionContext={sessionResult?.sessionContext ?? null}
             baselineInsights={baselineInsights}
+            sessionId={sessionResult?.id}
           />
         </>
       )}
@@ -313,16 +318,20 @@ export function ResultsView({
         </div>
       )}
 
-      {/* 0273: Table controls */}
+      {/* 0273 + 0278: Table controls with CI filter */}
       {(() => {
         const minRt = insights?.minRtMs ?? 0;
         const maxRt = insights?.maxRtMs ?? 1;
+        const sessionAnnotations = sessionResult
+          ? trialAnnotations.getSessionAnnotations(sessionResult.id)
+          : {};
 
         // Build filtered+searched list
         const filteredRows = trials.map((trial, i) => {
           const flags = trialFlags[i]?.flags ?? [];
           const response = getResponseText(trial);
           const timedOut = getTimedOut(trial, flags as string[]);
+          const trialCiCodes = insights?.ciByTrial.get(i) ?? [];
           const matches = rowMatchesFilter(
             trial.stimulus.word,
             response,
@@ -330,8 +339,10 @@ export function ResultsView({
             timedOut,
             activeFilter,
             searchQuery,
+            activeCiCode,
+            trialCiCodes,
           );
-          return { trial, i, flags, response, timedOut, matches };
+          return { trial, i, flags, response, timedOut, trialCiCodes, matches };
         });
         const visibleRows = filteredRows.filter((r) => r.matches);
 
@@ -344,6 +355,9 @@ export function ResultsView({
               searchQuery={searchQuery}
               onFilterChange={setActiveFilter}
               onSearchChange={setSearchQuery}
+              activeCiCode={activeCiCode}
+              onCiCodeChange={setActiveCiCode}
+              ciCounts={insights?.ciCounts}
             />
 
             <div className="overflow-x-auto rounded-md border border-border">
@@ -359,7 +373,7 @@ export function ResultsView({
                     <th className="px-3 py-2 text-right">BS</th>
                     {/* 0274: ΔRT column when comparable */}
                     {isComparable && <th className="px-3 py-2 text-right">ΔRT</th>}
-                    <th className="px-3 py-2">Flags</th>
+                    <th className="px-3 py-2">Flags / Tags</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -372,6 +386,9 @@ export function ResultsView({
                     const deltaRt = baselineRef !== null
                       ? a.reactionTimeMs - baselineRef.reactionTimeMs
                       : null;
+                    // 0279: annotation badges
+                    const annotation = sessionAnnotations[i];
+                    const annotationTags = annotation?.tags ?? [];
 
                     return (
                       <tr key={i} className={`border-t border-border ${flags.length > 0 ? "bg-destructive/5" : ""}`}>
@@ -394,9 +411,21 @@ export function ResultsView({
                           </td>
                         )}
                         <td className="px-3 py-2">
-                          {flags.length > 0
-                            ? <span className="text-xs text-destructive">{flags.join(", ")}</span>
-                            : <span className="text-xs text-muted-foreground">—</span>}
+                          <div className="flex flex-wrap gap-1">
+                            {flags.length > 0
+                              ? <span className="text-xs text-destructive">{flags.join(", ")}</span>
+                              : <span className="text-xs text-muted-foreground">—</span>}
+                            {/* 0279: self-tag badges */}
+                            {annotationTags.map((tag) => (
+                              <span
+                                key={tag}
+                                data-testid={`annotation-badge-${tag}`}
+                                className="rounded bg-primary/15 px-1 py-0.5 text-[10px] font-mono font-semibold text-primary"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -414,6 +443,7 @@ export function ResultsView({
           </>
         );
       })()}
+
 
       {reflectionPrompts.length > 0 && (
         <div className="mt-8">
