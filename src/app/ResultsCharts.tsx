@@ -1,18 +1,21 @@
 /**
- * RtTimeline and RtHistogram — pure SVG chart components.
- * No external chart deps. Ticket 0265.
+ * RtTimeline, RtHistogram, FlagBreakdownChart, ResponseClusters — pure SVG/HTML chart components.
+ * No external chart deps. Ticket 0265 + 0272 + 0274.
  */
 
-import type { TimelinePoint } from "@/domain";
+import type { TimelinePoint, FlagKind } from "@/domain";
 
 // ── RtTimeline ────────────────────────────────────────────────────────
 
 interface RtTimelineProps {
   points: TimelinePoint[];
   onPointClick?: (sessionTrialIndex: number) => void;
+  /** Optional baseline median/p90 overlay lines (0274) */
+  baselineMedian?: number;
+  baselineP90?: number;
 }
 
-export function RtTimeline({ points, onPointClick }: RtTimelineProps) {
+export function RtTimeline({ points, onPointClick, baselineMedian, baselineP90 }: RtTimelineProps) {
   if (points.length === 0) {
     return (
       <div
@@ -71,6 +74,37 @@ export function RtTimeline({ points, onPointClick }: RtTimelineProps) {
         className="text-border"
         opacity={0.4}
       />
+      {/* 0274: Baseline overlay lines */}
+      {baselineMedian !== undefined && (
+        <line
+          data-testid="baseline-median-line"
+          x1={PAD.left}
+          y1={toY(baselineMedian)}
+          x2={PAD.left + plotW}
+          y2={toY(baselineMedian)}
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeDasharray="4 3"
+          opacity={0.5}
+          className="text-muted-foreground"
+          aria-label={`Baseline median: ${baselineMedian}ms`}
+        />
+      )}
+      {baselineP90 !== undefined && (
+        <line
+          data-testid="baseline-p90-line"
+          x1={PAD.left}
+          y1={toY(baselineP90)}
+          x2={PAD.left + plotW}
+          y2={toY(baselineP90)}
+          stroke="currentColor"
+          strokeWidth={1}
+          strokeDasharray="2 3"
+          opacity={0.35}
+          className="text-muted-foreground"
+          aria-label={`Baseline p90: ${baselineP90}ms`}
+        />
+      )}
       {/* Connecting line */}
       {points.length > 1 && (
         <polyline
@@ -116,9 +150,12 @@ export function RtTimeline({ points, onPointClick }: RtTimelineProps) {
 
 interface RtHistogramProps {
   histogram: { binEdges: number[]; counts: number[] };
+  /** Optional baseline markers (0274) */
+  baselineMedian?: number;
+  baselineP90?: number;
 }
 
-export function RtHistogram({ histogram }: RtHistogramProps) {
+export function RtHistogram({ histogram, baselineMedian, baselineP90 }: RtHistogramProps) {
   const { binEdges, counts } = histogram;
 
   if (counts.length === 0) {
@@ -140,6 +177,12 @@ export function RtHistogram({ histogram }: RtHistogramProps) {
   const maxCount = Math.max(...counts, 1);
   const binCount = counts.length;
   const barW = plotW / binCount;
+
+  const minEdge = binEdges[0];
+  const maxEdge = binEdges[binEdges.length - 1];
+  const edgeRange = maxEdge - minEdge || 1;
+
+  const toHistX = (val: number) => PAD.left + ((val - minEdge) / edgeRange) * plotW;
 
   return (
     <svg
@@ -179,27 +222,137 @@ export function RtHistogram({ histogram }: RtHistogramProps) {
           />
         );
       })}
-      {/* X axis labels: first + last bin edge */}
-      <text
-        x={PAD.left}
-        y={H - 6}
-        fontSize={9}
-        fill="currentColor"
-        textAnchor="start"
-        className="text-muted-foreground"
-      >
+      {/* 0274: Baseline vertical markers */}
+      {baselineMedian !== undefined && (
+        <line
+          data-testid="baseline-hist-median"
+          x1={toHistX(baselineMedian)}
+          y1={PAD.top}
+          x2={toHistX(baselineMedian)}
+          y2={PAD.top + plotH}
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeDasharray="4 3"
+          opacity={0.5}
+          className="text-muted-foreground"
+        />
+      )}
+      {baselineP90 !== undefined && (
+        <line
+          data-testid="baseline-hist-p90"
+          x1={toHistX(baselineP90)}
+          y1={PAD.top}
+          x2={toHistX(baselineP90)}
+          y2={PAD.top + plotH}
+          stroke="currentColor"
+          strokeWidth={1}
+          strokeDasharray="2 3"
+          opacity={0.35}
+          className="text-muted-foreground"
+        />
+      )}
+      {/* X axis labels */}
+      <text x={PAD.left} y={H - 6} fontSize={9} fill="currentColor" textAnchor="start" className="text-muted-foreground">
         {Math.round(binEdges[0])}
       </text>
-      <text
-        x={PAD.left + plotW}
-        y={H - 6}
-        fontSize={9}
-        fill="currentColor"
-        textAnchor="end"
-        className="text-muted-foreground"
-      >
+      <text x={PAD.left + plotW} y={H - 6} fontSize={9} fill="currentColor" textAnchor="end" className="text-muted-foreground">
         {Math.round(binEdges[binEdges.length - 1])}
       </text>
     </svg>
+  );
+}
+
+// ── FlagBreakdownChart (0272) ─────────────────────────────────────────
+
+const FLAG_LABELS: Partial<Record<FlagKind, string>> = {
+  timing_outlier_slow: "Slow",
+  timing_outlier_fast: "Fast",
+  empty_response: "Empty",
+  repeated_response: "Repeated",
+  high_editing: "High editing",
+  timeout: "Timeout",
+};
+
+interface FlagBreakdownChartProps {
+  counts: Partial<Record<FlagKind, number>>;
+}
+
+export function FlagBreakdownChart({ counts }: FlagBreakdownChartProps) {
+  const entries = (Object.entries(counts) as [FlagKind, number][])
+    .filter(([, c]) => c > 0)
+    .sort(([, a], [, b]) => b - a);
+
+  if (entries.length === 0) {
+    return (
+      <div
+        data-testid="flag-breakdown-chart"
+        className="flex h-20 items-center justify-center text-xs text-muted-foreground"
+      >
+        No flags
+      </div>
+    );
+  }
+
+  const maxCount = entries[0][1];
+
+  return (
+    <div data-testid="flag-breakdown-chart" className="space-y-1.5">
+      {entries.map(([flag, count]) => (
+        <div key={flag} className="flex items-center gap-2">
+          <span className="w-20 shrink-0 text-right text-[11px] text-muted-foreground">
+            {FLAG_LABELS[flag] ?? flag}
+          </span>
+          <div className="flex-1 overflow-hidden rounded-full bg-muted" style={{ height: 10 }}>
+            <div
+              className="h-full rounded-full bg-destructive"
+              style={{ width: `${(count / maxCount) * 100}%`, opacity: 0.7 }}
+            />
+          </div>
+          <span className="w-5 text-[11px] font-mono text-muted-foreground">{count}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── ResponseClusters (0272) ───────────────────────────────────────────
+
+interface Cluster {
+  response: string;
+  count: number;
+  words: string[];
+  sessionTrialIndices: number[];
+}
+
+interface ResponseClustersProps {
+  clusters: Cluster[];
+}
+
+export function ResponseClusters({ clusters }: ResponseClustersProps) {
+  if (clusters.length === 0) {
+    return (
+      <div
+        data-testid="response-clusters"
+        className="flex h-20 items-center justify-center text-xs text-muted-foreground"
+      >
+        No repeated responses
+      </div>
+    );
+  }
+
+  return (
+    <ul data-testid="response-clusters" className="divide-y divide-border rounded-md border border-border text-xs">
+      {clusters.map((c) => (
+        <li key={c.response} className="flex items-center justify-between px-3 py-1.5">
+          <span className="font-mono font-medium text-foreground">
+            {c.response || <span className="italic text-muted-foreground">(empty)</span>}
+          </span>
+          <span className="ml-2 text-muted-foreground">
+            {c.count}× · {c.words.slice(0, 4).join(", ")}
+            {c.words.length > 4 ? "…" : ""}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
