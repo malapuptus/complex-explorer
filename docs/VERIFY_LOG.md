@@ -1,6 +1,35 @@
 # Verify Run Log
 
+## 2026-02-17 — Tickets 0264–0268
+
+**Oracle:** `npx vitest run src` → **503/503 PASS** (45 test files)
+
+**Files changed:**
+- NEW `src/domain/sessionInsights.ts` — pure analysis layer (buildSessionInsights, computeQualityIndex, getMicroGoal)
+- NEW `src/domain/simulateSession.ts` — deterministic session generator (0268)
+- NEW `src/app/ResultsDashboardPanel.tsx` — 4-card dashboard + anomalies list
+- NEW `src/app/ResultsCharts.tsx` — RtTimeline + RtHistogram SVG charts
+- NEW `src/app/TrialDetailPanel.tsx` — drilldown dialog (0266)
+- NEW `src/infra/localStorageUiPrefs.ts` — baseline session preference store (0267)
+- EDIT `src/app/ResultsView.tsx` — integrate dashboard, baseline compare, mark baseline button
+- EDIT `src/app/PreviousSessions.tsx` — baseline badge, dev simulate button (0268)
+- EDIT `src/domain/index.ts` — barrel exports for new symbols
+- EDIT `src/infra/index.ts` — export uiPrefs
+- NEW `src/domain/__tests__/sessionInsights.test.ts` — 32 tests
+- NEW `src/domain/__tests__/simulateSession.test.ts` — 9 tests
+- NEW `src/app/__tests__/resultsDashboard.test.tsx` — 10 tests
+- NEW `src/app/__tests__/resultsBaselineCompare.test.tsx` — 3 tests
+- NEW `src/app/__tests__/simulatedSessionFlow.test.tsx` — 5 tests
+- NEW `src/infra/__tests__/uiPrefs.test.ts` — 5 tests
+
+**Canary (0264):** fixture 3 trials (tree/420, house/380, water/510) → scoredCount=3, medianRtMs=420, p90RtMs=510, meanRtMs≈436.67, spikinessMs=130, emptyResponseCount=0, timeoutCount=0, flaggedOtherCount=0
+
+**Risk card:** Proved — deterministic insights layer locked by 32 tests; drilldown uses existing Radix Dialog; no new npm deps; simulate is pack-store-independent. Not proved — SVG layout at all viewport sizes (fixed height acceptable for v1).
+
+---
+
 ## 2026-02-17 — Tickets 0259–0263
+
 
 **Oracle:** `npx vitest run src` → **395/395 PASS** (36 test files)
 

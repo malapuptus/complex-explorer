@@ -8,7 +8,8 @@ import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { SessionListEntry, SessionResult } from "@/domain";
 import { sessionResultsToCsv } from "@/domain";
-import { localStorageSessionStore, buildStorageReport } from "@/infra";
+import { localStorageSessionStore, buildStorageReport, uiPrefs } from "@/infra";
+import { simulateSession } from "@/domain";
 import { ResultsView } from "./ResultsView";
 
 export function PreviousSessions() {
@@ -16,6 +17,7 @@ export function PreviousSessions() {
   const [selected, setSelected] = useState<SessionResult | null>(null);
   const [cleanupMsg, setCleanupMsg] = useState<string | null>(null);
   const navigate = useNavigate();
+  const baselineId = uiPrefs.getBaselineSessionId();
 
   const refresh = useCallback(() => {
     localStorageSessionStore.list().then(setEntries);
@@ -24,6 +26,14 @@ export function PreviousSessions() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // 0268: Dev-only simulated session generator
+  const handleSimulate = useCallback(async () => {
+    const result = simulateSession(Date.now());
+    await localStorageSessionStore.save(result);
+    refresh();
+  }, [refresh]);
+
 
   const handleDeleteAll = async () => {
     if (!window.confirm(`Delete all ${entries.length} sessions? This cannot be undone.`)) return;
@@ -193,6 +203,12 @@ export function PreviousSessions() {
                         Imported
                       </span>
                     )}
+                    {/* 0267: Baseline badge */}
+                    {entry.id === baselineId && (
+                      <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-primary">
+                        Baseline
+                      </span>
+                    )}
                     <span className="ml-4 text-sm text-muted-foreground">
                       {entry.totalTrials} trials &middot;{" "}
                       {new Date(entry.completedAt).toLocaleString()}
@@ -240,6 +256,15 @@ export function PreviousSessions() {
             >
               Export Storage Report
             </button>
+            {/* 0268: Dev-only simulate button */}
+            {import.meta.env.DEV && (
+              <button
+                onClick={handleSimulate}
+                className="rounded-md border border-dashed border-border px-4 py-2 text-sm text-muted-foreground hover:bg-muted"
+              >
+                Generate simulated session
+              </button>
+            )}
           </div>
 
           {/* 0263: Cleanup actions */}

@@ -1,9 +1,10 @@
-import { useMemo, useCallback, useState } from "react";
+import { useMemo, useCallback, useState, useEffect } from "react";
 import type { Trial, TrialFlag, OrderPolicy, SessionResult, StimulusPackSnapshot } from "@/domain";
-import { generateReflectionPrompts, getStimulusList } from "@/domain";
-import { localStorageStimulusStore } from "@/infra";
+import { generateReflectionPrompts, getStimulusList, buildSessionInsights } from "@/domain";
+import { localStorageStimulusStore, localStorageSessionStore, uiPrefs } from "@/infra";
 import { SessionSummaryCard } from "./SessionSummaryCard";
 import { ExportActions, SCORING_VERSION, APP_VERSION } from "./ResultsExportActions";
+import { ResultsDashboardPanel } from "./ResultsDashboardPanel";
 
 interface Props {
   trials: Trial[];
@@ -98,12 +99,111 @@ export function ResultsView({
     return lines.join("\n");
   }, [csvMeta]);
 
+  // 0264/0265: Session insights for dashboard
+  const insights = useMemo(
+    () => sessionResult ? buildSessionInsights(sessionResult) : null,
+    [sessionResult],
+  );
+
+  // 0267: Baseline compare
+  const [baselineId, setBaselineId] = useState<string | null>(() => uiPrefs.getBaselineSessionId());
+  const [baseline, setBaseline] = useState<SessionResult | null>(null);
+  const [baselineNotFound, setBaselineNotFound] = useState(false);
+
+  const handleMarkBaseline = useCallback(() => {
+    if (!sessionResult) return;
+    const newId = sessionResult.id === baselineId ? null : sessionResult.id;
+    uiPrefs.setBaselineSessionId(newId);
+    setBaselineId(newId);
+    if (!newId) { setBaseline(null); setBaselineNotFound(false); }
+  }, [sessionResult, baselineId]);
+
+  const handleClearBaseline = useCallback(() => {
+    uiPrefs.setBaselineSessionId(null);
+    setBaselineId(null);
+    setBaseline(null);
+    setBaselineNotFound(false);
+  }, []);
+
+  useEffect(() => {
+    if (!baselineId || baselineId === sessionResult?.id) {
+      setBaseline(null); setBaselineNotFound(false);
+      return;
+    }
+    localStorageSessionStore.load(baselineId).then((s) => {
+      if (s) { setBaseline(s); setBaselineNotFound(false); }
+      else { setBaseline(null); setBaselineNotFound(true); }
+    });
+  }, [baselineId, sessionResult?.id]);
+
+  const baselineInsights = useMemo(
+    () => baseline ? buildSessionInsights(baseline) : null,
+    [baseline],
+  );
+
+  const showCompare = baseline !== null && baseline.id !== sessionResult?.id
+    && baselineInsights !== null && insights !== null;
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <h2 className="mb-2 text-2xl font-bold text-foreground">Session Results</h2>
-      <p className="mb-6 text-sm text-muted-foreground">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-foreground">Session Results</h2>
+        {sessionResult && (
+          <button
+            onClick={handleMarkBaseline}
+            className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
+          >
+            {baselineId === sessionResult.id ? "Baseline ✓" : "Mark as baseline"}
+          </button>
+        )}
+      </div>
+      <p className="mb-4 text-sm text-muted-foreground">
         Mean RT: {meanReactionTimeMs} ms &middot; Median RT: {medianReactionTimeMs} ms
       </p>
+
+      {/* 0265: Dashboard */}
+      {insights && (
+        <ResultsDashboardPanel
+          insights={insights}
+          sessionContext={sessionResult?.sessionContext ?? null}
+        />
+      )}
+
+      {/* 0267: Baseline not found */}
+      {baselineNotFound && (
+        <div className="mb-4 rounded-md border border-border bg-muted/30 px-4 py-3 text-sm">
+          <span className="text-muted-foreground">Baseline not found — </span>
+          <button onClick={handleClearBaseline} className="text-primary underline">clear baseline</button>
+        </div>
+      )}
+
+      {/* 0267: Compare card */}
+      {showCompare && baselineInsights && (
+        <div className="mb-6 rounded-md border border-border bg-muted/30 p-4">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Compare to baseline</h3>
+          <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+            {[
+              { label: "Median RT", delta: insights!.medianRtMs - baselineInsights.medianRtMs, unit: "ms" },
+              { label: "Empty", delta: insights!.emptyResponseCount - baselineInsights.emptyResponseCount, unit: "" },
+              { label: "Timeouts", delta: insights!.timeoutCount - baselineInsights.timeoutCount, unit: "" },
+              { label: "Flagged", delta: insights!.flaggedTrialCount - baselineInsights.flaggedTrialCount, unit: "" },
+            ].map(({ label, delta, unit }) => (
+              <div key={label} className="rounded-md border border-border bg-card p-2">
+                <p className="text-muted-foreground">{label}</p>
+                <p className={`font-mono font-semibold ${delta > 0 ? "text-destructive" : delta < 0 ? "text-green-600" : "text-foreground"}`}>
+                  {delta > 0 ? `+${delta}` : delta}{unit}
+                </p>
+              </div>
+            ))}
+          </div>
+          {(() => {
+            const cur = new Set(insights!.topSlowTrials.map((r) => r.word));
+            const bas = new Set(baselineInsights.topSlowTrials.map((r) => r.word));
+            const overlap = [...cur].filter((w) => bas.has(w)).length;
+            return <p className="mt-2 text-xs text-muted-foreground">Spike overlap: {overlap}/{Math.min(5, cur.size)} slow words match baseline</p>;
+          })()}
+        </div>
+      )}
 
       {csvMeta && reproBundle && (
         <div className="mb-6 rounded-md border border-border bg-muted/30 p-4">
@@ -142,7 +242,6 @@ export function ResultsView({
             {csvMeta.breakEveryN !== undefined && (
               <><dt className="text-muted-foreground">Break every</dt><dd className="text-foreground">{csvMeta.breakEveryN} trials</dd></>
             )}
-            {/* 0257: import provenance — only when present */}
             {sessionResult?.importedFrom && (
               <>
                 <dt className="text-muted-foreground">Imported from</dt>
