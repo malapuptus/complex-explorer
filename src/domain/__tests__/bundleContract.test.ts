@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import type { SessionResult } from "@/domain/types";
 
 /**
- * Ticket 0190/0202 — Bundle completeness contract test.
+ * Ticket 0190/0202/0215 — Bundle completeness contract test.
  * Asserts the Research Bundle includes all fields required for
- * reproducibility and analysis, including rb_v2 pack snapshot.
+ * reproducibility and analysis, including rb_v3 full pack payload.
  */
 
 function makeFullSession(): SessionResult {
@@ -80,7 +80,7 @@ function makeFullSession(): SessionResult {
 describe("Bundle completeness contract", () => {
   const session = makeFullSession();
 
-  // Simulate bundle construction (mirrors ResultsView rb_v2 logic)
+  // Simulate bundle construction (mirrors ResultsExportActions rb_v3 logic)
   const bundle = {
     sessionResult: {
       id: session.id,
@@ -98,12 +98,11 @@ describe("Bundle completeness contract", () => {
     protocolDocVersion: "PROTOCOL.md@2026-02-13",
     appVersion: session.appVersion,
     scoringAlgorithm: "MAD-modified-z@3.5 + fast<200ms + timeout excluded",
-    exportSchemaVersion: "rb_v2",
+    exportSchemaVersion: "rb_v3",
     exportedAt: new Date().toISOString(),
-    stimulusPackSnapshot: session.stimulusPackSnapshot ?? {
-      stimulusListHash: "abc123hash",
-      stimulusSchemaVersion: "sp_v1",
-      provenance: session.provenanceSnapshot,
+    stimulusPackSnapshot: {
+      ...session.stimulusPackSnapshot,
+      words: session.stimulusOrder,
     },
   };
 
@@ -125,16 +124,28 @@ describe("Bundle completeness contract", () => {
     }
   });
 
-  it("exportSchemaVersion is rb_v2", () => {
-    expect(bundle.exportSchemaVersion).toBe("rb_v2");
+  it("exportSchemaVersion is rb_v3", () => {
+    expect(bundle.exportSchemaVersion).toBe("rb_v3");
   });
 
-  it("stimulusPackSnapshot has hash, schema version, and provenance", () => {
+  it("stimulusPackSnapshot has hash, schema version, provenance, and words", () => {
     expect(bundle.stimulusPackSnapshot).toHaveProperty("stimulusListHash");
     expect(bundle.stimulusPackSnapshot).toHaveProperty("stimulusSchemaVersion");
     expect(bundle.stimulusPackSnapshot).toHaveProperty("provenance");
+    expect(bundle.stimulusPackSnapshot).toHaveProperty("words");
     expect(bundle.stimulusPackSnapshot.provenance).toHaveProperty("listId");
     expect(bundle.stimulusPackSnapshot.stimulusSchemaVersion).toBe("sp_v1");
+    expect(Array.isArray(bundle.stimulusPackSnapshot.words)).toBe(true);
+    expect(bundle.stimulusPackSnapshot.words).toContain("sun");
+  });
+
+  it("bundle alone is sufficient to recreate the pack", () => {
+    const snap = bundle.stimulusPackSnapshot;
+    expect(snap.words!.length).toBeGreaterThan(0);
+    expect(snap.provenance).toBeDefined();
+    expect(snap.provenance!.listId).toBeTruthy();
+    expect(snap.provenance!.listVersion).toBeTruthy();
+    expect(snap.provenance!.language).toBeTruthy();
   });
 
   describe("sessionResult completeness", () => {

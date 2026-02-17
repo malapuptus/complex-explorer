@@ -83,15 +83,15 @@ SHA-256( words.join("\n") )
 
 ---
 
-## rb_v2 — Research Bundle Schema
+## rb_v3 — Research Bundle Schema
 
-**Current version:** `rb_v2`
+**Current version:** `rb_v3`
 
 ### Top-level structure
 
 ```json
 {
-  "exportSchemaVersion": "rb_v2",
+  "exportSchemaVersion": "rb_v3",
   "exportedAt": "ISO-8601 timestamp",
   "protocolDocVersion": "PROTOCOL.md@YYYY-MM-DD",
   "appVersion": "string | null",
@@ -100,7 +100,8 @@ SHA-256( words.join("\n") )
   "stimulusPackSnapshot": {
     "stimulusListHash": "string | null",
     "stimulusSchemaVersion": "string | null",
-    "provenance": { "ProvenanceSnapshot | null" }
+    "provenance": { "ProvenanceSnapshot | null" },
+    "words": ["string[] (full word list when available)"]
   }
 }
 ```
@@ -128,6 +129,12 @@ SHA-256( words.join("\n") )
 | `stimulusListHash` | string\|null | SHA-256 of canonical word list |
 | `stimulusSchemaVersion` | string\|null | Pack schema version (e.g. `"sp_v1"`) |
 | `provenance` | ProvenanceSnapshot\|null | Full provenance metadata |
+| `words` | string[]\|undefined | Full word list (new in rb_v3; absent if unavailable) |
+
+### Changes from rb_v2
+
+- Added `words` array to `stimulusPackSnapshot` — enables pack restoration directly from bundle.
+- Bundle is now self-contained: importing a bundle JSON into the pack import flow auto-extracts the pack payload.
 
 ### Changes from rb_v1
 
@@ -139,7 +146,7 @@ SHA-256( words.join("\n") )
 ## Version Bump Rules
 
 1. **Patch bump** (e.g. `csv_v1` stays `csv_v1`): Adding optional fields that don't change existing column order or semantics.
-2. **Minor bump** (e.g. `rb_v1` → `rb_v2`): Adding required fields, changing field semantics, or restructuring.
+2. **Minor bump** (e.g. `rb_v2` → `rb_v3`): Adding required fields, changing field semantics, or restructuring.
 3. **Major bump** (e.g. `sp_v1` → `sp_v2`): Breaking changes to existing fields, removing fields, changing hash canonicalization.
 4. Always update `docs/SCHEMAS.md` when bumping any schema version.
 5. Update `src/domain/__tests__/bundleContract.test.ts` and `src/domain/__tests__/exportParity.test.ts` to assert the new version.
