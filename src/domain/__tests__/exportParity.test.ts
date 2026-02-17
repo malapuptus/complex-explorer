@@ -100,9 +100,11 @@ describe("Export parity", () => {
         protocolDocVersion: "PROTOCOL.md@2026-02-13",
         appVersion: "0.0.0",
         scoringAlgorithm: "MAD-modified-z@3.5 + fast<200ms + timeout excluded",
-        exportSchemaVersion: "rb_v2",
+        exportSchemaVersion: "rb_v3",
         exportedAt: new Date().toISOString(),
-        stimulusPackSnapshot: { stimulusListHash: null, stimulusSchemaVersion: null, provenance: null },
+        stimulusPackSnapshot: {
+          stimulusListHash: null, stimulusSchemaVersion: null, provenance: null, words: ["test"],
+        },
       };
 
       for (const key of REQUIRED_BUNDLE_KEYS) {
@@ -117,25 +119,47 @@ describe("Export parity", () => {
         protocolDocVersion: "test",
         appVersion: "1.0.0",
         scoringAlgorithm: "test",
-        exportSchemaVersion: "rb_v2",
+        exportSchemaVersion: "rb_v3",
         exportedAt: "2026-01-01",
-        stimulusPackSnapshot: { stimulusListHash: null, stimulusSchemaVersion: null, provenance: null },
+        stimulusPackSnapshot: {
+          stimulusListHash: null, stimulusSchemaVersion: null, provenance: null, words: ["w"],
+        },
       };
       expect(bundle).toHaveProperty("appVersion");
       expect(bundle.appVersion).toBeTruthy();
     });
 
-    it("exportSchemaVersion is rb_v2", () => {
+    it("exportSchemaVersion is rb_v3", () => {
       const bundle = {
         sessionResult: {},
         protocolDocVersion: "test",
         appVersion: "1.0.0",
         scoringAlgorithm: "test",
-        exportSchemaVersion: "rb_v2",
+        exportSchemaVersion: "rb_v3",
         exportedAt: "2026-01-01",
-        stimulusPackSnapshot: { stimulusListHash: null, stimulusSchemaVersion: null, provenance: null },
+        stimulusPackSnapshot: {
+          stimulusListHash: null, stimulusSchemaVersion: null, provenance: null, words: ["w"],
+        },
       };
-      expect(bundle.exportSchemaVersion).toBe("rb_v2");
+      expect(bundle.exportSchemaVersion).toBe("rb_v3");
+    });
+
+    it("stimulusPackSnapshot includes words array", () => {
+      const bundle = {
+        sessionResult: {},
+        protocolDocVersion: "test",
+        appVersion: "1.0.0",
+        scoringAlgorithm: "test",
+        exportSchemaVersion: "rb_v3",
+        exportedAt: "2026-01-01",
+        stimulusPackSnapshot: {
+          stimulusListHash: "hash", stimulusSchemaVersion: "sp_v1",
+          provenance: { listId: "p", listVersion: "1", language: "en", source: "s",
+            sourceName: "S", sourceYear: "2026", sourceCitation: "c", licenseNote: "l", wordCount: 1 },
+          words: ["alpha", "beta"],
+        },
+      };
+      expect(bundle.stimulusPackSnapshot.words).toEqual(["alpha", "beta"]);
     });
   });
 });

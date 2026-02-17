@@ -3,7 +3,7 @@ import { sessionTrialsToCsv, CSV_SCHEMA_VERSION } from "@/domain/csvExport";
 import type { Trial, TrialFlag, SessionResult, SessionConfig } from "@/domain/types";
 
 /**
- * Ticket 0186 — Minimal integration test for export wiring.
+ * Ticket 0186/0205 — Minimal integration test for export wiring.
  * Verifies CSV and Research Bundle outputs contain required fields.
  */
 
@@ -59,6 +59,11 @@ const testSession: SessionResult = {
   sessionFingerprint: "abc123def456",
   scoringVersion: "scoring_v2_mad_3.5",
   appVersion: "1.0.0",
+  stimulusPackSnapshot: {
+    stimulusListHash: "testhash123",
+    stimulusSchemaVersion: "sp_v1",
+    provenance: null,
+  },
 };
 
 describe("Export button wiring", () => {
@@ -103,7 +108,7 @@ describe("Export button wiring", () => {
   });
 
   describe("Research Bundle structure", () => {
-    // Simulate what ResultsView builds
+    // Simulate what ResultsExportActions builds (rb_v3)
     const bundle = {
       sessionResult: {
         id: testSession.id,
@@ -116,12 +121,16 @@ describe("Export button wiring", () => {
       protocolDocVersion: "PROTOCOL.md@2026-02-13",
       appVersion: testSession.appVersion,
       scoringAlgorithm: "MAD-modified-z@3.5",
-      exportSchemaVersion: "rb_v1",
+      exportSchemaVersion: "rb_v3",
       exportedAt: new Date().toISOString(),
+      stimulusPackSnapshot: {
+        ...testSession.stimulusPackSnapshot,
+        words: testSession.stimulusOrder,
+      },
     };
 
-    it("includes exportSchemaVersion", () => {
-      expect(bundle.exportSchemaVersion).toBe("rb_v1");
+    it("includes exportSchemaVersion rb_v3", () => {
+      expect(bundle.exportSchemaVersion).toBe("rb_v3");
     });
 
     it("includes appVersion", () => {
@@ -136,10 +145,22 @@ describe("Export button wiring", () => {
         "scoringAlgorithm",
         "exportSchemaVersion",
         "exportedAt",
+        "stimulusPackSnapshot",
       ];
       for (const key of required) {
         expect(bundle).toHaveProperty(key);
       }
+    });
+
+    it("stimulusPackSnapshot includes words and hash", () => {
+      expect(bundle.stimulusPackSnapshot).toHaveProperty("words");
+      expect(bundle.stimulusPackSnapshot).toHaveProperty("stimulusListHash");
+      expect(bundle.stimulusPackSnapshot.words).toEqual(["sun", "moon"]);
+    });
+
+    it("snapshot is present for historical sessions", () => {
+      expect(bundle.stimulusPackSnapshot.stimulusListHash).toBe("testhash123");
+      expect(bundle.stimulusPackSnapshot.stimulusSchemaVersion).toBe("sp_v1");
     });
   });
 });

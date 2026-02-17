@@ -2,6 +2,7 @@
  * ProtocolScreen — standardized pre-session instructions.
  * Includes an Advanced section for experimental controls.
  * Supports custom pack import/export with collision detection.
+ * Supports importing from Research Bundle JSON (auto-detects rb_v3+ payload).
  */
 
 import { useState, useRef } from "react";
@@ -58,6 +59,34 @@ const INSTRUCTIONS = [
 
 const DEFAULT_BREAK_EVERY = 20;
 
+/**
+ * Try to extract a pack from a Research Bundle JSON (rb_v3+).
+ * Returns null if the JSON is not a bundle or lacks pack payload.
+ */
+function extractPackFromBundle(parsed: Record<string, unknown>): Partial<StimulusList> | null {
+  if (typeof parsed.exportSchemaVersion !== "string") return null;
+  const snapshot = parsed.stimulusPackSnapshot as Record<string, unknown> | undefined;
+  if (!snapshot) return null;
+  const words = snapshot.words as string[] | undefined;
+  const prov = snapshot.provenance as Record<string, unknown> | undefined;
+  if (!Array.isArray(words) || words.length === 0 || !prov) return null;
+  return {
+    id: prov.listId as string,
+    version: prov.listVersion as string,
+    language: prov.language as string,
+    source: prov.source as string,
+    provenance: {
+      sourceName: prov.sourceName as string,
+      sourceYear: prov.sourceYear as string,
+      sourceCitation: prov.sourceCitation as string,
+      licenseNote: prov.licenseNote as string,
+    },
+    words,
+    stimulusSchemaVersion: snapshot.stimulusSchemaVersion as string | undefined,
+    stimulusListHash: snapshot.stimulusListHash as string | undefined,
+  };
+}
+
 export function ProtocolScreen({
   wordCount, practiceCount, source, estimatedMinutes,
   isLongPack, onReady, onPackImported, selectedPack, children,
@@ -84,6 +113,43 @@ export function ProtocolScreen({
     });
   };
 
+  const importPack = (parsed: Record<string, unknown>) => {
+    // Auto-detect: is this a Research Bundle?
+    const bundlePack = extractPackFromBundle(parsed);
+    const packData = bundlePack ?? parsed;
+
+    const errors = validateStimulusList(packData as Partial<StimulusList>);
+    if (errors.length > 0) {
+      const messages = errors.map((err) => ERROR_CODE_MESSAGES[err.code] ?? err.message);
+      setImportError(messages.join("; "));
+      return;
+    }
+    const pack = packData as StimulusList;
+    if (localStorageStimulusStore.exists(pack.id, pack.version)) {
+      setImportError(
+        `Pack "${pack.id}@${pack.version}" already exists. Delete it first to re-import.`,
+      );
+      return;
+    }
+    void computeWordsSha256(pack.words as string[]).then((hash) => {
+      const enriched: StimulusList = {
+        ...pack,
+        stimulusSchemaVersion: pack.stimulusSchemaVersion ?? STIMULUS_SCHEMA_VERSION,
+        stimulusListHash: pack.stimulusListHash ?? hash,
+      };
+      if (pack.stimulusListHash && pack.stimulusListHash !== hash) {
+        setImportError(
+          `Hash mismatch: expected ${pack.stimulusListHash}, computed ${hash}. Pack may be corrupted.`,
+        );
+        return;
+      }
+      localStorageStimulusStore.save(enriched);
+      const fromBundle = bundlePack ? " (extracted from Research Bundle)" : "";
+      setImportSuccess(`Imported "${pack.id}" (${pack.words.length} words)${fromBundle}`);
+      onPackImported?.();
+    });
+  };
+
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -94,37 +160,7 @@ export function ProtocolScreen({
     reader.onload = () => {
       try {
         const parsed = JSON.parse(reader.result as string);
-        const errors = validateStimulusList(parsed);
-        if (errors.length > 0) {
-          const messages = errors.map((err) => ERROR_CODE_MESSAGES[err.code] ?? err.message);
-          setImportError(messages.join("; "));
-          return;
-        }
-        // Collision check: reject if same (id, version) exists
-        if (localStorageStimulusStore.exists(parsed.id, parsed.version)) {
-          setImportError(
-            `Pack "${parsed.id}@${parsed.version}" already exists. Delete it first to re-import.`,
-          );
-          return;
-        }
-        // Compute and attach hash + schema version if missing
-        void computeWordsSha256(parsed.words).then((hash) => {
-          const enriched: StimulusList = {
-            ...parsed,
-            stimulusSchemaVersion: parsed.stimulusSchemaVersion ?? STIMULUS_SCHEMA_VERSION,
-            stimulusListHash: parsed.stimulusListHash ?? hash,
-          };
-          // If hash was provided, verify it matches
-          if (parsed.stimulusListHash && parsed.stimulusListHash !== hash) {
-            setImportError(
-              `Hash mismatch: expected ${parsed.stimulusListHash}, computed ${hash}. Pack may be corrupted.`,
-            );
-            return;
-          }
-          localStorageStimulusStore.save(enriched);
-          setImportSuccess(`Imported "${parsed.id}" (${parsed.words.length} words)`);
-          onPackImported?.();
-        });
+        importPack(parsed);
       } catch {
         setImportError("Invalid JSON file.");
       }
@@ -186,7 +222,7 @@ export function ProtocolScreen({
       {/* Pack tools: import + export + manage */}
       <div className="flex flex-wrap items-center justify-center gap-3">
         <label className="cursor-pointer rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted">
-          Import Pack (JSON)
+          Import Pack (JSON / Bundle)
           <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
         </label>
         {selectedPack && (

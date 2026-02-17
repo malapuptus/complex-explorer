@@ -30,7 +30,43 @@ Copy this block for each new entry:
 
 ## Runs
 
-### 2026-02-17 16:14 (Lovable sandbox) — Tickets 0208–0212
+### 2026-02-17 16:34 (Lovable sandbox) — Tickets 0213–0217
+
+- **Environment:** Lovable (tests only)
+- **Command:** `npx vitest run src`
+- **Result:** PASS (177/177)
+
+| # | Oracle | Runnable in Lovable | Evidence provided | Notes |
+|---|--------|---------------------|-------------------|-------|
+| 1 | Hygiene | N | — | ResultsView.tsx now under 350 lines ✓; ResultsExportActions.tsx extracted |
+| 2 | Format | N | — | No shell access |
+| 3 | Lint | N | — | No shell access |
+| 4 | Typecheck | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 5 | Boundaries | N | — | No shell access |
+| 6 | Load smoke | N | — | No shell access |
+| 7 | Build | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 8 | Tests | Y | 177/177 passed | 20 test files |
+
+**Canary artifacts:**
+
+- **ResultsView.tsx line count (0213):** Under 350 lines (export actions extracted to ResultsExportActions.tsx)
+- **Restore pack label (0214):** Button label now "Restore pack from this session"; only appears when provenance + stimulusOrder available; shows coded reason when restoration impossible
+- **rb_v3 bundle snippet (0215):** `{ "exportSchemaVersion": "rb_v3", "stimulusPackSnapshot": { "stimulusListHash": "abc123hash", "stimulusSchemaVersion": "sp_v1", "provenance": { "listId": "demo-10", ... }, "words": ["sun"] }, ... }`
+- **Bundle import (0216):** Import UI accepts both pack JSON and Research Bundle JSON (auto-detects by `exportSchemaVersion` key and extracts `stimulusPackSnapshot.words` + provenance); label updated to "Import Pack (JSON / Bundle)"
+- **Export size guardrails (0217):** Size labels shown on CSV, Research Bundle, and Pack Snapshot export buttons; warning (⚠) displayed above 250 KB threshold
+- **Custom pack deleted, historical export still includes snapshot hash:** ✓
+
+**Policy checklist:**
+
+- [x] `npx vitest run src` passed (177/177)
+- [x] Oracle table included (8 rows)
+- [x] CSV canary: header present
+- [x] Bundle canary: rb_v3 + stimulusPackSnapshot with words
+- [x] Environment line present: "Lovable (tests only)"
+
+---
+
+
 
 - **Environment:** Lovable (tests only)
 - **Command:** `npx vitest run src`
