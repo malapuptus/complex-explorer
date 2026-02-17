@@ -35,6 +35,12 @@ export interface SessionStore {
   releaseDraftLock(tabId: string): void;
   /** Check whether the lock is held by a different tab (TTL not expired). */
   isDraftLockedByOther(tabId: string): boolean;
+
+  /** Approximate bytes used by sessions in storage. */
+  estimateBytes(): number;
+
+  /** Return all pack references (id@version) used by saved sessions. */
+  referencedPacks(): Promise<Set<string>>;
 }
 
 export interface SessionListEntry {

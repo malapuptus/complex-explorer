@@ -107,6 +107,30 @@ describe("Export button wiring", () => {
     });
   });
 
+  describe("Redacted CSV output", () => {
+    const redacted = sessionTrialsToCsv(
+      testSession.trials,
+      testSession.scoring.trialFlags,
+      testSession.id,
+      testSession.config.stimulusListId,
+      testSession.config.stimulusListVersion,
+      testSession.seedUsed,
+      testSession.sessionFingerprint,
+      testSession.scoringVersion,
+      { redactResponses: true },
+    );
+
+    it("redacted CSV has same header", () => {
+      expect(redacted.split("\n")[0]).toContain("response");
+    });
+
+    it("redacted CSV blanks response column", () => {
+      const row = redacted.split("\n")[1];
+      const fields = row.split(",");
+      expect(fields[10]).toBe("");
+    });
+  });
+
   describe("Research Bundle structure", () => {
     // Simulate what ResultsExportActions builds (rb_v3)
     const bundle = {

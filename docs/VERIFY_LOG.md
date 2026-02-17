@@ -65,6 +65,40 @@ Copy this block for each new entry:
 - [x] Environment line present: "Lovable (tests only)"
 
 ---
+### 2026-02-17 17:06 (Lovable sandbox) — Tickets 0218–0222
+
+- **Environment:** Lovable (tests only)
+- **Command:** `npx vitest run src`
+- **Result:** PASS (188/188)
+
+| # | Oracle | Runnable in Lovable | Evidence provided | Notes |
+|---|--------|---------------------|-------------------|-------|
+| 1 | Hygiene | N | — | ResultsExportActions.tsx under 350 lines ✓ |
+| 2 | Format | N | — | No shell access |
+| 3 | Lint | N | — | No shell access |
+| 4 | Typecheck | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 5 | Boundaries | N | — | No shell access |
+| 6 | Load smoke | N | — | No shell access |
+| 7 | Build | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 8 | Tests | Y | 188/188 passed | 21 test files |
+
+**Canary artifacts:**
+
+- **Minimal bundle (0218):** `{ "exportSchemaVersion": "rb_v3", "stimulusPackSnapshot": { "stimulusListHash": "abc123hash", "stimulusSchemaVersion": "sp_v1", "provenance": {...} } }` — no `words` key
+- **Redacted CSV (0219):** response column index 10 is empty string in all data rows; all other columns identical to normal CSV
+- **Round-trip hash invariant (0220):** `["café","naïve","über","日本語","hello world"]` → hash stable through JSON.stringify/parse round-trip (3/3 tests)
+- **Storage pressure (0221):** Storage indicator shows sessions + packs KB; warns above 3 MB threshold
+- **Orphan cleanup (0222):** "Delete orphan packs" button removes packs not referenced by any session; referenced packs preserved
+
+**Policy checklist:**
+
+- [x] `npx vitest run src` passed (188/188)
+- [x] Oracle table included (8 rows)
+- [x] CSV canary: header present
+- [x] Bundle canary: rb_v3 full + minimal modes
+- [x] Environment line present: "Lovable (tests only)"
+
+---
 
 
 

@@ -69,6 +69,12 @@ function trialToCsvRow(
   return values.join(",");
 }
 
+/** Options for CSV export. */
+export interface CsvExportOptions {
+  /** If true, response column is replaced with empty string. */
+  redactResponses?: boolean;
+}
+
 /** Export a single session's trials as CSV. */
 export function sessionTrialsToCsv(
   trials: Trial[],
@@ -79,10 +85,14 @@ export function sessionTrialsToCsv(
   seed: number | null,
   sessionFingerprint?: string | null,
   scoringVersion?: string | null,
+  options?: CsvExportOptions,
 ): string {
   const rows = [CSV_HEADERS.join(",")];
   for (let i = 0; i < trials.length; i++) {
     const flags = trialFlags[i]?.flags ?? [];
+    const trial = options?.redactResponses
+      ? { ...trials[i], association: { ...trials[i].association, response: "" } }
+      : trials[i];
     rows.push(
       trialToCsvRow(
         sessionId,
@@ -91,7 +101,7 @@ export function sessionTrialsToCsv(
         packId,
         packVersion,
         seed,
-        trials[i],
+        trial,
         flags,
       ),
     );
@@ -100,13 +110,16 @@ export function sessionTrialsToCsv(
 }
 
 /** Export multiple complete SessionResults as a single CSV. */
-export function sessionResultsToCsv(sessions: SessionResult[]): string {
+export function sessionResultsToCsv(sessions: SessionResult[], options?: CsvExportOptions): string {
   const rows = [CSV_HEADERS.join(",")];
   for (const s of sessions) {
     const packId = s.config.stimulusListId;
     const packVersion = s.config.stimulusListVersion;
     for (let i = 0; i < s.trials.length; i++) {
       const flags = s.scoring.trialFlags[i]?.flags ?? [];
+      const trial = options?.redactResponses
+        ? { ...s.trials[i], association: { ...s.trials[i].association, response: "" } }
+        : s.trials[i];
       rows.push(
         trialToCsvRow(
           s.id,
@@ -115,7 +128,7 @@ export function sessionResultsToCsv(sessions: SessionResult[]): string {
           packId,
           packVersion,
           s.seedUsed,
-          s.trials[i],
+          trial,
           flags,
         ),
       );

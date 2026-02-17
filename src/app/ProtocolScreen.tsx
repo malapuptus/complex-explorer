@@ -10,6 +10,7 @@ import type { ReactNode } from "react";
 import type { OrderPolicy, ValidationErrorCode } from "@/domain";
 import { validateStimulusList, STIMULUS_SCHEMA_VERSION, computeWordsSha256 } from "@/domain";
 import type { StimulusList } from "@/domain";
+import { localStorageStimulusStore, localStorageSessionStore } from "@/infra";
 
 /** Human-readable messages for validation error codes. */
 const ERROR_CODE_MESSAGES: Record<ValidationErrorCode, string> = {
@@ -26,8 +27,9 @@ const ERROR_CODE_MESSAGES: Record<ValidationErrorCode, string> = {
   BLANK_WORDS: "Word list contains blank entries.",
   DUPLICATE_WORDS: "Word list contains duplicates (case-insensitive).",
 };
-import { localStorageStimulusStore } from "@/infra";
 import { CustomPackManager } from "./CustomPackManager";
+
+const STORAGE_WARN_BYTES = 3 * 1024 * 1024; // 3 MB
 
 /** Config produced by the Advanced settings panel. */
 export interface AdvancedConfig {
@@ -58,6 +60,11 @@ const INSTRUCTIONS = [
 ] as const;
 
 const DEFAULT_BREAK_EVERY = 20;
+
+function formatKB(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  return `${(bytes / 1024).toFixed(1)} KB`;
+}
 
 /**
  * Try to extract a pack from a Research Bundle JSON (rb_v3+).
@@ -189,6 +196,10 @@ export function ProtocolScreen({
   };
 
   const customPacks = localStorageStimulusStore.list();
+  const storageSessionBytes = localStorageSessionStore.estimateBytes();
+  const storagePackBytes = localStorageStimulusStore.estimateBytes();
+  const storageTotalBytes = storageSessionBytes + storagePackBytes;
+  const storageWarn = storageTotalBytes > STORAGE_WARN_BYTES;
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8 px-4">
@@ -249,6 +260,11 @@ export function ProtocolScreen({
         />
       )}
 
+      {/* Storage pressure indicator */}
+      <div className={`text-xs ${storageWarn ? "text-destructive" : "text-muted-foreground"}`}>
+        Storage: {formatKB(storageSessionBytes)} sessions, {formatKB(storagePackBytes)} packs
+        {storageWarn && " ⚠ approaching browser quota"}
+      </div>
       {/* Advanced settings toggle */}
       <button
         type="button"

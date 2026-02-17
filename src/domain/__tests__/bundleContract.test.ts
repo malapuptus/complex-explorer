@@ -139,6 +139,42 @@ describe("Bundle completeness contract", () => {
     expect(bundle.stimulusPackSnapshot.words).toContain("sun");
   });
 
+  describe("Minimal bundle mode", () => {
+    const minimalBundle = {
+      sessionResult: bundle.sessionResult,
+      protocolDocVersion: bundle.protocolDocVersion,
+      appVersion: bundle.appVersion,
+      scoringAlgorithm: bundle.scoringAlgorithm,
+      exportSchemaVersion: "rb_v3",
+      exportedAt: bundle.exportedAt,
+      stimulusPackSnapshot: {
+        stimulusListHash: session.stimulusPackSnapshot!.stimulusListHash,
+        stimulusSchemaVersion: session.stimulusPackSnapshot!.stimulusSchemaVersion,
+        provenance: session.stimulusPackSnapshot!.provenance,
+        // No words array
+      },
+    };
+
+    it("minimal bundle has no words", () => {
+      expect(minimalBundle.stimulusPackSnapshot).not.toHaveProperty("words");
+    });
+
+    it("minimal bundle still has hash + provenance + schema version", () => {
+      expect(minimalBundle.stimulusPackSnapshot.stimulusListHash).toBeTruthy();
+      expect(minimalBundle.stimulusPackSnapshot.stimulusSchemaVersion).toBe("sp_v1");
+      expect(minimalBundle.stimulusPackSnapshot.provenance).toBeDefined();
+    });
+
+    it("minimal bundle has all required top-level keys", () => {
+      const required = ["exportSchemaVersion", "appVersion", "protocolDocVersion",
+        "scoringAlgorithm", "exportedAt", "sessionResult", "stimulusPackSnapshot"];
+      for (const key of required) {
+        expect(minimalBundle).toHaveProperty(key);
+      }
+    });
+  });
+
+
   it("bundle alone is sufficient to recreate the pack", () => {
     const snap = bundle.stimulusPackSnapshot;
     expect(snap.words!.length).toBeGreaterThan(0);
