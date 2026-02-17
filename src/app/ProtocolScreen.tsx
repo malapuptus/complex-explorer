@@ -1,41 +1,17 @@
 /**
  * ProtocolScreen — standardized pre-session instructions.
  * Includes an Advanced section for experimental controls.
- * Supports custom pack import/export with collision detection.
- * Supports importing from Research Bundle JSON (auto-detects rb_v3+ payload).
- * Import preview + confirmation gate added (0232).
+ * Supports custom pack import/export via ImportSection (0249).
  * ImportPreviewPanel extracted (0244); importedFrom + collision safety (0246, 0247).
  */
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import type { ReactNode } from "react";
-import type { OrderPolicy, ValidationErrorCode, SessionResult } from "@/domain";
-import { validateStimulusList, STIMULUS_SCHEMA_VERSION, computeWordsSha256 } from "@/domain";
+import type { OrderPolicy } from "@/domain";
 import type { StimulusList } from "@/domain";
 import { localStorageStimulusStore, localStorageSessionStore } from "@/infra";
-import { verifyPackageIntegrity } from "./ResultsExportActions";
-import {
-  ImportPreviewPanel,
-  analyzeImport,
-  formatKB,
-} from "./ImportPreviewPanel";
-import type { ImportPreview } from "./ImportPreviewPanel";
-
-/** Human-readable messages for validation error codes. */
-const ERROR_CODE_MESSAGES: Record<ValidationErrorCode, string> = {
-  MISSING_ID: "Pack ID is required.",
-  MISSING_VERSION: "Version is required.",
-  MISSING_LANGUAGE: "Language is required.",
-  MISSING_SOURCE: "Source is required.",
-  MISSING_PROVENANCE: "Provenance metadata is required.",
-  MISSING_PROVENANCE_SOURCE_NAME: "Provenance source name is required.",
-  MISSING_PROVENANCE_SOURCE_YEAR: "Provenance source year is required.",
-  MISSING_PROVENANCE_SOURCE_CITATION: "Provenance citation is required.",
-  MISSING_PROVENANCE_LICENSE_NOTE: "Provenance license note is required.",
-  EMPTY_WORD_LIST: "Word list must not be empty.",
-  BLANK_WORDS: "Word list contains blank entries.",
-  DUPLICATE_WORDS: "Word list contains duplicates (case-insensitive).",
-};
+import { formatKB } from "./ImportPreviewPanel";
+import { ImportSection } from "./ImportSection";
 import { CustomPackManager } from "./CustomPackManager";
 
 const STORAGE_WARN_BYTES = 3 * 1024 * 1024; // 3 MB
@@ -70,7 +46,6 @@ const INSTRUCTIONS = [
 
 const DEFAULT_BREAK_EVERY = 20;
 
-
 export function ProtocolScreen({
   wordCount, practiceCount, source, estimatedMinutes,
   isLongPack, onReady, onPackImported, selectedPack, children,
@@ -81,11 +56,7 @@ export function ProtocolScreen({
   const [breakEvery, setBreakEvery] = useState(DEFAULT_BREAK_EVERY);
   const [timeoutEnabled, setTimeoutEnabled] = useState(false);
   const [timeoutMs, setTimeoutMs] = useState(8000);
-  const [importError, setImportError] = useState<string | null>(null);
-  const [importSuccess, setImportSuccess] = useState<string | null>(null);
-  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
   const [showManager, setShowManager] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleReady = () => {
     const parsedSeed =
@@ -95,107 +66,6 @@ export function ProtocolScreen({
       orderPolicy, seed: finalSeed,
       breakEveryN: isLongPack ? breakEvery : 0,
       trialTimeoutMs: timeoutEnabled ? timeoutMs : undefined,
-    });
-  };
-
-  const doImport = (packData: Partial<StimulusList>) => {
-    const errors = validateStimulusList(packData as Partial<StimulusList>);
-    if (errors.length > 0) {
-      const messages = errors.map((err) => ERROR_CODE_MESSAGES[err.code] ?? err.message);
-      setImportError(messages.join("; "));
-      return;
-    }
-    const pack = packData as StimulusList;
-    if (localStorageStimulusStore.exists(pack.id, pack.version)) {
-      setImportError(
-        `Pack "${pack.id}@${pack.version}" already exists. Delete it first to re-import.`,
-      );
-      return;
-    }
-    void computeWordsSha256(pack.words as string[]).then((hash) => {
-      const enriched: StimulusList = {
-        ...pack,
-        stimulusSchemaVersion: pack.stimulusSchemaVersion ?? STIMULUS_SCHEMA_VERSION,
-        stimulusListHash: pack.stimulusListHash ?? hash,
-      };
-      if (pack.stimulusListHash && pack.stimulusListHash !== hash) {
-        setImportError(
-          `Hash mismatch: expected ${pack.stimulusListHash}, computed ${hash}. Pack may be corrupted.`,
-        );
-        return;
-      }
-      localStorageStimulusStore.save(enriched);
-      const fromType = importPreview?.type === "bundle" ? " (extracted from Research Bundle)"
-        : importPreview?.type === "package" ? " (extracted from Session Package)" : "";
-      setImportSuccess(`Imported "${pack.id}" (${pack.words.length} words)${fromType}`);
-      setImportPreview(null);
-      onPackImported?.();
-    });
-  };
-
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImportError(null);
-    setImportSuccess(null);
-    setImportPreview(null);
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const rawJson = reader.result as string;
-        const parsed = JSON.parse(rawJson);
-        const preview = analyzeImport(parsed, rawJson);
-        if (!preview) {
-          setImportError("Could not detect a valid pack in this file.");
-          return;
-        }
-        // 0233: Integrity check for pkg_v1
-        if (preview.type === "package" && typeof parsed.packageHash === "string") {
-          void verifyPackageIntegrity(parsed).then((result) => {
-            // 0234: Extract session for import
-            let sessionToImport: SessionResult | null = null;
-            if (result.valid) {
-              const bundle = parsed.bundle as Record<string, unknown> | undefined;
-              if (bundle?.sessionResult) {
-                const sr = bundle.sessionResult as Record<string, unknown>;
-                sessionToImport = sr as unknown as SessionResult;
-              }
-            }
-            setImportPreview({ ...preview, integrityResult: result, sessionToImport });
-          });
-        } else {
-          setImportPreview(preview);
-        }
-      } catch {
-        setImportError("Invalid JSON file.");
-      }
-    };
-    reader.readAsText(file);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const handleConfirmImport = () => {
-    if (!importPreview) return;
-    doImport(importPreview.packData);
-  };
-
-  const handleExportPack = () => {
-    if (!selectedPack) return;
-    void computeWordsSha256(selectedPack.words).then((hash) => {
-      const exported = {
-        ...selectedPack,
-        stimulusSchemaVersion: selectedPack.stimulusSchemaVersion ?? STIMULUS_SCHEMA_VERSION,
-        stimulusListHash: selectedPack.stimulusListHash ?? hash,
-      };
-      const json = JSON.stringify(exported, null, 2);
-      const blob = new Blob([json], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `pack-${selectedPack.id}-${selectedPack.version}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
     });
   };
 
@@ -234,78 +104,21 @@ export function ProtocolScreen({
 
       {children}
 
-      {/* Pack tools: import + export + manage */}
-      <div className="flex flex-wrap items-center justify-center gap-3">
-        <label className="cursor-pointer rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted">
-          Import Pack (JSON / Bundle)
-          <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
-        </label>
-        {selectedPack && (
-          <button onClick={handleExportPack} className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted">
-            Export Pack JSON
-          </button>
-        )}
-        {customPacks.length > 0 && (
-          <button
-            onClick={() => setShowManager((v) => !v)}
-            className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
-          >
-            {showManager ? "Hide custom packs" : "Manage custom packs"}
-          </button>
-        )}
-      </div>
+      {/* Import section (0249): all import wiring extracted */}
+      <ImportSection
+        onPackImported={() => { onPackImported?.(); }}
+        selectedPack={selectedPack}
+      />
 
-      {/* Import preview (0232, 0233, 0234, 0244–0248) */}
-      {importPreview && (
-        <ImportPreviewPanel
-          preview={importPreview}
-          onConfirm={handleConfirmImport}
-          onCancel={() => setImportPreview(null)}
-          onExtractPack={
-            importPreview.packData && Object.keys(importPreview.packData).length > 0
-              ? () => doImport(importPreview.packData)
-              : undefined
-          }
-          onImportSession={async () => {
-            if (!importPreview.sessionToImport) return;
-            const session = importPreview.sessionToImport;
-            const packageHash = importPreview.packageHash ?? "";
-            const packageVersion = importPreview.packageVersion ?? "pkg_v1";
-
-            // 0246: attach importedFrom provenance
-            const withProvenance = {
-              ...session,
-              _imported: true,
-              importedFrom: { packageVersion, packageHash },
-            } as SessionResult & { _imported: boolean };
-
-            // 0247: collision safety — rewrite ID if already exists
-            let finalId = withProvenance.id;
-            let collisionWarning = "";
-            if (await localStorageSessionStore.exists(finalId)) {
-              const baseId = finalId;
-              finalId = `${baseId}__import_${packageHash.slice(0, 8)}`;
-              let attempt = 2;
-              while (await localStorageSessionStore.exists(finalId) && attempt <= 10) {
-                finalId = `${baseId}__import_${packageHash.slice(0, 8)}__${attempt}`;
-                attempt++;
-              }
-              collisionWarning = ` (ID collision — imported as ${finalId})`;
-            }
-
-            const toSave = { ...withProvenance, id: finalId };
-            void localStorageSessionStore.save(toSave).then(() => {
-              setImportSuccess(`Session "${finalId}" imported to Previous Sessions.${collisionWarning}`);
-              setImportPreview(null);
-            }).catch((err) => {
-              setImportError(`Failed to import session: ${String(err)}`);
-            });
-          }}
-        />
+      {/* Manage custom packs */}
+      {customPacks.length > 0 && (
+        <button
+          onClick={() => setShowManager((v) => !v)}
+          className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
+        >
+          {showManager ? "Hide custom packs" : "Manage custom packs"}
+        </button>
       )}
-
-      {importError && <p className="text-xs text-destructive">{importError}</p>}
-      {importSuccess && <p className="text-xs text-primary">{importSuccess}</p>}
 
       {showManager && (
         <CustomPackManager
@@ -319,6 +132,7 @@ export function ProtocolScreen({
         Storage: {formatKB(storageSessionBytes)} sessions, {formatKB(storagePackBytes)} packs
         {storageWarn && " ⚠ approaching browser quota"}
       </div>
+
       {/* Advanced settings toggle */}
       <button
         type="button"
@@ -338,7 +152,10 @@ export function ProtocolScreen({
         />
       )}
 
-      <button onClick={handleReady} className="rounded-md bg-primary px-8 py-3 text-lg text-primary-foreground hover:opacity-90">
+      <button
+        onClick={handleReady}
+        className="rounded-md bg-primary px-8 py-3 text-lg text-primary-foreground hover:opacity-90"
+      >
         I'm ready
       </button>
     </div>
@@ -373,7 +190,8 @@ function AdvancedPanel({
       {orderPolicy === "seeded" && (
         <div className="flex items-center gap-3">
           <label className="w-28 shrink-0 text-sm text-muted-foreground">Seed:</label>
-          <input type="text" inputMode="numeric" value={seedInput}
+          <input
+            type="text" inputMode="numeric" value={seedInput}
             onChange={(e) => setSeedInput(e.target.value)} placeholder="Auto-generate"
             className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground/60"
           />
@@ -382,7 +200,8 @@ function AdvancedPanel({
       {isLongPack && (
         <div className="flex items-center gap-3">
           <label className="w-28 shrink-0 text-sm text-muted-foreground">Break every:</label>
-          <input type="number" min={5} max={100} value={breakEvery}
+          <input
+            type="number" min={5} max={100} value={breakEvery}
             onChange={(e) => setBreakEvery(Math.max(5, Math.min(100, Number(e.target.value) || 5)))}
             className="w-20 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
           />
@@ -393,7 +212,9 @@ function AdvancedPanel({
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <label className="w-28 shrink-0 text-sm text-muted-foreground">Trial timeout:</label>
-            <button type="button" onClick={() => setTimeoutEnabled(!timeoutEnabled)}
+            <button
+              type="button"
+              onClick={() => setTimeoutEnabled(!timeoutEnabled)}
               className={`rounded-md border px-3 py-1.5 text-sm ${timeoutEnabled ? "border-primary bg-primary/10 text-foreground" : "border-input bg-background text-muted-foreground"}`}
             >
               {timeoutEnabled ? "On" : "Off"}
@@ -401,7 +222,8 @@ function AdvancedPanel({
           </div>
           {timeoutEnabled && (
             <div className="flex items-center gap-3 pl-[7.75rem]">
-              <input type="number" min={3000} max={30000} step={1000} value={timeoutMs}
+              <input
+                type="number" min={3000} max={30000} step={1000} value={timeoutMs}
                 onChange={(e) => setTimeoutMs(Math.max(3000, Math.min(30000, Number(e.target.value) || 3000)))}
                 className="w-24 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
               />

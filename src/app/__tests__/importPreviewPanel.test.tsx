@@ -3,11 +3,12 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ImportPreviewPanel } from "@/app/ImportPreviewPanel";
 import type { ImportPreview } from "@/app/ImportPreviewPanel";
 import { analyzeImport } from "@/app/ImportPreviewPanel";
+import { getAvailableActions } from "@/app/importPreviewModel";
 import { localStorageSessionStore } from "@/infra/localStorageSessionStore";
 import type { SessionResult } from "@/domain/types";
 
 /**
- * Tests for Tickets 0244–0248.
+ * Tests for Tickets 0244–0253.
  */
 
 // ── Fixtures ─────────────────────────────────────────────────────────
@@ -270,7 +271,6 @@ describe("0246 — importedFrom round-trip persistence", () => {
   });
 
   it("legacy session without importedFrom migrates to null", async () => {
-    // Use schemaVersion 2 so migration runs
     const raw = {
       schemaVersion: 2,
       sessions: {
@@ -326,7 +326,6 @@ describe("0248 — Available actions summary", () => {
       />,
     );
     expect(screen.getByText("Available actions")).toBeTruthy();
-    // "Import as Session" appears in both the actions list <li> and the button — use getAllByText
     expect(screen.getAllByText("Import as Session").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Extract Pack").length).toBeGreaterThanOrEqual(1);
   });
@@ -339,9 +338,7 @@ describe("0248 — Available actions summary", () => {
         onImportSession={() => {}} onExtractPack={() => {}}
       />,
     );
-    // At least one "Import as Session" (in actions list and/or button)
     expect(screen.getAllByText("Import as Session").length).toBeGreaterThanOrEqual(1);
-    // Extract Pack should NOT appear anywhere (no words)
     expect(screen.queryAllByText("Extract Pack").length).toBe(0);
   });
 
@@ -364,7 +361,6 @@ describe("0248 — Available actions summary", () => {
       />,
     );
     const importSessionBtn = screen.queryByRole("button", { name: /import as session/i });
-    // Button is not rendered for tampered (no session) — check that no enabled import buttons exist
     expect(importSessionBtn).toBeNull();
   });
 
@@ -378,6 +374,132 @@ describe("0248 — Available actions summary", () => {
     const copyBtn = screen.getByText("Copy diagnostics");
     expect(copyBtn).toBeTruthy();
     expect((copyBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+// ── 0251: Clipboard fallback ──────────────────────────────────────────
+
+describe("0251 — Clipboard failure fallback", () => {
+  it("shows Copied confirmation on clipboard success", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText }, configurable: true,
+    });
+
+    render(
+      <ImportPreviewPanel
+        preview={tamperedPkgPreview}
+        onConfirm={() => {}} onCancel={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByText("Copy diagnostics"));
+    await waitFor(() => expect(screen.getByText(/Copied ✓/)).toBeTruthy());
+  });
+
+  it("shows manual copy fallback textarea on clipboard failure", async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error("no clipboard"));
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText }, configurable: true,
+    });
+
+    render(
+      <ImportPreviewPanel
+        preview={tamperedPkgPreview}
+        onConfirm={() => {}} onCancel={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByText("Copy diagnostics"));
+    await waitFor(() =>
+      expect(screen.getByText(/Clipboard unavailable/)).toBeTruthy(),
+    );
+    const textarea = screen.getByRole("textbox", { name: /Diagnostics JSON/i });
+    expect(textarea).toBeTruthy();
+    const value = (textarea as HTMLTextAreaElement).value;
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    expect(parsed.code).toBe("ERR_INTEGRITY_MISMATCH");
+  });
+});
+
+// ── 0252: originalSessionId in importedFrom ───────────────────────────
+
+describe("0252 — originalSessionId in importedFrom", () => {
+  beforeEach(() => { localStorage.clear(); });
+
+  it("persists originalSessionId and reloads it", async () => {
+    const session = {
+      ...makeSession("orig-sess-1"),
+      importedFrom: {
+        packageVersion: "pkg_v1",
+        packageHash: "abc123",
+        originalSessionId: "original-id-before-collision",
+      },
+    };
+    await localStorageSessionStore.save(session);
+    const loaded = await localStorageSessionStore.load("orig-sess-1");
+    expect(loaded).toBeDefined();
+    expect(loaded!.importedFrom?.originalSessionId).toBe("original-id-before-collision");
+  });
+
+  it("legacy session without originalSessionId is safe (no crash)", async () => {
+    const session = {
+      ...makeSession("legacy-import"),
+      importedFrom: { packageVersion: "pkg_v1", packageHash: "xyz789" },
+    };
+    await localStorageSessionStore.save(session);
+    const loaded = await localStorageSessionStore.load("legacy-import");
+    expect(loaded).toBeDefined();
+    // originalSessionId is optional — should be undefined (not error)
+    expect(loaded!.importedFrom?.originalSessionId).toBeUndefined();
+  });
+});
+
+// ── 0253: getAvailableActions SSoT ───────────────────────────────────
+
+describe("0253 — getAvailableActions single source of truth", () => {
+  it("valid pkg full → Import as Session + Extract Pack", () => {
+    const actions = getAvailableActions(fullPkgPreview, false);
+    expect(actions).toContain("Import as Session");
+    expect(actions).toContain("Extract Pack");
+    expect(actions).not.toContain("Blocked: Integrity mismatch");
+  });
+
+  it("valid pkg minimal/redacted → Import as Session only", () => {
+    const actions = getAvailableActions(minimalPkgPreview, false);
+    expect(actions).toContain("Import as Session");
+    expect(actions).not.toContain("Extract Pack");
+  });
+
+  it("tampered pkg → Blocked only", () => {
+    const actions = getAvailableActions(tamperedPkgPreview, true);
+    expect(actions).toEqual(["Blocked: Integrity mismatch"]);
+  });
+
+  it("bundle → Import Pack", () => {
+    const bundlePreview: ImportPreview = {
+      type: "bundle",
+      packData: { id: "test", version: "1.0.0", words: ["a"] },
+      wordCount: 1,
+      hash: null,
+      schemaVersion: null,
+      sizeBytes: 100,
+      rawJson: "{}",
+    };
+    const actions = getAvailableActions(bundlePreview, false);
+    expect(actions).toEqual(["Import Pack"]);
+  });
+
+  it("pack JSON → Import Pack", () => {
+    const packPreview: ImportPreview = {
+      type: "pack",
+      packData: { id: "test", version: "1.0.0", words: ["a"] },
+      wordCount: 1,
+      hash: null,
+      schemaVersion: null,
+      sizeBytes: 100,
+      rawJson: "{}",
+    };
+    const actions = getAvailableActions(packPreview, false);
+    expect(actions).toEqual(["Import Pack"]);
   });
 });
 

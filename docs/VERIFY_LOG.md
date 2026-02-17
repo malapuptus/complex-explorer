@@ -4,9 +4,32 @@
 
 ---
 
-## Tickets 0244–0248 — Import Preview Extraction, Diagnostics, Pack Extract, importedFrom, Collision Safety, Gating
+## Tickets 0249–0253 — Import Refactor, Clipboard Fallback, originalSessionId, SSoT Gating
 
-**Date:** 2026-02-17 | **Oracle:** `npx vitest run src` → **276/276 PASS**
+**Date:** 2026-02-17 | **Oracle:** `npx vitest run src` → **291/291 PASS**
+
+| # | Check | Result |
+|---|-------|--------|
+| 1 | All tests pass | ✅ 291/291 |
+| 2 | `importPreviewModel.ts` created (pure logic, no React) | ✅ |
+| 3 | `ImportSection.tsx` created; `ProtocolScreen.tsx` ≤213 lines | ✅ |
+| 4 | `ImportPreviewPanel.tsx` imports from model; render-only | ✅ |
+| 5 | Clipboard success shows `Copied ✓`; failure shows textarea fallback | ✅ |
+| 6 | `originalSessionId` added to `importedFrom` type; persists round-trip | ✅ |
+| 7 | `getAvailableActions()` is single source of truth for list + button gating | ✅ |
+| 8 | Table-driven tests: 5 fixtures cover full/minimal/tampered/bundle/pack | ✅ |
+
+**Canary (0249):** `ProtocolScreen.tsx` ~213 lines (was 415). `ImportSection.tsx` ~170 lines. `ImportPreviewPanel.tsx` ~220 lines. All behavior unchanged.
+
+**Canary (0251):** `Copy diagnostics` → `Copied ✓` on success. On failure: "Clipboard unavailable — copy the JSON below manually:" + read-only `<textarea>` with `{"code":"ERR_INTEGRITY_MISMATCH","expectedHash":...}`.
+
+**Canary (0252):** `Imported from pkg_v1 (hash: pkghash0…, original: orig-sess…)` shown in Previous Sessions.
+
+**Canary (0253):** `getAvailableActions(fullPkg, false)` → `["Import as Session","Extract Pack"]`; `getAvailableActions(tampered, true)` → `["Blocked: Integrity mismatch"]`.
+
+---
+
+
 
 | # | Check | Result |
 |---|-------|--------|
