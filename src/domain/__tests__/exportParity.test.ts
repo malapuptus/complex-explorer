@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sessionTrialsToCsv } from "../csvExport";
+import { sessionTrialsToCsv, CSV_SCHEMA_VERSION } from "../csvExport";
 import type { Trial, TrialFlag } from "../types";
 
 /**
@@ -26,6 +26,7 @@ function makeTrial(word: string, index: number): Trial {
 
 /** Required CSV columns in expected relative order. */
 const REQUIRED_CSV_COLUMNS = [
+  "csv_schema_version",
   "session_id",
   "session_fingerprint",
   "scoring_version",
@@ -74,6 +75,12 @@ describe("Export parity", () => {
 
     it("has at least the required number of columns", () => {
       expect(columns.length).toBeGreaterThanOrEqual(REQUIRED_CSV_COLUMNS.length);
+    });
+
+    it("csv_schema_version column is populated in data rows", () => {
+      const row = csv.split("\n")[1];
+      const fields = row.split(",");
+      expect(fields[0]).toBe(CSV_SCHEMA_VERSION);
     });
   });
 

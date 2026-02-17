@@ -54,8 +54,8 @@ describe("sessionTrialsToCsv", () => {
   it("scoring_version is empty when not provided", () => {
     const csv = sessionTrialsToCsv(trials, flags, "s1", "demo-10", "1.0.0", 42);
     const row = csv.split("\n")[1];
-    // session_id,fingerprint,scoring_version — third field should be empty
+    // csv_schema_version,session_id,session_fingerprint,scoring_version — index 3
     const fields = row.split(",");
-    expect(fields[2]).toBe("");
+    expect(fields[3]).toBe("");
   });
 });
