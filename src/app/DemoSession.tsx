@@ -3,6 +3,8 @@
  * Autosaves draft after each scored trial; offers resume on reload.
  */
 
+declare const __APP_VERSION__: string;
+
 import { getStimulusList, computeSessionFingerprint } from "@/domain";
 import type { SessionResult, ProvenanceSnapshot, DraftSession } from "@/domain";
 import { localStorageSessionStore } from "@/infra";
@@ -130,6 +132,8 @@ export function DemoSession() {
         stimulusOrder: session.stimulusOrder,
         seedUsed: session.seedUsed,
       });
+      const appVer =
+        typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : null;
       const result: SessionResult = {
         id: draftIdRef.current,
         config,
@@ -142,6 +146,7 @@ export function DemoSession() {
         provenanceSnapshot: provSnapshot,
         sessionFingerprint: fingerprint,
         scoringVersion: "scoring_v2_mad_3.5",
+        appVersion: appVer,
       };
       localStorageSessionStore.save(result);
       setSessionFingerprint(fingerprint);

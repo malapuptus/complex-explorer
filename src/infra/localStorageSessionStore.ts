@@ -75,6 +75,7 @@ function migrateSessionToV3(raw: Record<string, unknown>): SessionResult {
     provenanceSnapshot: (raw.provenanceSnapshot as SessionResult["provenanceSnapshot"]) ?? null,
     sessionFingerprint: (raw.sessionFingerprint as string | null) ?? null,
     scoringVersion: (raw.scoringVersion as string | null) ?? null,
+    appVersion: (raw.appVersion as string | null) ?? null,
   };
 }
 
