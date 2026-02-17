@@ -83,4 +83,10 @@ export const localStorageStimulusStore = {
   deleteAll(): void {
     writeEnvelope({ packs: {} });
   },
+
+  /** Approximate bytes used by custom packs in localStorage. */
+  estimateBytes(): number {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? new Blob([raw]).size : 0;
+  },
 };

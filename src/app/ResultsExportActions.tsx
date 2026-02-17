@@ -5,7 +5,7 @@
 
 import { useMemo } from "react";
 import type { Trial, TrialFlag, OrderPolicy, SessionResult, StimulusPackSnapshot, StimulusList } from "@/domain";
-import { sessionTrialsToCsv, getStimulusList } from "@/domain";
+import { sessionTrialsToCsv, getStimulusList, type CsvExportOptions } from "@/domain";
 import { localStorageStimulusStore } from "@/infra";
 
 declare const __APP_VERSION__: string;
@@ -113,50 +113,75 @@ export function ExportActions({
     [trials, trialFlags, csvMeta],
   );
 
-  const bundleJson = useMemo(() => {
-    const bundleSession = sessionResult
-      ? {
-          id: sessionResult.id, config: sessionResult.config,
-          trials: sessionResult.trials, scoring: sessionResult.scoring,
-          sessionFingerprint: sessionResult.sessionFingerprint,
-          provenanceSnapshot: sessionResult.provenanceSnapshot,
-          stimulusOrder: sessionResult.stimulusOrder,
-          seedUsed: sessionResult.seedUsed,
-          scoringVersion: sessionResult.scoringVersion,
-          startedAt: sessionResult.startedAt,
-          completedAt: sessionResult.completedAt,
-        }
-      : {
-          id: csvMeta.sessionId,
-          config: {
-            stimulusListId: csvMeta.packId, stimulusListVersion: csvMeta.packVersion,
-            orderPolicy: csvMeta.orderPolicy ?? "fixed", seed: csvMeta.seed,
-            ...(csvMeta.trialTimeoutMs !== undefined && { trialTimeoutMs: csvMeta.trialTimeoutMs }),
-            ...(csvMeta.breakEveryN !== undefined && { breakEveryN: csvMeta.breakEveryN }),
-          },
-          trials, scoring: { trialFlags, summary: { meanReactionTimeMs, medianReactionTimeMs } },
-          sessionFingerprint: csvMeta.sessionFingerprint ?? null,
+  const csvRedacted = useMemo(() =>
+    sessionTrialsToCsv(trials, trialFlags, csvMeta.sessionId, csvMeta.packId,
+      csvMeta.packVersion, csvMeta.seed, csvMeta.sessionFingerprint, SCORING_VERSION,
+      { redactResponses: true }),
+    [trials, trialFlags, csvMeta],
+  );
+
+  const buildBundleJson = useMemo(() => {
+    return (mode: "full" | "minimal") => {
+      const bundleSession = sessionResult
+        ? {
+            id: sessionResult.id, config: sessionResult.config,
+            trials: sessionResult.trials, scoring: sessionResult.scoring,
+            sessionFingerprint: sessionResult.sessionFingerprint,
+            provenanceSnapshot: sessionResult.provenanceSnapshot,
+            stimulusOrder: sessionResult.stimulusOrder,
+            seedUsed: sessionResult.seedUsed,
+            scoringVersion: sessionResult.scoringVersion,
+            startedAt: sessionResult.startedAt,
+            completedAt: sessionResult.completedAt,
+          }
+        : {
+            id: csvMeta.sessionId,
+            config: {
+              stimulusListId: csvMeta.packId, stimulusListVersion: csvMeta.packVersion,
+              orderPolicy: csvMeta.orderPolicy ?? "fixed", seed: csvMeta.seed,
+              ...(csvMeta.trialTimeoutMs !== undefined && { trialTimeoutMs: csvMeta.trialTimeoutMs }),
+              ...(csvMeta.breakEveryN !== undefined && { breakEveryN: csvMeta.breakEveryN }),
+            },
+            trials, scoring: { trialFlags, summary: { meanReactionTimeMs, medianReactionTimeMs } },
+            sessionFingerprint: csvMeta.sessionFingerprint ?? null,
+          };
+
+      const baseSnapshot = persistedSnapshot ?? {
+        stimulusListHash: csvMeta.stimulusListHash ?? null,
+        stimulusSchemaVersion: null,
+        provenance: sessionResult?.provenanceSnapshot ?? null,
+      };
+
+      if (mode === "full") {
+        const words = resolvePackWords(csvMeta, sessionResult);
+        const snapshotWithWords = { ...baseSnapshot, ...(words ? { words } : {}) };
+        const bundle: ResearchBundle = {
+          sessionResult: bundleSession, protocolDocVersion: PROTOCOL_DOC_VERSION,
+          appVersion: APP_VERSION, scoringAlgorithm: SCORING_ALGORITHM,
+          exportSchemaVersion: EXPORT_SCHEMA_VERSION, exportedAt: new Date().toISOString(),
+          stimulusPackSnapshot: snapshotWithWords,
         };
-
-    const baseSnapshot = persistedSnapshot ?? {
-      stimulusListHash: csvMeta.stimulusListHash ?? null,
-      stimulusSchemaVersion: null,
-      provenance: sessionResult?.provenanceSnapshot ?? null,
+        return JSON.stringify(bundle, null, 2);
+      } else {
+        // Minimal: omit words, keep hash + provenance + schema version
+        const minimalSnapshot = {
+          stimulusListHash: baseSnapshot.stimulusListHash,
+          stimulusSchemaVersion: baseSnapshot.stimulusSchemaVersion,
+          provenance: baseSnapshot.provenance,
+        };
+        const bundle: ResearchBundle = {
+          sessionResult: bundleSession, protocolDocVersion: PROTOCOL_DOC_VERSION,
+          appVersion: APP_VERSION, scoringAlgorithm: SCORING_ALGORITHM,
+          exportSchemaVersion: EXPORT_SCHEMA_VERSION, exportedAt: new Date().toISOString(),
+          stimulusPackSnapshot: minimalSnapshot,
+        };
+        return JSON.stringify(bundle, null, 2);
+      }
     };
-    const words = resolvePackWords(csvMeta, sessionResult);
-    const snapshotWithWords = { ...baseSnapshot, ...(words ? { words } : {}) };
-
-    const bundle: ResearchBundle = {
-      sessionResult: bundleSession,
-      protocolDocVersion: PROTOCOL_DOC_VERSION,
-      appVersion: APP_VERSION,
-      scoringAlgorithm: SCORING_ALGORITHM,
-      exportSchemaVersion: EXPORT_SCHEMA_VERSION,
-      exportedAt: new Date().toISOString(),
-      stimulusPackSnapshot: snapshotWithWords,
-    };
-    return JSON.stringify(bundle, null, 2);
   }, [trials, trialFlags, meanReactionTimeMs, medianReactionTimeMs, sessionResult, csvMeta, persistedSnapshot]);
+
+  const bundleJsonFull = useMemo(() => buildBundleJson("full"), [buildBundleJson]);
+  const bundleJsonMinimal = useMemo(() => buildBundleJson("minimal"), [buildBundleJson]);
 
   const snapshotJson = useMemo(() =>
     persistedSnapshot ? JSON.stringify(persistedSnapshot, null, 2) : null,
@@ -189,12 +214,14 @@ export function ExportActions({
     alert(`Pack "${restoredPack.id}@${restoredPack.version}" restored from this session (${restoredPack.words.length} words). Note: only scored words are included; practice words are not in the snapshot.`);
   };
 
-  const bundleFn = () => {
+  const makeBundleFn = (mode: "full" | "minimal") => () => {
+    const json = mode === "full" ? bundleJsonFull : bundleJsonMinimal;
     const fp = csvMeta.sessionFingerprint?.slice(0, 8) ?? "";
     const seedPart = csvMeta.seed != null ? `seed${csvMeta.seed}` : "noseed";
     const datePart = new Date().toISOString().slice(0, 10);
-    const filename = ["bundle", datePart, csvMeta.packId, seedPart, ...(fp ? [fp] : [])].join("-") + ".json";
-    downloadFile(bundleJson, "application/json", filename);
+    const suffix = mode === "minimal" ? "-minimal" : "";
+    const filename = ["bundle", datePart, csvMeta.packId, seedPart, ...(fp ? [fp] : [])].join("-") + suffix + ".json";
+    downloadFile(json, "application/json", filename);
   };
 
   return (
@@ -205,10 +232,21 @@ export function ExportActions({
       >
         Export CSV <SizeLabel bytes={csvContent.length} />
       </button>
-      <button onClick={bundleFn}
+      <button
+        onClick={() => downloadFile(csvRedacted, "text/csv", `session-${csvMeta.sessionId}-redacted.csv`)}
         className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
       >
-        Export Research Bundle <SizeLabel bytes={bundleJson.length} />
+        Export CSV (Redacted) <SizeLabel bytes={csvRedacted.length} />
+      </button>
+      <button onClick={makeBundleFn("full")}
+        className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+      >
+        Export Bundle (Full) <SizeLabel bytes={bundleJsonFull.length} />
+      </button>
+      <button onClick={makeBundleFn("minimal")}
+        className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+      >
+        Export Bundle (Minimal) <SizeLabel bytes={bundleJsonMinimal.length} />
       </button>
       {snapshotJson && (
         <button

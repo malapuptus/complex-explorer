@@ -281,4 +281,20 @@ export const localStorageSessionStore: SessionStore = {
     if (existing.tabId === tabId) return false;
     return !isLockExpired(existing);
   },
+
+  /** Approximate bytes used by sessions in localStorage. */
+  estimateBytes(): number {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? new Blob([raw]).size : 0;
+  },
+
+  /** Return all session pack references (id@version) for orphan detection. */
+  async referencedPacks(): Promise<Set<string>> {
+    const envelope = readEnvelope();
+    const refs = new Set<string>();
+    for (const s of Object.values(envelope.sessions)) {
+      refs.add(`${s.config.stimulusListId}@${s.config.stimulusListVersion}`);
+    }
+    return refs;
+  },
 };

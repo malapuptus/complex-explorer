@@ -84,6 +84,36 @@ describe("Export parity", () => {
     });
   });
 
+  describe("Redacted CSV", () => {
+    const redacted = sessionTrialsToCsv(trials, flags, "s1", "demo-10", "1.0.0", 42, "fp123", "sv1", { redactResponses: true });
+    const redactedRows = redacted.split("\n");
+
+    it("has same header as normal CSV", () => {
+      expect(redactedRows[0]).toBe(redacted.split("\n")[0]);
+    });
+
+    it("response column is empty in redacted rows", () => {
+      for (let i = 1; i < redactedRows.length; i++) {
+        const fields = redactedRows[i].split(",");
+        // response is column index 10 (0-based)
+        expect(fields[10]).toBe("");
+      }
+    });
+
+    it("non-response columns match normal CSV", () => {
+      const normalCsv = sessionTrialsToCsv(trials, flags, "s1", "demo-10", "1.0.0", 42, "fp123", "sv1");
+      const normalRows = normalCsv.split("\n");
+      for (let i = 1; i < normalRows.length; i++) {
+        const normalFields = normalRows[i].split(",");
+        const redactedFields = redactedRows[i].split(",");
+        for (let j = 0; j < normalFields.length; j++) {
+          if (j === 10) continue; // skip response column
+          expect(redactedFields[j]).toBe(normalFields[j]);
+        }
+      }
+    });
+  });
+
   describe("Research Bundle structure", () => {
     const REQUIRED_BUNDLE_KEYS = [
       "sessionResult",

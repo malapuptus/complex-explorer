@@ -129,12 +129,18 @@ SHA-256( words.join("\n") )
 | `stimulusListHash` | string\|null | SHA-256 of canonical word list |
 | `stimulusSchemaVersion` | string\|null | Pack schema version (e.g. `"sp_v1"`) |
 | `provenance` | ProvenanceSnapshot\|null | Full provenance metadata |
-| `words` | string[]\|undefined | Full word list (new in rb_v3; absent if unavailable) |
+| `words` | string[]\|undefined | Full word list (present in Full mode; absent in Minimal mode) |
 
-### Changes from rb_v2
+### Export modes
 
-- Added `words` array to `stimulusPackSnapshot` — enables pack restoration directly from bundle.
-- Bundle is now self-contained: importing a bundle JSON into the pack import flow auto-extracts the pack payload.
+- **Full** (`Export Bundle (Full)`): includes `words` — enables pack restoration directly from bundle.
+- **Minimal** (`Export Bundle (Minimal)`): omits `words` — share-safe, preserves hash + provenance for integrity verification.
+
+Both modes use `exportSchemaVersion: "rb_v3"`.
+
+### Redacted CSV
+
+`Export CSV (Redacted)` replaces the `response` column with empty strings while preserving all timing, flag, and metadata columns. No schema column changes — still `csv_v1`.
 
 ### Changes from rb_v1
 
