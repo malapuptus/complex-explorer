@@ -10,6 +10,7 @@ export type {
   SessionSummary,
   OrderPolicy,
   ProvenanceSnapshot,
+  StimulusPackSnapshot,
 } from "./types";
 
 export type { SessionStore, SessionListEntry, DraftSession, DraftLock } from "./sessionStore";

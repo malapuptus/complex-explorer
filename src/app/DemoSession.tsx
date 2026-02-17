@@ -5,7 +5,7 @@
 
 declare const __APP_VERSION__: string;
 
-import type { SessionResult, ProvenanceSnapshot, DraftSession } from "@/domain";
+import type { SessionResult, ProvenanceSnapshot, DraftSession, StimulusPackSnapshot } from "@/domain";
 import { computeSessionFingerprint } from "@/domain";
 import { localStorageSessionStore } from "@/infra";
 import { useSession } from "./useSession";
@@ -110,6 +110,16 @@ export function DemoSession() {
         config, stimulusOrder: session.stimulusOrder, seedUsed: session.seedUsed,
       });
       const appVer = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : null;
+      let packHash: string | null = null;
+      try {
+        const { computeWordsSha256 } = await import("@/domain");
+        packHash = await computeWordsSha256(list.words as string[]);
+      } catch { /* hash unavailable */ }
+      const packSnapshot: StimulusPackSnapshot = {
+        stimulusListHash: packHash,
+        stimulusSchemaVersion: "sp_v1",
+        provenance: provSnapshot,
+      };
       const result: SessionResult = {
         id: draftIdRef.current, config, trials: session.trials,
         startedAt: startedAtRef.current ?? new Date().toISOString(),
@@ -120,6 +130,7 @@ export function DemoSession() {
         sessionFingerprint: fingerprint,
         scoringVersion: "scoring_v2_mad_3.5",
         appVersion: appVer,
+        stimulusPackSnapshot: packSnapshot,
       };
       localStorageSessionStore.save(result);
       setSessionFingerprint(fingerprint);

@@ -74,6 +74,36 @@ describe("appVersion persistence", () => {
     expect(loaded?.appVersion).toBeNull();
   });
 });
+
+describe("stimulusPackSnapshot persistence", () => {
+  it("round-trips stimulusPackSnapshot through save/load", async () => {
+    const snapshot = {
+      stimulusListHash: "abc123hash",
+      stimulusSchemaVersion: "sp_v1",
+      provenance: {
+        listId: "demo-10", listVersion: "1.0.0", language: "en",
+        source: "test", sourceName: "Test", sourceYear: "2026",
+        sourceCitation: "Test citation", licenseNote: "Test license", wordCount: 10,
+      },
+    };
+    const result = makeFakeResult({ stimulusPackSnapshot: snapshot });
+    await localStorageSessionStore.save(result as never);
+    const loaded = await localStorageSessionStore.load("test-1");
+    expect(loaded?.stimulusPackSnapshot).toEqual(snapshot);
+    expect(loaded?.stimulusPackSnapshot?.stimulusListHash).toBe("abc123hash");
+    expect(loaded?.stimulusPackSnapshot?.stimulusSchemaVersion).toBe("sp_v1");
+  });
+
+  it("migrates legacy session without stimulusPackSnapshot to null", async () => {
+    const legacy = makeFakeResult();
+    delete (legacy as Record<string, unknown>).stimulusPackSnapshot;
+    const envelope = { schemaVersion: 2, sessions: { "test-1": legacy } };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
+
+    const loaded = await localStorageSessionStore.load("test-1");
+    expect(loaded?.stimulusPackSnapshot).toBeNull();
+  });
+});
 describe("draft startedAt persistence", () => {
   it("preserves startedAt through draft save/load", async () => {
     const draft = {
