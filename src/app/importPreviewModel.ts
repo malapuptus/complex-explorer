@@ -1,6 +1,7 @@
 /**
  * importPreviewModel — pure logic for import preview analysis.
- * Tickets 0250 (extract from ImportPreviewPanel) + 0253 (SSoT for available actions).
+ * Tickets 0250 (extract from ImportPreviewPanel) + 0253 (SSoT for available actions)
+ *        + 0260 (compatibility warnings).
  * No I/O, no React. Safe to import in tests without a DOM.
  */
 
@@ -29,6 +30,79 @@ export interface ImportPreview {
   packageVersion?: string;
   /** For pkg_v1: the package hash (for collision safety). */
   packageHash?: string;
+  /** Ticket 0260: compatibility metadata extracted from bundle/package. */
+  compat?: ImportCompat | null;
+}
+
+// ── Compatibility warnings (0260) ────────────────────────────────────
+
+/** Compatibility metadata extracted during import analysis. */
+export interface ImportCompat {
+  /** rb schema version from the import file (e.g. "rb_v3"). */
+  exportSchemaVersion: string | null;
+  /** Protocol doc version from the bundle. */
+  protocolDocVersion: string | null;
+  /** App version recorded in the bundle. */
+  importedAppVersion: string | null;
+  /** Privacy mode recorded in the bundle. */
+  privacyMode: string | null;
+}
+
+/** A single compatibility warning. */
+export interface CompatWarning {
+  field: string;
+  message: string;
+}
+
+/** Current app schema / protocol constants the model checks against. */
+export const CURRENT_EXPORT_SCHEMA = "rb_v3";
+export const SUPPORTED_SCHEMAS = ["rb_v2", "rb_v3"];
+export const CURRENT_PROTOCOL_DOC = "PROTOCOL.md@2026-02-13";
+
+declare const __APP_VERSION__: string;
+function currentAppVersion(): string | null {
+  try {
+    return typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Derive non-blocking compatibility warnings from compat metadata.
+ * Ticket 0260: advisory only — never blocks import.
+ */
+export function getCompatWarnings(compat: ImportCompat | null | undefined): CompatWarning[] {
+  if (!compat) return [];
+  const warnings: CompatWarning[] = [];
+
+  if (
+    compat.exportSchemaVersion &&
+    compat.exportSchemaVersion !== CURRENT_EXPORT_SCHEMA &&
+    SUPPORTED_SCHEMAS.includes(compat.exportSchemaVersion)
+  ) {
+    warnings.push({
+      field: "exportSchemaVersion",
+      message: `Older schema version: ${compat.exportSchemaVersion} (current: ${CURRENT_EXPORT_SCHEMA})`,
+    });
+  }
+
+  if (compat.protocolDocVersion && compat.protocolDocVersion !== CURRENT_PROTOCOL_DOC) {
+    warnings.push({
+      field: "protocolDocVersion",
+      message: `Different protocol version: ${compat.protocolDocVersion}`,
+    });
+  }
+
+  const appVer = currentAppVersion();
+  if (appVer && compat.importedAppVersion && compat.importedAppVersion !== appVer) {
+    warnings.push({
+      field: "appVersion",
+      message: `Created with app v${compat.importedAppVersion} (current: v${appVer})`,
+    });
+  }
+
+  return warnings;
 }
 
 /**
@@ -78,6 +152,17 @@ export function extractPackFromBundle(
   };
 }
 
+/** Extract compat metadata from a bundle object (rb_v3). */
+function extractCompat(bundleObj: Record<string, unknown>): ImportCompat {
+  const privacy = bundleObj.privacy as Record<string, unknown> | undefined;
+  return {
+    exportSchemaVersion: (bundleObj.exportSchemaVersion as string | null) ?? null,
+    protocolDocVersion: (bundleObj.protocolDocVersion as string | null) ?? null,
+    importedAppVersion: (bundleObj.appVersion as string | null) ?? null,
+    privacyMode: privacy ? (privacy.mode as string | null) ?? null : null,
+  };
+}
+
 /** Detect type and extract pack data for preview. */
 export function analyzeImport(
   parsed: Record<string, unknown>,
@@ -87,6 +172,7 @@ export function analyzeImport(
   let packData: Partial<StimulusList> | null = null;
   let packageVersion: string | undefined;
   let packageHash: string | undefined;
+  let compat: ImportCompat | null = null;
 
   // Session package?
   if (typeof parsed.packageVersion === "string" && parsed.bundle) {
@@ -95,11 +181,13 @@ export function analyzeImport(
     packageHash = typeof parsed.packageHash === "string" ? parsed.packageHash : undefined;
     const bundle = parsed.bundle as Record<string, unknown>;
     packData = extractPackFromBundle(bundle);
+    compat = extractCompat(bundle);
   }
   // Research bundle?
   else if (typeof parsed.exportSchemaVersion === "string") {
     type = "bundle";
     packData = extractPackFromBundle(parsed);
+    compat = extractCompat(parsed);
   }
   // Direct pack JSON
   else {
@@ -125,6 +213,7 @@ export function analyzeImport(
     rawJson,
     packageVersion,
     packageHash,
+    compat,
   };
 }
 

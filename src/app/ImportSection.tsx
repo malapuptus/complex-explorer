@@ -12,6 +12,7 @@ import { localStorageStimulusStore, localStorageSessionStore } from "@/infra";
 import { verifyPackageIntegrity } from "./ResultsExportActions";
 import { ImportPreviewPanel, analyzeImport } from "./ImportPreviewPanel";
 import type { ImportPreview } from "./ImportPreviewPanel";
+import { packFilename } from "@/domain/exportFilenames";
 
 /** Human-readable messages for validation error codes. */
 const ERROR_CODE_MESSAGES: Partial<Record<string, string>> = {
@@ -133,7 +134,7 @@ export function ImportSection({ onPackImported, selectedPack }: ImportSectionPro
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `pack-${selectedPack.id}-${selectedPack.version}.json`;
+      a.download = packFilename({ id: selectedPack.id, version: selectedPack.version });
       a.click();
       URL.revokeObjectURL(url);
     });

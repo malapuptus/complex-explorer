@@ -44,6 +44,12 @@ export interface SessionStore {
 
   /** Check if a session with this ID exists (0247 collision safety). */
   exists(id: string): Promise<boolean>;
+
+  /** Delete sessions completed before the given cutoff date (0263). Returns count deleted. */
+  deleteOlderThan(cutoffDate: Date): Promise<number>;
+
+  /** Delete sessions with importedFrom != null (0263). Returns count deleted. */
+  deleteImported(): Promise<number>;
 }
 
 export interface SessionListEntry {
