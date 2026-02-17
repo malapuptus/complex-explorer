@@ -3,56 +3,24 @@
  * Autosaves draft after each scored trial; offers resume on reload.
  */
 
-import { getStimulusList, listAvailableStimulusLists, computeSessionFingerprint } from "@/domain";
+import { getStimulusList, computeSessionFingerprint } from "@/domain";
 import type { SessionResult, ProvenanceSnapshot, DraftSession } from "@/domain";
 import { localStorageSessionStore } from "@/infra";
 import { useSession } from "./useSession";
 import type { SessionSnapshot, StartOverrides } from "./useSession";
-import { TrialView } from "./TrialView";
 import { ResultsView } from "./ResultsView";
 import { ProtocolScreen } from "./ProtocolScreen";
 import type { AdvancedConfig } from "./ProtocolScreen";
-import { BreakScreen } from "./BreakScreen";
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function generateTabId(): string {
-  return `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-const PRACTICE_WORDS = ["sun", "table", "road"];
-const DEFAULT_BREAK_EVERY = 20;
-
-interface PackOption {
-  id: string;
-  version: string;
-  label: string;
-  wordCount: number;
-  estimate: string;
-}
-
-function buildPackOptions(): PackOption[] {
-  return listAvailableStimulusLists().map((meta) => ({
-    id: meta.id,
-    version: meta.version,
-    label:
-      meta.id === "demo-10"
-        ? `Demo (${meta.wordCount} words)`
-        : `${meta.source} (${meta.wordCount} words)`,
-    wordCount: meta.wordCount,
-    estimate: estimateDuration(meta.wordCount),
-  }));
-}
-
-function estimateDuration(wordCount: number): string {
-  const loMin = Math.max(1, Math.round((wordCount * 3) / 60));
-  const hiMin = Math.max(1, Math.round((wordCount * 7) / 60));
-  if (loMin === hiMin) return `~${loMin} min`;
-  return `~${loMin}–${hiMin} min`;
-}
+import { ResumePrompt } from "./ResumePrompt";
+import { RunningTrial } from "./RunningTrial";
+import {
+  generateId,
+  generateTabId,
+  buildPackOptions,
+  PRACTICE_WORDS,
+  DEFAULT_BREAK_EVERY,
+} from "./DemoSessionHelpers";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 export function DemoSession() {
   const packOptions = useRef(buildPackOptions()).current;
@@ -116,7 +84,6 @@ export function DemoSession() {
       breakEveryN,
     };
     localStorageSessionStore.saveDraft(draft);
-    // Refresh lock TTL on each autosave
     localStorageSessionStore.acquireDraftLock(tabIdRef.current);
   }, [
     session.phase,
@@ -132,53 +99,53 @@ export function DemoSession() {
 
   // Clear draft when session completes
   useEffect(() => {
-    if (session.phase === "done" && session.scoring && !savedRef.current) {
-      savedRef.current = true;
-      localStorageSessionStore.deleteDraft();
-      localStorageSessionStore.releaseDraftLock(tabIdRef.current);
-      const provSnapshot: ProvenanceSnapshot = {
-        listId: list.id,
-        listVersion: list.version,
-        language: list.language,
-        source: list.source,
-        sourceName: list.provenance.sourceName,
-        sourceYear: list.provenance.sourceYear,
-        sourceCitation: list.provenance.sourceCitation,
-        licenseNote: list.provenance.licenseNote,
-        wordCount: list.words.length,
+    if (session.phase !== "done" || !session.scoring || savedRef.current) return;
+    savedRef.current = true;
+    localStorageSessionStore.deleteDraft();
+    localStorageSessionStore.releaseDraftLock(tabIdRef.current);
+
+    const provSnapshot: ProvenanceSnapshot = {
+      listId: list.id,
+      listVersion: list.version,
+      language: list.language,
+      source: list.source,
+      sourceName: list.provenance.sourceName,
+      sourceYear: list.provenance.sourceYear,
+      sourceCitation: list.provenance.sourceCitation,
+      licenseNote: list.provenance.licenseNote,
+      wordCount: list.words.length,
+    };
+    const config = {
+      stimulusListId: list.id,
+      stimulusListVersion: list.version,
+      maxResponseTimeMs: 0,
+      orderPolicy,
+      seed: session.seedUsed,
+      trialTimeoutMs: session.trialTimeoutMs,
+      breakEveryN,
+    };
+    void (async () => {
+      const fingerprint = await computeSessionFingerprint({
+        config,
+        stimulusOrder: session.stimulusOrder,
+        seedUsed: session.seedUsed,
+      });
+      const result: SessionResult = {
+        id: draftIdRef.current,
+        config,
+        trials: session.trials,
+        startedAt: startedAtRef.current ?? new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+        scoring: session.scoring,
+        seedUsed: session.seedUsed,
+        stimulusOrder: session.stimulusOrder,
+        provenanceSnapshot: provSnapshot,
+        sessionFingerprint: fingerprint,
+        scoringVersion: "scoring_v2_mad_3.5",
       };
-      const config = {
-        stimulusListId: list.id,
-        stimulusListVersion: list.version,
-        maxResponseTimeMs: 0,
-        orderPolicy,
-        seed: session.seedUsed,
-        trialTimeoutMs: session.trialTimeoutMs,
-        breakEveryN,
-      };
-      void (async () => {
-        const fingerprint = await computeSessionFingerprint({
-          config,
-          stimulusOrder: session.stimulusOrder,
-          seedUsed: session.seedUsed,
-        });
-        const result: SessionResult = {
-          id: draftIdRef.current,
-          config,
-          trials: session.trials,
-          startedAt: startedAtRef.current ?? new Date().toISOString(),
-          completedAt: new Date().toISOString(),
-          scoring: session.scoring,
-          seedUsed: session.seedUsed,
-          stimulusOrder: session.stimulusOrder,
-          provenanceSnapshot: provSnapshot,
-          sessionFingerprint: fingerprint,
-          scoringVersion: "scoring_v2_mad_3.5",
-        };
-        localStorageSessionStore.save(result);
-        setSessionFingerprint(fingerprint);
-      })();
-    }
+      localStorageSessionStore.save(result);
+      setSessionFingerprint(fingerprint);
+    })();
   }, [
     session.phase,
     session.scoring,
@@ -193,8 +160,6 @@ export function DemoSession() {
 
   const handleResume = useCallback(() => {
     if (!pendingDraft) return;
-
-    // Acquire lock before resuming
     const acquired = localStorageSessionStore.acquireDraftLock(tabIdRef.current);
     if (!acquired) {
       setDraftLocked(true);
@@ -243,7 +208,6 @@ export function DemoSession() {
 
   const handleStart = useCallback(
     (config: AdvancedConfig) => {
-      // Acquire lock before starting
       const acquired = localStorageSessionStore.acquireDraftLock(tabIdRef.current);
       if (!acquired) {
         setDraftLocked(true);
@@ -286,41 +250,13 @@ export function DemoSession() {
 
   // Resume prompt
   if (pendingDraft && session.phase === "idle") {
-    const scoredDone = pendingDraft.trials.filter((t) => !t.isPractice).length;
-    const savedDate = new Date(pendingDraft.savedAt);
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-4">
-        <h2 className="text-2xl font-bold text-foreground">Resume Session?</h2>
-        <div className="max-w-md space-y-2 text-center">
-          <p className="text-muted-foreground">
-            You have an unfinished session from{" "}
-            <strong className="text-foreground">{savedDate.toLocaleString()}</strong>
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Pack: {pendingDraft.stimulusListId} · {scoredDone} words completed
-            {pendingDraft.seedUsed !== null && <> · Seed: {pendingDraft.seedUsed}</>}
-          </p>
-        </div>
-        {draftLocked && (
-          <p className="max-w-md text-center text-sm text-destructive">
-            A session is active in another tab. Close it or wait 2 minutes.
-          </p>
-        )}
-        <div className="flex gap-3">
-          <button
-            onClick={handleResume}
-            className="rounded-md bg-primary px-6 py-2 text-primary-foreground hover:opacity-90"
-          >
-            Resume
-          </button>
-          <button
-            onClick={handleDiscard}
-            className="rounded-md border border-border px-6 py-2 text-foreground hover:bg-muted"
-          >
-            Discard
-          </button>
-        </div>
-      </div>
+      <ResumePrompt
+        pendingDraft={pendingDraft}
+        draftLocked={draftLocked}
+        onResume={handleResume}
+        onDiscard={handleDiscard}
+      />
     );
   }
 
@@ -362,61 +298,21 @@ export function DemoSession() {
 
   // Running phase
   if (session.phase === "running" && session.currentWord) {
-    const isPractice = session.currentIndex < session.practiceCount;
-    const scoredCompleted = isPractice ? 0 : session.currentIndex - session.practiceCount;
-    const totalScored = session.words.length - session.practiceCount;
-
-    // Break logic (only when breakEveryN > 0)
-    if (
-      breakEveryN > 0 &&
-      !isPractice &&
-      scoredCompleted > 0 &&
-      scoredCompleted % breakEveryN === 0 &&
-      scoredCompleted !== lastBreakAtRef.current &&
-      onBreak
-    ) {
-      return (
-        <BreakScreen
-          completedScored={scoredCompleted}
-          totalScored={totalScored}
-          onContinue={() => {
-            lastBreakAtRef.current = scoredCompleted;
-            setOnBreak(false);
-          }}
-        />
-      );
-    }
-
-    if (
-      breakEveryN > 0 &&
-      !isPractice &&
-      scoredCompleted > 0 &&
-      scoredCompleted % breakEveryN === 0 &&
-      scoredCompleted !== lastBreakAtRef.current &&
-      !onBreak
-    ) {
-      setOnBreak(true);
-    }
-
-    // Show seedUsed banner on first scored trial
-    const showSeedBanner = session.seedUsed !== null && scoredCompleted === 0 && !isPractice;
-
     return (
-      <div className="flex flex-col items-center">
-        {showSeedBanner && (
-          <p className="mb-2 text-xs text-muted-foreground">Seed: {session.seedUsed}</p>
-        )}
-        <TrialView
-          word={session.currentWord.word}
-          index={session.currentIndex}
-          total={session.words.length}
-          isPractice={isPractice}
-          practiceCount={session.practiceCount}
-          trialTimeoutMs={session.trialTimeoutMs}
-          onSubmit={session.submitResponse}
-          onTimeout={session.handleTimeout}
-        />
-      </div>
+      <RunningTrial
+        currentWord={session.currentWord}
+        currentIndex={session.currentIndex}
+        words={session.words}
+        practiceCount={session.practiceCount}
+        breakEveryN={breakEveryN}
+        onBreak={onBreak}
+        setOnBreak={setOnBreak}
+        lastBreakAtRef={lastBreakAtRef}
+        seedUsed={session.seedUsed}
+        trialTimeoutMs={session.trialTimeoutMs}
+        onSubmit={session.submitResponse}
+        onTimeout={session.handleTimeout}
+      />
     );
   }
 
