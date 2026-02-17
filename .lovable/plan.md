@@ -1,126 +1,191 @@
 
 
-# Adjusted Implementation Plan: Tickets 0162--0166
+# Tickets 0244-0248: Import Preview Extraction, Diagnostics, Pack Extract, Session Metadata, Collision Safety, and Gating
 
-## Changes from previous plan
+## Overview
 
-1. **Path normalization** added to `tools/check-hygiene.ts` (line 35): `const rel = path.relative(SRC, file).replace(/\\/g, "/");` -- included in Ticket 0162 and carried into 0163.
-2. **Ticket 0163 simplified**: No refactoring of `ResultsView.tsx`. Only remove its ALLOWLIST entry (it is already 310 lines, well under 350). Also include the path normalization if not already done.
-3. **Ticket 0164 break fix**: Use `useEffect` with deps `[scoredCompleted, breakEveryN, isPractice]`. Guard body with `!onBreak && scoredCompleted !== lastBreakAtRef.current`. Do NOT include `lastBreakAtRef.current` or `onBreak` in the dependency array.
+Five tickets that harden the import flow: extract ImportPreviewPanel from ProtocolScreen (reducing its size by ~150 lines), add integrity diagnostics with copyable details, enable pack extraction from packages, persist import provenance on sessions, prevent ID collisions, and unify button gating with an "Available actions" summary.
 
 ---
 
-## Ticket 0162 -- Split DemoSession.tsx
+## Ticket 0244 -- Extract ImportPreviewPanel + integrity diagnostics
 
-### New files
+**Files changed:**
+- **NEW** `src/app/ImportPreviewPanel.tsx` (~120 lines)
+- `src/app/ProtocolScreen.tsx` (shrinks by ~150 lines: remove `ImportPreviewPanel`, `ImportPreview` interface, `ImportType`, `analyzeImport`, `extractPackFromBundle`, `formatKB` -- move all to new file)
+- `src/app/__tests__/resultsViewExports.test.ts` (add tests for diagnostics rendering)
+- `docs/VERIFY_LOG.md`
 
-**`src/app/DemoSessionHelpers.ts`** (~40 lines)
-- Exports: `generateId`, `generateTabId`, `estimateDuration`, `buildPackOptions`, `PRACTICE_WORDS`, `DEFAULT_BREAK_EVERY`, `PackOption` interface
+**What moves to ImportPreviewPanel.tsx:**
+- `ImportType` type (line 100)
+- `ImportPreview` interface (lines 103-115)
+- `analyzeImport()` function (lines 117-148)
+- `extractPackFromBundle()` function (lines 75-97)
+- `formatKB()` helper (lines 66-69)
+- `ImportPreviewPanel` component (lines 150-218)
 
-**`src/app/ResumePrompt.tsx`** (~45 lines)
-- Extracted from DemoSession lines 287-325
-- Props: `pendingDraft: DraftSession`, `draftLocked: boolean`, `onResume: () => void`, `onDiscard: () => void`
+**New diagnostics in ImportPreviewPanel:**
+1. When `integrityResult` is present, show two new `<dl>` rows:
+   - "Expected hash" with monospace value from `integrityResult.expected`
+   - "Computed hash" with monospace value from `integrityResult.actual`
+2. Add a "Copy diagnostics" button that calls `navigator.clipboard.writeText()` with JSON: `{ code: "ERR_INTEGRITY_MISMATCH" | "PASS", expectedHash, computedHash, packageVersion }`.
+3. The packageVersion is extracted from `preview` (needs a new optional field `packageVersion?: string` on `ImportPreview`, set during `analyzeImport` for packages).
 
-**`src/app/RunningTrial.tsx`** (~55 lines)
-- Extracted from DemoSession lines 363-421
-- Contains the break-check render logic and TrialView delegation
-- Props: session state, breakEveryN, onBreak, setOnBreak, lastBreakAtRef, BreakScreen/TrialView rendering
-- Note: The `setOnBreak(true)` anti-pattern is preserved here as-is (fixed in Ticket 0164)
+**ProtocolScreen.tsx changes:**
+- Import `ImportPreviewPanel`, `ImportPreview`, `analyzeImport`, `extractPackFromBundle`, `formatKB` from `./ImportPreviewPanel`.
+- Remove the moved code (~150 lines removed).
+- ProtocolScreen drops from ~533 lines to ~380 lines.
 
-### Edits to existing files
-
-**`src/app/DemoSession.tsx`**: Import from new files, remove extracted code. Target: ~310 lines.
-
-**`tools/check-hygiene.ts`**:
-- Line 35: `const rel = path.relative(SRC, file).replace(/\\/g, "/");`
-- Remove `"app/DemoSession.tsx"` from ALLOWLIST
-
-### Estimated line counts after split
-
-| File | Lines |
-|------|-------|
-| DemoSession.tsx | ~310 |
-| DemoSessionHelpers.ts | ~40 |
-| ResumePrompt.tsx | ~45 |
-| RunningTrial.tsx | ~55 |
-
----
-
-## Ticket 0163 -- Remove ResultsView allowlist entry (simplified)
-
-### Edits
-
-**`tools/check-hygiene.ts`**: Remove `"app/ResultsView.tsx": { maxLines: 400 }` from ALLOWLIST. The ALLOWLIST object becomes empty `{}`. Ensure path normalization line is present (should already be from 0162).
-
-No changes to `ResultsView.tsx` -- it is 310 lines, under the 350 limit.
+**Tests:**
+- Assert that when `integrityResult.valid === false`, both expected and computed hashes render.
+- Assert "Copy diagnostics" button exists when integrity result is present.
+- Mock `navigator.clipboard.writeText` and assert payload shape.
 
 ---
 
-## Ticket 0164 -- Fix break logic anti-pattern
+## Ticket 0245 -- "Extract Pack" action from pkg_v1
 
-### Location
+**Files changed:**
+- `src/app/ImportPreviewPanel.tsx` (add "Extract Pack" button)
+- `src/app/ProtocolScreen.tsx` (wire `onExtractPack` prop)
+- `src/app/__tests__/resultsViewExports.test.ts` (add tests)
+- `docs/VERIFY_LOG.md`
 
-`src/app/RunningTrial.tsx` (after Ticket 0162 extracts it there).
+**What changes:**
+1. `ImportPreviewPanel` gains an `onExtractPack?: () => void` prop.
+2. Show "Extract Pack" button when `preview.type === "package"` AND `preview.wordCount > 0` AND integrity is not failed. Hidden otherwise (not disabled -- just not rendered when words are absent).
+3. In `ProtocolScreen.tsx`, `onExtractPack` calls existing `doImport(importPreview.packData)` -- reuses the same validation + collision logic.
+4. The existing "Import Pack" button label changes contextually: for `type === "package"` it says "Extract Pack"; for `type === "pack" | "bundle"` it stays "Import Pack". This simplifies the action naming.
 
-### Implementation
+**Tests:**
+- Assert button appears when `preview.type === "package"` and `wordCount > 0`.
+- Assert button hidden when `wordCount === 0`.
+- Assert clicking triggers the pack import path.
 
-Replace the inline `setOnBreak(true)` (current DemoSession lines 390-399) with a `useEffect`:
+---
 
-```text
-useEffect(() => {
-  if (
-    breakEveryN > 0 &&
-    !isPractice &&
-    scoredCompleted > 0 &&
-    scoredCompleted % breakEveryN === 0 &&
-    !onBreak &&
-    scoredCompleted !== lastBreakAtRef.current
-  ) {
-    setOnBreak(true);
-  }
-}, [scoredCompleted, breakEveryN, isPractice]);
+## Ticket 0246 -- Persist `importedFrom` on imported sessions
+
+**Files changed:**
+- `src/domain/types.ts` (add `importedFrom?` to `SessionResult`)
+- `src/infra/localStorageSessionStore.ts` (migration defaults to `null`)
+- `src/app/ProtocolScreen.tsx` (set `importedFrom` when importing session from pkg)
+- `src/app/PreviousSessions.tsx` (show hash prefix in Imported badge)
+- `src/app/__tests__/previousSessions.test.ts` (round-trip + legacy migration)
+- `docs/SCHEMAS.md` (addendum: `sessionResult.importedFrom`)
+- `docs/VERIFY_LOG.md`
+
+**Type change in `src/domain/types.ts`:**
+```typescript
+// Add to SessionResult interface (after stimulusPackSnapshot):
+readonly importedFrom?: {
+  packageVersion: string;
+  packageHash: string;
+} | null;
 ```
 
-Key points:
-- `onBreak` and `lastBreakAtRef.current` are guards in the body, NOT in the dependency array
-- The effect fires when `scoredCompleted` changes (new trial submitted)
-- The render body only checks `if (onBreak && ...)` to show BreakScreen
+**Migration in `localStorageSessionStore.ts` `migrateSessionToV3`:**
+- Add: `importedFrom: (raw.importedFrom as SessionResult["importedFrom"]) ?? null`
 
-### Files changed
+**ProtocolScreen.tsx import-as-session handler:**
+- When importing from pkg_v1, set `importedFrom: { packageVersion: parsed.packageVersion, packageHash: parsed.packageHash }` on the session object before saving.
 
-| File | Action |
-|------|--------|
-| `src/app/RunningTrial.tsx` | Edit (move setState into useEffect) |
+**PreviousSessions.tsx:**
+- When session has `importedFrom`, show detail text: `Imported from pkg_v1 (hash: abcdef12...)` below the Imported badge.
 
----
-
-## Ticket 0165 -- Persistence tests (unchanged from prior plan)
-
-### New file
-
-**`src/infra/__tests__/sessionPersistence.test.ts`** (~80 lines)
-
-Test cases:
-1. Save SessionResult with `scoringVersion`, reload, assert present
-2. Legacy session without `scoringVersion` migrates to `null`
-3. Draft with `startedAt` round-trips correctly
-4. Draft without `startedAt` returns `undefined`
+**Tests:**
+- Persist a session with `importedFrom`, reload, assert fields present.
+- Migrate a legacy session (no `importedFrom`), assert it defaults to `null`.
 
 ---
 
-## Ticket 0166 -- README cleanup (unchanged from prior plan)
+## Ticket 0247 -- Import collision safety
 
-Edit `README.md` only: remove `REPLACE_WITH_PROJECT_ID` placeholders, fix oracle count to 8.
+**Files changed:**
+- `src/app/ProtocolScreen.tsx` (collision detection in import-as-session handler)
+- `src/infra/localStorageSessionStore.ts` (add `exists(id)` method)
+- `src/domain/sessionStore.ts` (add `exists` to interface)
+- `src/app/__tests__/previousSessions.test.ts` or new test file
+- `docs/VERIFY_LOG.md`
+
+**SessionStore interface addition (~3 lines):**
+```typescript
+/** Check if a session with this ID exists. */
+exists(id: string): Promise<boolean>;
+```
+
+**Implementation in localStorageSessionStore.ts:**
+```typescript
+async exists(id: string): Promise<boolean> {
+  const envelope = readEnvelope();
+  return id in envelope.sessions;
+},
+```
+
+**ProtocolScreen.tsx import handler changes:**
+- Before `localStorageSessionStore.save(imported)`, check `await localStorageSessionStore.exists(session.id)`.
+- If collision: compute new ID as `${session.id}__import_${packageHash.slice(0,8)}` (using `parsed.packageHash`).
+- If that also exists, append `__2`, `__3`, etc. (simple loop, max 10 attempts).
+- Show warning in `importSuccess` message: `"Session ID collision -- imported as <newId>"`.
+
+**Tests:**
+- Import same pkg twice, assert two distinct sessions exist with different IDs.
+- Assert neither overwrites the other's data.
 
 ---
 
-## Execution order
+## Ticket 0248 -- "Available actions" summary + unified gating
 
-| Step | Ticket | Notes |
-|------|--------|-------|
-| 1 | 0162 | Split DemoSession + path normalization + remove DemoSession allowlist |
-| 2 | 0163 | Remove ResultsView allowlist entry (one-line change) |
-| 3 | 0164 | Fix break anti-pattern in RunningTrial.tsx |
-| 4 | 0165 | Add persistence tests |
-| 5 | 0166 | README cleanup |
+**Files changed:**
+- `src/app/ImportPreviewPanel.tsx` (add "Available actions" section + gating logic)
+- `src/app/__tests__/resultsViewExports.test.ts` (test 3 fixtures)
+- `docs/VERIFY_LOG.md`
+
+**What changes:**
+1. Add an "Available actions" row to the preview `<dl>`:
+   - Compute action list based on state:
+     - Integrity FAIL: `["Blocked: Integrity mismatch"]`
+     - Package + words + PASS: `["Import as Session", "Extract Pack"]`
+     - Package + no words + PASS: `["Import as Session"]`
+     - Bundle with extractable pack: `["Import Pack"]`
+     - Pack JSON: `["Import Pack"]`
+   - Render as a compact bulleted list within the `<dd>`.
+
+2. Button gating consolidation (already mostly correct, but formalize):
+   - Integrity FAIL: all import/extract buttons disabled; "Copy diagnostics" and "Cancel" remain enabled.
+   - No words: "Extract Pack" not rendered.
+   - No session: "Import as Session" not rendered.
+
+3. Tests with 3 fixtures:
+   - valid pkg full (both actions available)
+   - valid pkg minimal/redacted (only Import as Session)
+   - tampered pkg (Blocked)
+
+---
+
+## Execution Order
+
+1. **0244** -- extract + diagnostics (foundational file split, everything else depends on it)
+2. **0245** -- extract pack (adds button to new component)
+3. **0246** -- importedFrom metadata (type + migration + UI)
+4. **0247** -- collision safety (needs `exists()` + import handler change)
+5. **0248** -- gating summary (consolidates all above into clean Available actions)
+
+---
+
+## Technical Notes
+
+- **ProtocolScreen.tsx** is currently 533 lines. After extracting ~150 lines to `ImportPreviewPanel.tsx`, it drops to ~380 lines (well within budget).
+- **ImportPreviewPanel.tsx** will be ~120-140 lines initially, growing to ~160 after tickets 0245 and 0248. Within budget.
+- `SessionResult.importedFrom` does not require a schema version bump since `migrateSessionToV3` already handles unknown fields via `??` defaulting.
+- The `exists()` method is a trivial 3-line addition to `SessionStore`.
+- No new dependencies. Clipboard API is standard browser API.
+- `_imported` flag (existing) is kept for backward compat; `importedFrom` is the richer metadata.
+
+## Risk Card
+
+- **Proved:** Import flow is debuggable, non-destructive, and traceable. ProtocolScreen shrinks materially.
+- **Not proved:** Clipboard API availability in all browsers (fallback: silent fail, diagnostics still visible in UI).
+- **Residual:** ImportPreviewPanel line count grows across tickets but stays within budget.
+- **Detect failure:** Tests assert hash rendering, collision ID generation, action lists, and disabled states.
 
