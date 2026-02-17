@@ -41,7 +41,10 @@ export function RunningTrial({
   const scoredCompleted = isPractice ? 0 : currentIndex - practiceCount;
   const totalScored = words.length - practiceCount;
 
-  // Trigger break via effect (not during render)
+  // Trigger break via effect (not during render).
+  // Guards: !onBreak prevents re-fire while showing break screen;
+  // lastBreakAtRef prevents duplicate triggers for the same threshold
+  // (including React Strict Mode double-invocation).
   useEffect(() => {
     if (
       breakEveryN > 0 &&
@@ -51,24 +54,18 @@ export function RunningTrial({
       !onBreak &&
       scoredCompleted !== lastBreakAtRef.current
     ) {
+      lastBreakAtRef.current = scoredCompleted;
       setOnBreak(true);
     }
   }, [scoredCompleted, breakEveryN, isPractice]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Show break screen
-  if (
-    onBreak &&
-    breakEveryN > 0 &&
-    scoredCompleted > 0 &&
-    scoredCompleted % breakEveryN === 0 &&
-    scoredCompleted !== lastBreakAtRef.current
-  ) {
+  // Show break screen (onBreak is the single source of truth)
+  if (onBreak) {
     return (
       <BreakScreen
         completedScored={scoredCompleted}
         totalScored={totalScored}
         onContinue={() => {
-          lastBreakAtRef.current = scoredCompleted;
           setOnBreak(false);
         }}
       />

@@ -29,6 +29,7 @@
 - [ ] All acceptance criteria met
 - [ ] All required oracles pass
 - [ ] **No out-of-scope edits were made.** If any were necessary, a Scope Exception entry was added to `docs/SCOPE_EXCEPTIONS.md` before merging.
+- [ ] **Attach raw verify output** (or state verify unavailable) **and include one canary artifact** (CSV header+row or JSON snippet).
 
 ---
 

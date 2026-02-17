@@ -10,6 +10,7 @@ This is the canonical record of out-of-scope edits made during ticket execution.
 | 0146 | `src/domain/fingerprint.ts` (new), `src/app/DemoSession.tsx` | New fingerprint module needed a dedicated file; `DemoSession` required edits to compute and thread the fingerprint on completion. | Include host/orchestration components and allow new domain files when the ticket introduces a new domain concept. |
 | 0149 | `src/app/DemoSession.tsx` | Reproducibility bundle in `ResultsView` required passing `orderPolicy`, `trialTimeoutMs`, and `breakEveryN` via `csvMeta`, which meant editing the parent component. | Include host/integration components in allowed edits when expanding a child component's props interface. |
 | 0165 | `src/infra/localStorageSessionStore.ts` | `migrateDraft()` did not include the `startedAt` field added to `DraftSession` in Ticket 0158. Without this fix, the persistence test for draft `startedAt` round-trip would fail — `loadDraft()` silently dropped the field. The ticket allowed edits to this file "only if tests reveal a real bug", and the test did reveal the bug. | Include infra adapter files in allowed edits when adding new fields to domain interfaces they serialize. |
+| 0172 | `vite.config.ts` | `appVersion` in the Research Bundle required defining `__APP_VERSION__` via Vite's `define` option, reading `package.json` at build time. No way to inject version without this config change. | Include `vite.config.ts` in allowed edits when tickets need build-time constants. |
 
 ## Known Hygiene Exceptions (Ticket 0161)
 

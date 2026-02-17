@@ -2,6 +2,8 @@ import { useMemo, useCallback, useState } from "react";
 import type { Trial, TrialFlag, OrderPolicy, SessionScoring, SessionResult } from "@/domain";
 import { generateReflectionPrompts, sessionTrialsToCsv } from "@/domain";
 
+declare const __APP_VERSION__: string;
+
 /** Self-contained research bundle for offline reproducibility. */
 interface ResearchBundle {
   sessionResult: Record<string, unknown>;
@@ -14,6 +16,8 @@ interface ResearchBundle {
 const PROTOCOL_DOC_VERSION = "PROTOCOL.md@2026-02-13";
 const SCORING_VERSION = "scoring_v2_mad_3.5";
 const SCORING_ALGORITHM = "MAD-modified-z@3.5 + fast<200ms + timeout excluded";
+const APP_VERSION: string | null =
+  typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : null;
 
 interface Props {
   trials: Trial[];
@@ -270,7 +274,7 @@ export function ResultsView({
                 const bundle: ResearchBundle = {
                   sessionResult: bundleSession,
                   protocolDocVersion: PROTOCOL_DOC_VERSION,
-                  appVersion: null,
+                  appVersion: APP_VERSION,
                   scoringAlgorithm: SCORING_ALGORITHM,
                   exportedAt: new Date().toISOString(),
                 };

@@ -32,7 +32,82 @@ Copy this block for each new entry:
 
 _(newest first)_
 
-### 2026-02-17 10:51 (Lovable sandbox)
+### 2026-02-17 11:07 (Lovable sandbox) — Tickets 0168–0172
+
+- **OS:** Lovable sandbox (unknown)
+- **Node:** Lovable sandbox (Bun runtime)
+- **Command:** `npx vitest run src` (Oracle 8 only — see Ticket 0169 note)
+- **Result:** PASS (Oracle 8 — 81/81 tests)
+
+<details>
+<summary>Full raw terminal output</summary>
+
+```
+$ vitest run src
+
+ RUN  v3.2.4 /dev-server
+
+ ✓ src/domain/__tests__/shuffle.test.ts (8 tests) 10ms
+ ✓ src/test/example.test.ts (1 test) 4ms
+ ✓ src/domain/__tests__/csvExport.test.ts (3 tests) 5ms
+ ✓ src/domain/__tests__/exportParity.test.ts (5 tests) 6ms
+ ✓ src/domain/__tests__/fingerprint.test.ts (7 tests) 13ms
+ ✓ src/domain/__tests__/stimuli.test.ts (15 tests) 14ms
+ ✓ src/domain/__tests__/reflection.test.ts (11 tests) 11ms
+ ✓ src/domain/__tests__/scoring.test.ts (19 tests) 15ms
+ ✓ src/infra/__tests__/sessionPersistence.test.ts (4 tests) 7ms
+ ✓ src/infra/__tests__/draftLock.test.ts (8 tests) 10ms
+
+ Test Files  10 passed (10)
+      Tests  81 passed (81)
+   Start at  11:07:05
+   Duration  3.32s (transform 302ms, setup 2.83s, collect 860ms, tests 94ms, environment 18.12s, prepare 4.89s)
+```
+
+</details>
+
+**Oracles NOT executed** (Lovable sandbox does not support arbitrary shell commands — see Ticket 0169):
+
+| Oracle | Command | Status |
+|--------|---------|--------|
+| 1 — Hygiene | `npx tsx tools/check-hygiene.ts` | NOT RUN |
+| 2 — Format | `npx prettier --check "src/**/*.{ts,tsx}"` | NOT RUN |
+| 3 — Lint | `npx eslint .` | NOT RUN |
+| 4 — Typecheck | `npx tsc --noEmit` | NOT RUN |
+| 5 — Boundaries | `npx tsx tools/check-boundaries.ts` | NOT RUN |
+| 6 — Load smoke | `node tools/load-smoke.mjs` | NOT RUN |
+| 7 — Build | `npx vite build` | NOT RUN |
+| 8 — Tests | `npx vitest run` | **PASS** (81/81) |
+
+**Ticket 0169 finding:** The Lovable sandbox exposes only the Vitest test runner. There is no shell access for `node`, `npx`, or `bun` commands. `node tools/verify.mjs` is structurally unrunnable. **Proxy verify procedure:** Run each oracle individually when local shell becomes available; in Lovable, only Oracle 8 (tests) can execute.
+
+### Canary Artifacts (0168–0172)
+
+#### CSV header (unchanged — parity locked by exportParity.test.ts)
+
+```
+session_id,session_fingerprint,scoring_version,pack_id,pack_version,seed,order_index,word,warmup,response,t_first_input_ms,t_submit_ms,backspaces,edits,compositions,timed_out,flags
+```
+
+#### Research Bundle snippet (now with appVersion populated)
+
+```json
+{
+  "sessionResult": { "..." : "..." },
+  "protocolDocVersion": "PROTOCOL.md@2026-02-13",
+  "appVersion": "0.0.0",
+  "scoringAlgorithm": "MAD-modified-z@3.5 + fast<200ms + timeout excluded",
+  "exportedAt": "2026-02-17T..."
+}
+```
+
+`appVersion` is now populated from `package.json` via Vite `define` (Ticket 0172).
+
+#### Break logic (Ticket 0170)
+
+Break effect now sets `lastBreakAtRef.current = scoredCompleted` inside the effect body (before `setOnBreak(true)`), preventing double-fire under React Strict Mode. Render condition simplified to `if (onBreak)`.
+
+---
 
 - **OS:** Lovable sandbox (unknown)
 - **Node:** Lovable sandbox (unknown — Bun runtime)
