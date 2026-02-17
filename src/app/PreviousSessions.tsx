@@ -2,6 +2,7 @@
  * PreviousSessions — lists saved sessions with delete/export controls.
  * Shows provenance and reproducibility metadata when viewing a session.
  * Ticket 0262: Storage report. Ticket 0263: Cleanup actions.
+ * Ticket 0270: Devtools toggle gates simulate button.
  */
 
 import { useEffect, useState, useCallback } from "react";
@@ -11,6 +12,7 @@ import { sessionResultsToCsv } from "@/domain";
 import { localStorageSessionStore, buildStorageReport, uiPrefs } from "@/infra";
 import { simulateSession } from "@/domain";
 import { ResultsView } from "./ResultsView";
+import { isDevToolsEnabled } from "./devtools";
 
 export function PreviousSessions() {
   const [entries, setEntries] = useState<SessionListEntry[]>([]);
@@ -256,9 +258,10 @@ export function PreviousSessions() {
             >
               Export Storage Report
             </button>
-            {/* 0268: Dev-only simulate button */}
-            {import.meta.env.DEV && (
+            {/* 0270: Devtools simulate button (DEV or ?dev=1 or cm_devtools=1) */}
+            {isDevToolsEnabled() && (
               <button
+                data-testid="simulate-session-btn"
                 onClick={handleSimulate}
                 className="rounded-md border border-dashed border-border px-4 py-2 text-sm text-muted-foreground hover:bg-muted"
               >

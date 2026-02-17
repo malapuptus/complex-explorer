@@ -1,5 +1,5 @@
 /**
- * Tests for ResultsDashboardPanel — Tickets 0265/0266.
+ * Tests for ResultsDashboardPanel — Tickets 0265/0266/0271.
  */
 
 import { describe, it, expect } from "vitest";
@@ -138,3 +138,15 @@ describe("Trial Drilldown (0266)", () => {
     // no crash = pass
   });
 });
+
+describe("Dashboard card structure (0271)", () => {
+  it("Dashboard cards include expected section titles", () => {
+    const insights = buildSessionInsights(makeSession(TRIALS));
+    render(<ResultsDashboardPanel insights={insights} />);
+    // These section headers are stable labels used in the dashboard cards
+    expect(screen.getByText("Response Quality")).toBeDefined();
+    expect(screen.getByText("Speed Profile")).toBeDefined();
+    expect(screen.getByText("Session Quality")).toBeDefined();
+  });
+});
+
