@@ -77,6 +77,8 @@ function migrateSessionToV3(raw: Record<string, unknown>): SessionResult {
     scoringVersion: (raw.scoringVersion as string | null) ?? null,
     appVersion: (raw.appVersion as string | null) ?? null,
     stimulusPackSnapshot: (raw.stimulusPackSnapshot as SessionResult["stimulusPackSnapshot"]) ?? null,
+    // 0246: importedFrom — default legacy sessions to null
+    importedFrom: (raw.importedFrom as SessionResult["importedFrom"]) ?? null,
   };
 }
 
@@ -320,5 +322,11 @@ export const localStorageSessionStore: SessionStore = {
       refs.add(`${s.config.stimulusListId}@${s.config.stimulusListVersion}`);
     }
     return refs;
+  },
+
+  /** Check if a session with this ID exists (0247). */
+  async exists(id: string): Promise<boolean> {
+    const envelope = readEnvelope();
+    return id in envelope.sessions;
   },
 };

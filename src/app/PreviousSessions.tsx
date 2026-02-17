@@ -150,6 +150,14 @@ export function PreviousSessions() {
                       {entry.totalTrials} trials &middot;{" "}
                       {new Date(entry.completedAt).toLocaleString()}
                     </span>
+                    {/* 0246: importedFrom detail row */}
+                    {isImported && (entry as unknown as { importedFrom?: { packageVersion: string; packageHash: string } | null }).importedFrom && (
+                      <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                        Imported from{" "}
+                        {(entry as unknown as { importedFrom: { packageVersion: string; packageHash: string } }).importedFrom.packageVersion}{" "}
+                        (hash: {(entry as unknown as { importedFrom: { packageVersion: string; packageHash: string } }).importedFrom.packageHash.slice(0, 8)}…)
+                      </span>
+                    )}
                   </button>
                 </li>
               );
