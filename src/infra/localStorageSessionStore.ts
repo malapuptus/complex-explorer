@@ -79,6 +79,8 @@ function migrateSessionToV3(raw: Record<string, unknown>): SessionResult {
     stimulusPackSnapshot: (raw.stimulusPackSnapshot as SessionResult["stimulusPackSnapshot"]) ?? null,
     // 0246: importedFrom — default legacy sessions to null
     importedFrom: (raw.importedFrom as SessionResult["importedFrom"]) ?? null,
+    // 0259: sessionContext — default legacy sessions to null
+    sessionContext: (raw.sessionContext as SessionResult["sessionContext"]) ?? null,
   };
 }
 

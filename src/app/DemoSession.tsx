@@ -8,6 +8,7 @@ declare const __APP_VERSION__: string;
 
 import type { SessionResult, ProvenanceSnapshot, DraftSession, StimulusPackSnapshot, OrderPolicy } from "@/domain";
 import { computeSessionFingerprint, getStimulusList, sessionTrialsToCsv } from "@/domain";
+import { buildSessionContext } from "@/domain/sessionContext";
 import { localStorageSessionStore, localStorageStimulusStore } from "@/infra";
 import { useSession } from "./useSession";
 import type { SessionSnapshot, StartOverrides } from "./useSession";
@@ -211,6 +212,7 @@ export function DemoSession() {
         stimulusSchemaVersion: "sp_v1",
         provenance: provSnapshot,
       };
+      const sessionContext = buildSessionContext(session.trials);
       const result: SessionResult = {
         id: draftIdRef.current, config, trials: session.trials,
         startedAt: startedAtRef.current ?? new Date().toISOString(),
@@ -222,6 +224,7 @@ export function DemoSession() {
         scoringVersion: "scoring_v2_mad_3.5",
         appVersion: appVer,
         stimulusPackSnapshot: packSnapshot,
+        sessionContext,
       };
       try {
         await localStorageSessionStore.save(result);

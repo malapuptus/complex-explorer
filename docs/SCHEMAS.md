@@ -1,6 +1,7 @@
 # SCHEMAS.md — Complex Mapper Data Format Reference
 
-Last updated: 2026-02-17 (Tickets 0238–0258)
+Last updated: 2026-02-17 (Tickets 0238–0263)
+
 
 ---
 
@@ -73,6 +74,38 @@ All `SessionResult` fields are included verbatim. Notably:
 | `appVersion` | `string \| null` | App version at session time; null for legacy |
 | `scoringVersion` | `string \| null` | e.g. `"scoring_v2_mad_3.5"`; null for legacy |
 | `importedFrom` | `{ packageVersion, packageHash, originalSessionId? } \| null` | Present for imported sessions; null for local/legacy |
+| `sessionContext` | `SessionContext \| null` | Coarse device/OS/browser/IME hints (0259); null for legacy |
+
+### sessionContext shape (0259)
+
+Populated at session completion from browser globals. No raw userAgent string is stored.
+
+```typescript
+interface SessionContext {
+  deviceClass: "desktop" | "mobile" | "tablet" | "unknown";
+  osFamily: "macos" | "windows" | "linux" | "ios" | "android" | "unknown";
+  browserFamily: "chrome" | "safari" | "firefox" | "edge" | "unknown";
+  locale?: string | null;      // navigator.language
+  timeZone?: string | null;    // Intl.DateTimeFormat().resolvedOptions().timeZone
+  inputHints?: {
+    usedIME: boolean;          // totalCompositionCount > 0
+    totalCompositionCount: number;
+  } | null;
+}
+```
+
+
+
+### Privacy manifest (rb_v3 + pkg_v1)
+
+```typescript
+privacy: {
+  mode: "full" | "minimal" | "redacted";
+  includesStimulusWords: boolean;
+  includesResponses: boolean;
+  identifiersAnonymized: boolean;  // 0260: true when Anonymize toggle was enabled
+}
+```
 
 ### Privacy modes
 
@@ -91,10 +124,29 @@ When "Anonymize identifiers" is enabled:
 - `exportedAt` → `""` (blank string, key still present)
 - `sessionFingerprint`, `scoring`, all hash fields → **preserved**
 - `importedFrom` (packageHash, packageVersion, originalSessionId) → **preserved**
+- `sessionContext` → **preserved** (device/OS/browser hints are non-identifying)
+- `privacy.identifiersAnonymized` → **`true`** (explicit flag in every export)
 
 ---
 
 ## pkg_v1 — Session Package
+
+### Provenance snapshot fallback (0261)
+
+For built-in and demo packs where full provenance may be absent, the exported `stimulusPackSnapshot.provenance` uses:
+
+```json
+{
+  "sourceName": "built-in",
+  "sourceYear": "",
+  "sourceCitation": "",
+  "licenseNote": "internal/demo"
+}
+```
+
+This ensures `provenance` is never `null` in new exports even for demo sessions.
+
+
 
 A self-contained, integrity-checked archive of one session.
 

@@ -144,3 +144,30 @@ describe("draft startedAt persistence", () => {
     expect(loaded?.startedAt).toBeUndefined();
   });
 });
+
+describe("sessionContext persistence (0259)", () => {
+  it("round-trips sessionContext through save/load", async () => {
+    const ctx = {
+      deviceClass: "desktop" as const,
+      osFamily: "macos" as const,
+      browserFamily: "chrome" as const,
+      locale: "en-US",
+      timeZone: "America/New_York",
+      inputHints: { usedIME: true, totalCompositionCount: 3 },
+    };
+    const result = makeFakeResult({ sessionContext: ctx });
+    await localStorageSessionStore.save(result as never);
+    const loaded = await localStorageSessionStore.load("test-1");
+    expect(loaded?.sessionContext).toEqual(ctx);
+    expect(loaded?.sessionContext?.inputHints?.usedIME).toBe(true);
+  });
+
+  it("migrates legacy session without sessionContext to null", async () => {
+    const legacy = makeFakeResult();
+    delete (legacy as Record<string, unknown>).sessionContext;
+    const envelope = { schemaVersion: 2, sessions: { "test-1": legacy } };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
+    const loaded = await localStorageSessionStore.load("test-1");
+    expect(loaded?.sessionContext).toBeNull();
+  });
+});

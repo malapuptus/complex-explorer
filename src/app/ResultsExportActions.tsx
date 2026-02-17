@@ -19,6 +19,8 @@ export interface PrivacyManifest {
   mode: "full" | "minimal" | "redacted";
   includesStimulusWords: boolean;
   includesResponses: boolean;
+  /** Whether identifiers (session IDs, timestamps) were anonymized (0260). */
+  identifiersAnonymized: boolean;
 }
 
 /** Self-contained research bundle for offline reproducibility. */
@@ -208,6 +210,7 @@ export function buildBundleObject(
   csvMeta: Props["csvMeta"],
   persistedSnapshot: StimulusPackSnapshot | null,
   exportedAt: string,
+  anonymize = false,
 ): ResearchBundle {
   const isRedacted = mode === "redacted";
   const sessionTrials = isRedacted
@@ -230,6 +233,10 @@ export function buildBundleObject(
         ...(sessionResult.importedFrom !== undefined
           ? { importedFrom: sessionResult.importedFrom }
           : {}),
+        // 0259: include sessionContext in bundle
+        ...(sessionResult.sessionContext !== undefined
+          ? { sessionContext: sessionResult.sessionContext }
+          : {}),
       }
     : {
         id: csvMeta.sessionId,
@@ -244,22 +251,42 @@ export function buildBundleObject(
         sessionFingerprint: csvMeta.sessionFingerprint ?? null,
       };
 
+  // 0261: fallback provenance for built-in packs
+  const fallbackProvenance = sessionResult?.provenanceSnapshot ?? null;
   const baseSnapshot = persistedSnapshot ?? {
     stimulusListHash: csvMeta.stimulusListHash ?? null,
     stimulusSchemaVersion: null,
-    provenance: sessionResult?.provenanceSnapshot ?? null,
+    provenance: fallbackProvenance,
   };
+
+  // Ensure provenance is never null for new exports when we have list metadata
+  const resolvedProvenance = baseSnapshot.provenance ?? (
+    sessionResult?.config?.stimulusListId
+      ? {
+          listId: sessionResult.config.stimulusListId,
+          listVersion: sessionResult.config.stimulusListVersion,
+          language: "unknown",
+          source: "built-in",
+          sourceName: "built-in",
+          sourceYear: "",
+          sourceCitation: "",
+          licenseNote: "internal/demo",
+          wordCount: sessionResult.stimulusOrder?.length ?? 0,
+        }
+      : null
+  );
+  const normalizedBaseSnapshot = { ...baseSnapshot, provenance: resolvedProvenance };
 
   const includesWords = mode === "full";
   let snapshot: ResearchBundle["stimulusPackSnapshot"];
   if (includesWords) {
     const words = resolvePackWords(csvMeta, sessionResult);
-    snapshot = { ...baseSnapshot, ...(words ? { words } : {}) };
+    snapshot = { ...normalizedBaseSnapshot, ...(words ? { words } : {}) };
   } else {
     snapshot = {
-      stimulusListHash: baseSnapshot.stimulusListHash,
-      stimulusSchemaVersion: baseSnapshot.stimulusSchemaVersion,
-      provenance: baseSnapshot.provenance,
+      stimulusListHash: normalizedBaseSnapshot.stimulusListHash,
+      stimulusSchemaVersion: normalizedBaseSnapshot.stimulusSchemaVersion,
+      provenance: normalizedBaseSnapshot.provenance,
     };
   }
 
@@ -267,6 +294,7 @@ export function buildBundleObject(
     mode,
     includesStimulusWords: includesWords,
     includesResponses: !isRedacted,
+    identifiersAnonymized: anonymize,
   };
 
   return {
@@ -305,7 +333,7 @@ export function ExportActions({
   const bundle = useMemo(() => {
     const b = buildBundleObject(privacyMode, trials, trialFlags, meanReactionTimeMs,
       medianReactionTimeMs, sessionResult, csvMeta, persistedSnapshot,
-      anonymize ? "" : new Date().toISOString());
+      anonymize ? "" : new Date().toISOString(), anonymize);
     if (anonymize) return anonymizeBundle(b);
     return b;
   }, [privacyMode, trials, trialFlags, meanReactionTimeMs, medianReactionTimeMs, sessionResult, csvMeta, persistedSnapshot, anonymize]);
