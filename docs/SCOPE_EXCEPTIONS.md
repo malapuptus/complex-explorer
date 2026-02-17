@@ -11,11 +11,9 @@ This is the canonical record of out-of-scope edits made during ticket execution.
 | 0149   | `src/app/DemoSession.tsx`                                            | Reproducibility bundle in `ResultsView` required passing `orderPolicy`, `trialTimeoutMs`, and `breakEveryN` via `csvMeta`, which meant editing the parent component.                      | Include host/integration components in allowed edits when expanding a child component's props interface.                                                                                    |
 | 0172   | `vite.config.ts`                                                     | Needed a compile-time `__APP_VERSION__` define so Research Bundle `appVersion` is populated without runtime I/O or bundling `package.json`. This file was outside the allowed-edits list. | Include `vite.config.ts` (or a dedicated build/version module) in allowed edits whenever introducing build-time constants, version stamping, or bundle metadata.                            |
 
-## Known Hygiene Exceptions (Ticket 0161)
+## Resolved Hygiene Exceptions
 
-The following files exceed the constitution's 350-line/file or 60-line/function limits and are temporarily allowlisted in `tools/check-hygiene.ts`. Each requires a follow-up decomposition ticket.
+The following hygiene exceptions were previously tracked here. They have been resolved or are no longer applicable:
 
-| File                      | Current lines | Limit | Follow-up ticket                                                   |
-| ------------------------- | ------------- | ----- | ------------------------------------------------------------------ |
-| `src/app/DemoSession.tsx` | ~447          | 350   | Ticket 0162 (planned)                                              |
-| `src/app/ResultsView.tsx` | ~310          | 350   | Within limit but has large functions; allowlisted at 400 as buffer |
+- **`src/app/DemoSession.tsx`** — Was ~447 lines; decomposition planned under Ticket 0162. The `ALLOWLIST` in `tools/check-hygiene.ts` is now empty (no active overrides).
+- **`src/app/ResultsView.tsx`** — Was within limits; previously allowlisted at 400 as a buffer. No longer in the allowlist.

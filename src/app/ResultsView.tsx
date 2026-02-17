@@ -133,9 +133,15 @@ export function ResultsView({
             <dd className="text-foreground">{csvMeta.orderPolicy ?? "unknown"}</dd>
             <dt className="text-muted-foreground">Scoring</dt>
             <dd className="font-mono text-foreground">{SCORING_VERSION}</dd>
-            <dt className="text-muted-foreground">App version</dt>
+            <dt className="text-muted-foreground">
+              {sessionResult?.appVersion
+                ? "Saved app version"
+                : APP_VERSION
+                  ? "Current app version (fallback)"
+                  : "App version"}
+            </dt>
             <dd className="font-mono text-foreground">
-              {sessionResult?.appVersion ?? APP_VERSION ?? "unknown"}
+              {sessionResult?.appVersion ?? APP_VERSION ?? "unknown (legacy)"}
             </dd>
             {csvMeta.trialTimeoutMs !== undefined && (
               <>

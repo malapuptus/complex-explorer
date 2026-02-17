@@ -17,7 +17,7 @@ export { DRAFT_LOCK_TTL_MS } from "./sessionStore";
 
 export { scoreSession } from "./scoring";
 
-export { sessionTrialsToCsv, sessionResultsToCsv } from "./csvExport";
+export { sessionTrialsToCsv, sessionResultsToCsv, CSV_SCHEMA_VERSION } from "./csvExport";
 
 export { computeSessionFingerprint } from "./fingerprint";
 

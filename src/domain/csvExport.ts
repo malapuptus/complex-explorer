@@ -5,7 +5,10 @@
 
 import type { SessionResult, Trial, TrialFlag } from "./types";
 
+export const CSV_SCHEMA_VERSION = "csv_v1";
+
 const CSV_HEADERS = [
+  "csv_schema_version",
   "session_id",
   "session_fingerprint",
   "scoring_version",
@@ -44,6 +47,7 @@ function trialToCsvRow(
 ): string {
   const a = trial.association;
   const values: string[] = [
+    CSV_SCHEMA_VERSION,
     sessionId,
     sessionFingerprint ?? "",
     scoringVersion ?? "",

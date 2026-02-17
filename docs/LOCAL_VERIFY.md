@@ -122,3 +122,53 @@ CANARY=1 node tools/verify.mjs   # ⚠️ Local only
 ```
 
 This creates a temporary illegal import, verifies the oracle rejects it, then cleans up.
+
+---
+
+## Local Pull Readiness Checklist
+
+> Use this when pulling the Lovable project to a local machine for the first time.
+
+### Prerequisites
+
+- **Node.js 20+** (required for `crypto.subtle`, `node:fs`, etc.)
+- Verify: `node --version` → must be `v20.x` or higher
+
+### Steps
+
+1. **Clone and install:**
+   ```sh
+   git clone <repo-url> && cd <repo>
+   npm ci
+   ```
+
+2. **Run full verify pipeline:**
+   ```sh
+   node tools/verify.mjs
+   ```
+   All 8 oracles must pass. If any fail, triage in this order:
+   1. **Hygiene** — file too long? Check `docs/SCOPE_EXCEPTIONS.md` for known exceptions
+   2. **Format** — run `npx prettier --write "src/**/*.{ts,tsx}"` and retry
+   3. **Lint** — fix reported issues, usually unused imports
+   4. **Typecheck** — check for missing types or interface mismatches
+   5. **Boundaries** — domain must not import infra or app
+   6. **Load smoke** — check for browser-only APIs in non-`.browser.ts` files
+   7. **Build** — usually same root cause as load-smoke
+   8. **Tests** — run `npx vitest run` individually to isolate failures
+
+3. **Run proxy verify (optional comparison):**
+   ```sh
+   node tools/verify-proxy.mjs
+   ```
+
+4. **Compare canary artifacts to Lovable VERIFY_LOG:**
+   - Generate a CSV export and compare header + first row to the latest `docs/VERIFY_LOG.md` entry
+   - Export a Research Bundle and verify keys match: `sessionResult`, `protocolDocVersion`, `appVersion`, `scoringAlgorithm`, `exportedAt`, `exportSchemaVersion`
+   - Run `npx vitest run src/app/__tests__/breakLogic.test.ts` and compare to logged break canary
+
+5. **Run canary mode to validate boundary oracle:**
+   ```sh
+   CANARY=1 node tools/verify.mjs
+   ```
+
+6. **Paste full verify output into `docs/VERIFY_LOG.md`** with environment label "Local (full verify)".
