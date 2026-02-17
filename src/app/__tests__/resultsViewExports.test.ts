@@ -157,7 +157,7 @@ describe("Export button wiring", () => {
     });
   });
 
-  describe("Anonymize identifiers (0235)", () => {
+  describe("Anonymize identifiers (0235 + 0241)", () => {
     const csvMeta = {
       sessionId: "s1", packId: "demo-10", packVersion: "1.0.0",
       seed: null as number | null, sessionFingerprint: "fp123",
@@ -166,14 +166,26 @@ describe("Export button wiring", () => {
     const trials = [makeTrial("sun", 0)];
     const flags: TrialFlag[] = [{ trialIndex: 0, flags: [] }];
 
-    it("anonymizeBundle blanks session ID and timestamps", () => {
-      const bundle = buildBundleObject("full", trials, flags, 400, 400, undefined, csvMeta, null, "2026-01-01T00:00:00Z");
+    it("anonymizeBundle uses collision-safe ID from fingerprint", () => {
+      const bundle = buildBundleObject("full", trials, flags, 400, 400, testSession, csvMeta, null, "2026-01-01T00:00:00Z");
       const anon = anonymizeBundle(bundle);
       const sr = anon.sessionResult as Record<string, unknown>;
-      expect(sr.id).toBe("anon_session");
+      expect(sr.id).toBe("anon_abc123def456".slice(0, 17)); // anon_ + first 12 chars
+      expect(sr.id).toMatch(/^anon_[a-z0-9]{12}$/);
       expect(sr.startedAt).toBe("");
       expect(sr.completedAt).toBe("");
       expect(anon.exportedAt).toBe("");
+    });
+
+    it("two sessions with different fingerprints get different anon IDs", () => {
+      const bundle1 = buildBundleObject("full", trials, flags, 400, 400, testSession, csvMeta, null, "2026-01-01T00:00:00Z");
+      const session2 = { ...testSession, sessionFingerprint: "xyz789000111" };
+      const bundle2 = buildBundleObject("full", trials, flags, 400, 400, session2, csvMeta, null, "2026-01-01T00:00:00Z");
+      const anon1 = anonymizeBundle(bundle1);
+      const anon2 = anonymizeBundle(bundle2);
+      const sr1 = anon1.sessionResult as Record<string, unknown>;
+      const sr2 = anon2.sessionResult as Record<string, unknown>;
+      expect(sr1.id).not.toBe(sr2.id);
     });
 
     it("anonymizeBundle preserves hashes and scoring", () => {

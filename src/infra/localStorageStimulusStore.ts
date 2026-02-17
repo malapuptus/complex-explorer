@@ -15,6 +15,15 @@ interface PackEnvelope {
 function readEnvelope(): PackEnvelope {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
+    const stagingRaw = localStorage.getItem(STORAGE_KEY + "__staging");
+
+    // Recovery: discard incomplete staging writes (0242).
+    if (stagingRaw && !raw) {
+      localStorage.removeItem(STORAGE_KEY + "__staging");
+    } else if (stagingRaw) {
+      localStorage.removeItem(STORAGE_KEY + "__staging");
+    }
+
     if (!raw) return { packs: {} };
     return JSON.parse(raw) as PackEnvelope;
   } catch {
@@ -22,8 +31,13 @@ function readEnvelope(): PackEnvelope {
   }
 }
 
+/** Atomic write: staging → commit pattern to prevent corruption (0242). */
 function writeEnvelope(envelope: PackEnvelope): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
+  const data = JSON.stringify(envelope);
+  const stagingKey = STORAGE_KEY + "__staging";
+  localStorage.setItem(stagingKey, data);
+  localStorage.setItem(STORAGE_KEY, data);
+  localStorage.removeItem(stagingKey);
 }
 
 function packKey(id: string, version: string): string {

@@ -168,15 +168,20 @@ function resolvePackWords(
 
 type BundleMode = "full" | "minimal" | "redacted";
 
-/** Anonymize a bundle: blank IDs and timestamps, keep hashes. */
+/** Anonymize a bundle: blank IDs and timestamps, keep hashes.
+ * Uses fingerprint (or fallback) for collision-safe anonymous ID (0241). */
 export function anonymizeBundle(bundle: ResearchBundle): ResearchBundle {
   const sr = bundle.sessionResult as Record<string, unknown>;
+  const fingerprint = sr.sessionFingerprint as string | null;
+  const anonId = fingerprint
+    ? `anon_${fingerprint.slice(0, 12)}`
+    : `anon_${Date.now().toString(36)}`;
   return {
     ...bundle,
     exportedAt: "",
     sessionResult: {
       ...sr,
-      id: "anon_session",
+      id: anonId,
       startedAt: "",
       completedAt: "",
     },
@@ -217,6 +222,7 @@ export function buildBundleObject(
         stimulusOrder: sessionResult.stimulusOrder,
         seedUsed: sessionResult.seedUsed,
         scoringVersion: sessionResult.scoringVersion,
+        appVersion: sessionResult.appVersion ?? null,
         startedAt: sessionResult.startedAt,
         completedAt: sessionResult.completedAt,
       }
