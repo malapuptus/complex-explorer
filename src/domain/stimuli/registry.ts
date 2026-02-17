@@ -15,8 +15,7 @@ const DEMO_LIST_V1: StimulusList = {
   provenance: {
     sourceName: "Complex Mapper Project",
     sourceYear: "2025",
-    sourceCitation:
-      "Internal demo list — not derived from any clinical instrument.",
+    sourceCitation: "Internal demo list — not derived from any clinical instrument.",
     licenseNote: "Project-internal; no license restrictions.",
   },
   words: [
@@ -180,10 +179,7 @@ function key(list: StimulusList): string {
  * Look up a stimulus list by id and version.
  * Returns undefined if not found.
  */
-export function getStimulusList(
-  id: string,
-  version: string,
-): StimulusList | undefined {
+export function getStimulusList(id: string, version: string): StimulusList | undefined {
   return REGISTRY.get(`${id}@${version}`);
 }
 

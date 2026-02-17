@@ -3,16 +3,8 @@
  * Autosaves draft after each scored trial; offers resume on reload.
  */
 
-import {
-  getStimulusList,
-  listAvailableStimulusLists,
-  computeSessionFingerprint,
-} from "@/domain";
-import type {
-  SessionResult,
-  ProvenanceSnapshot,
-  DraftSession,
-} from "@/domain";
+import { getStimulusList, listAvailableStimulusLists, computeSessionFingerprint } from "@/domain";
+import type { SessionResult, ProvenanceSnapshot, DraftSession } from "@/domain";
 import { localStorageSessionStore } from "@/infra";
 import { useSession } from "./useSession";
 import type { SessionSnapshot, StartOverrides } from "./useSession";
@@ -67,9 +59,7 @@ export function DemoSession() {
   const [selectedPackKey, setSelectedPackKey] = useState(
     `${packOptions[0].id}@${packOptions[0].version}`,
   );
-  const [activeConfig, setActiveConfig] = useState<AdvancedConfig | null>(
-    null,
-  );
+  const [activeConfig, setActiveConfig] = useState<AdvancedConfig | null>(null);
   const [onBreak, setOnBreak] = useState(false);
   const lastBreakAtRef = useRef(0);
   const [pendingDraft, setPendingDraft] = useState<DraftSession | null>(null);
@@ -79,9 +69,7 @@ export function DemoSession() {
   const draftIdRef = useRef(generateId());
   const tabIdRef = useRef(generateTabId());
 
-  const selectedOption = packOptions.find(
-    (p) => `${p.id}@${p.version}` === selectedPackKey,
-  )!;
+  const selectedOption = packOptions.find((p) => `${p.id}@${p.version}` === selectedPackKey)!;
   const list = getStimulusList(selectedOption.id, selectedOption.version)!;
   const isLongPack = list.words.length > 10;
 
@@ -90,8 +78,7 @@ export function DemoSession() {
   });
   const savedRef = useRef(false);
 
-  const breakEveryN =
-    activeConfig?.breakEveryN ?? DEFAULT_BREAK_EVERY;
+  const breakEveryN = activeConfig?.breakEveryN ?? DEFAULT_BREAK_EVERY;
   const orderPolicy = activeConfig?.orderPolicy ?? "fixed";
 
   // Check for existing draft on mount
@@ -220,10 +207,7 @@ export function DemoSession() {
       return;
     }
 
-    const allWords = [
-      ...pendingDraft.practiceWords,
-      ...pendingDraft.stimulusOrder,
-    ];
+    const allWords = [...pendingDraft.practiceWords, ...pendingDraft.stimulusOrder];
     const snapshot: SessionSnapshot = {
       words: allWords.map((word, index) => ({ word, index })),
       currentIndex: pendingDraft.currentIndex,
@@ -235,9 +219,7 @@ export function DemoSession() {
     };
 
     draftIdRef.current = pendingDraft.id;
-    setSelectedPackKey(
-      `${pendingDraft.stimulusListId}@${pendingDraft.stimulusListVersion}`,
-    );
+    setSelectedPackKey(`${pendingDraft.stimulusListId}@${pendingDraft.stimulusListVersion}`);
     setActiveConfig({
       orderPolicy: pendingDraft.orderPolicy,
       seed: pendingDraft.seedUsed,
@@ -299,34 +281,24 @@ export function DemoSession() {
 
   // Resume prompt
   if (pendingDraft && session.phase === "idle") {
-    const scoredDone = pendingDraft.trials.filter(
-      (t) => !t.isPractice,
-    ).length;
+    const scoredDone = pendingDraft.trials.filter((t) => !t.isPractice).length;
     const savedDate = new Date(pendingDraft.savedAt);
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-4">
-        <h2 className="text-2xl font-bold text-foreground">
-          Resume Session?
-        </h2>
+        <h2 className="text-2xl font-bold text-foreground">Resume Session?</h2>
         <div className="max-w-md space-y-2 text-center">
           <p className="text-muted-foreground">
             You have an unfinished session from{" "}
-            <strong className="text-foreground">
-              {savedDate.toLocaleString()}
-            </strong>
+            <strong className="text-foreground">{savedDate.toLocaleString()}</strong>
           </p>
           <p className="text-sm text-muted-foreground">
-            Pack: {pendingDraft.stimulusListId} · {scoredDone} words
-            completed
-            {pendingDraft.seedUsed !== null && (
-              <> · Seed: {pendingDraft.seedUsed}</>
-            )}
+            Pack: {pendingDraft.stimulusListId} · {scoredDone} words completed
+            {pendingDraft.seedUsed !== null && <> · Seed: {pendingDraft.seedUsed}</>}
           </p>
         </div>
         {draftLocked && (
           <p className="max-w-md text-center text-sm text-destructive">
-            A session is active in another tab. Close it or wait 2
-            minutes.
+            A session is active in another tab. Close it or wait 2 minutes.
           </p>
         )}
         <div className="flex gap-3">
@@ -360,25 +332,19 @@ export function DemoSession() {
       >
         {draftLocked && (
           <p className="text-center text-sm text-destructive">
-            A session is active in another tab. Close it or wait 2
-            minutes.
+            A session is active in another tab. Close it or wait 2 minutes.
           </p>
         )}
         <div className="flex flex-col items-center gap-3">
           <div className="flex items-center gap-3">
-            <label className="text-sm text-muted-foreground">
-              Stimulus pack:
-            </label>
+            <label className="text-sm text-muted-foreground">Stimulus pack:</label>
             <select
               value={selectedPackKey}
               onChange={(e) => setSelectedPackKey(e.target.value)}
               className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
             >
               {packOptions.map((p) => (
-                <option
-                  key={`${p.id}@${p.version}`}
-                  value={`${p.id}@${p.version}`}
-                >
+                <option key={`${p.id}@${p.version}`} value={`${p.id}@${p.version}`}>
                   {p.label}
                 </option>
               ))}
@@ -392,9 +358,7 @@ export function DemoSession() {
   // Running phase
   if (session.phase === "running" && session.currentWord) {
     const isPractice = session.currentIndex < session.practiceCount;
-    const scoredCompleted = isPractice
-      ? 0
-      : session.currentIndex - session.practiceCount;
+    const scoredCompleted = isPractice ? 0 : session.currentIndex - session.practiceCount;
     const totalScored = session.words.length - session.practiceCount;
 
     // Break logic (only when breakEveryN > 0)
@@ -430,15 +394,12 @@ export function DemoSession() {
     }
 
     // Show seedUsed banner on first scored trial
-    const showSeedBanner =
-      session.seedUsed !== null && scoredCompleted === 0 && !isPractice;
+    const showSeedBanner = session.seedUsed !== null && scoredCompleted === 0 && !isPractice;
 
     return (
       <div className="flex flex-col items-center">
         {showSeedBanner && (
-          <p className="mb-2 text-xs text-muted-foreground">
-            Seed: {session.seedUsed}
-          </p>
+          <p className="mb-2 text-xs text-muted-foreground">Seed: {session.seedUsed}</p>
         )}
         <TrialView
           word={session.currentWord.word}
@@ -461,9 +422,7 @@ export function DemoSession() {
         trials={scoredTrials}
         trialFlags={session.scoring.trialFlags}
         meanReactionTimeMs={session.scoring.summary.meanReactionTimeMs}
-        medianReactionTimeMs={
-          session.scoring.summary.medianReactionTimeMs
-        }
+        medianReactionTimeMs={session.scoring.summary.medianReactionTimeMs}
         onReset={handleReset}
         csvMeta={{
           sessionId: draftIdRef.current,

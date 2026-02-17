@@ -9,20 +9,14 @@ interface Props {
   onContinue: () => void;
 }
 
-export function BreakScreen({
-  completedScored,
-  totalScored,
-  onContinue,
-}: Props) {
+export function BreakScreen({ completedScored, totalScored, onContinue }: Props) {
   const remaining = totalScored - completedScored;
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-4">
       <h2 className="text-2xl font-bold text-foreground">Take a Break</h2>
       <p className="max-w-sm text-center text-muted-foreground">
-        You've completed{" "}
-        <strong className="text-foreground">{completedScored}</strong> of{" "}
-        <strong className="text-foreground">{totalScored}</strong> words.{" "}
-        {remaining} remaining.
+        You've completed <strong className="text-foreground">{completedScored}</strong> of{" "}
+        <strong className="text-foreground">{totalScored}</strong> words. {remaining} remaining.
       </p>
       <p className="text-sm text-muted-foreground">
         Take a moment to rest. Press continue when you're ready.

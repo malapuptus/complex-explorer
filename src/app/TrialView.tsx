@@ -154,13 +154,8 @@ export function TrialView({
           </div>
         )}
       </div>
-      <h2 className="text-5xl font-bold tracking-tight text-foreground">
-        {word}
-      </h2>
-      <form
-        onSubmit={handleSubmit}
-        className="flex flex-col items-center gap-4"
-      >
+      <h2 className="text-5xl font-bold tracking-tight text-foreground">{word}</h2>
+      <form onSubmit={handleSubmit} className="flex flex-col items-center gap-4">
         <input
           autoFocus
           type="text"

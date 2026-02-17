@@ -1,6 +1,9 @@
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "node:url";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const SRC = path.resolve(__dirname, "../src");
 
 /**
@@ -88,7 +91,7 @@ for (const file of files) {
     if (targetLayer && ILLEGAL[layer].includes(targetLayer)) {
       const rel = path.relative(SRC, file);
       console.error(
-        `Boundary violation: ${rel} (${layer} layer) imports from ${targetLayer} layer via "${imp}" — rule: ${layer} cannot import ${targetLayer}`
+        `Boundary violation: ${rel} (${layer} layer) imports from ${targetLayer} layer via "${imp}" — rule: ${layer} cannot import ${targetLayer}`,
       );
       violations++;
     }

@@ -71,14 +71,11 @@ export function PreviousSessions() {
         {prov && (
           <div className="mx-auto mb-4 max-w-3xl rounded-md border border-border bg-muted/30 px-4 py-3">
             <p className="text-xs font-medium text-muted-foreground">
-              Stimulus pack: {prov.listId}@{prov.listVersion} · {prov.wordCount} words · {prov.language}
+              Stimulus pack: {prov.listId}@{prov.listVersion} · {prov.wordCount} words ·{" "}
+              {prov.language}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {prov.sourceCitation}
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground italic">
-              {prov.licenseNote}
-            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{prov.sourceCitation}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground italic">{prov.licenseNote}</p>
             {selected.seedUsed !== null && (
               <p className="mt-1 text-xs text-muted-foreground">
                 Order: seeded (seed={selected.seedUsed})
@@ -106,9 +103,7 @@ export function PreviousSessions() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-6 text-2xl font-bold text-foreground">
-        Previous Sessions
-      </h1>
+      <h1 className="mb-6 text-2xl font-bold text-foreground">Previous Sessions</h1>
 
       {entries.length === 0 ? (
         <div className="text-center text-muted-foreground">
@@ -132,9 +127,7 @@ export function PreviousSessions() {
                   }}
                   className="w-full rounded-md border border-border px-4 py-3 text-left hover:bg-muted"
                 >
-                  <span className="font-medium text-foreground">
-                    {entry.stimulusListId}
-                  </span>
+                  <span className="font-medium text-foreground">{entry.stimulusListId}</span>
                   <span className="ml-4 text-sm text-muted-foreground">
                     {entry.totalTrials} trials &middot;{" "}
                     {new Date(entry.completedAt).toLocaleString()}

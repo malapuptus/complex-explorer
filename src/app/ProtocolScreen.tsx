@@ -54,13 +54,8 @@ export function ProtocolScreen({
 
   const handleReady = () => {
     const parsedSeed =
-      orderPolicy === "seeded" && seedInput.trim() !== ""
-        ? parseInt(seedInput.trim(), 10)
-        : null;
-    const finalSeed =
-      parsedSeed !== null && !Number.isNaN(parsedSeed)
-        ? parsedSeed
-        : null;
+      orderPolicy === "seeded" && seedInput.trim() !== "" ? parseInt(seedInput.trim(), 10) : null;
+    const finalSeed = parsedSeed !== null && !Number.isNaN(parsedSeed) ? parsedSeed : null;
 
     onReady({
       orderPolicy,
@@ -72,43 +67,33 @@ export function ProtocolScreen({
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8 px-4">
-      <h1 className="text-3xl font-bold text-foreground">
-        Word Association Task
-      </h1>
+      <h1 className="text-3xl font-bold text-foreground">Word Association Task</h1>
 
       <div className="max-w-lg space-y-4">
         <p className="text-center text-muted-foreground">
-          You'll start with{" "}
-          <strong className="text-foreground">{practiceCount}</strong> warm-up
-          words, then see{" "}
-          <strong className="text-foreground">{wordCount}</strong> scored words.
-          For each word, type the first association that comes to mind.
+          You'll start with <strong className="text-foreground">{practiceCount}</strong> warm-up
+          words, then see <strong className="text-foreground">{wordCount}</strong> scored words. For
+          each word, type the first association that comes to mind.
         </p>
 
         <p className="text-center text-sm text-muted-foreground">
-          Estimated time:{" "}
-          <strong className="text-foreground">{estimatedMinutes}</strong>
+          Estimated time: <strong className="text-foreground">{estimatedMinutes}</strong>
         </p>
 
         <ul className="space-y-2 rounded-md border border-border bg-muted/40 p-4">
           {INSTRUCTIONS.map((text, i) => (
             <li key={i} className="flex gap-2 text-sm text-foreground">
-              <span className="shrink-0 text-muted-foreground">
-                {i + 1}.
-              </span>
+              <span className="shrink-0 text-muted-foreground">{i + 1}.</span>
               {text}
             </li>
           ))}
         </ul>
 
         <p className="text-center text-xs text-muted-foreground italic">
-          This is not a diagnostic tool. Results are for personal reflection
-          only.
+          This is not a diagnostic tool. Results are for personal reflection only.
         </p>
 
-        <p className="text-center text-xs text-muted-foreground">
-          Source: {source}
-        </p>
+        <p className="text-center text-xs text-muted-foreground">Source: {source}</p>
       </div>
 
       {children}
@@ -126,14 +111,10 @@ export function ProtocolScreen({
         <div className="w-full max-w-md space-y-4 rounded-md border border-border bg-muted/30 p-4">
           {/* Order policy */}
           <div className="flex items-center gap-3">
-            <label className="w-28 shrink-0 text-sm text-muted-foreground">
-              Word order:
-            </label>
+            <label className="w-28 shrink-0 text-sm text-muted-foreground">Word order:</label>
             <select
               value={orderPolicy}
-              onChange={(e) =>
-                setOrderPolicy(e.target.value as OrderPolicy)
-              }
+              onChange={(e) => setOrderPolicy(e.target.value as OrderPolicy)}
               className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
             >
               <option value="fixed">Fixed</option>
@@ -144,9 +125,7 @@ export function ProtocolScreen({
           {/* Seed input (only when seeded) */}
           {orderPolicy === "seeded" && (
             <div className="flex items-center gap-3">
-              <label className="w-28 shrink-0 text-sm text-muted-foreground">
-                Seed:
-              </label>
+              <label className="w-28 shrink-0 text-sm text-muted-foreground">Seed:</label>
               <input
                 type="text"
                 inputMode="numeric"
@@ -161,18 +140,14 @@ export function ProtocolScreen({
           {/* Break interval (long packs only) */}
           {isLongPack && (
             <div className="flex items-center gap-3">
-              <label className="w-28 shrink-0 text-sm text-muted-foreground">
-                Break every:
-              </label>
+              <label className="w-28 shrink-0 text-sm text-muted-foreground">Break every:</label>
               <input
                 type="number"
                 min={5}
                 max={100}
                 value={breakEvery}
                 onChange={(e) =>
-                  setBreakEvery(
-                    Math.max(5, Math.min(100, Number(e.target.value) || 5)),
-                  )
+                  setBreakEvery(Math.max(5, Math.min(100, Number(e.target.value) || 5)))
                 }
                 className="w-20 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
               />
@@ -208,12 +183,7 @@ export function ProtocolScreen({
                     step={1000}
                     value={timeoutMs}
                     onChange={(e) =>
-                      setTimeoutMs(
-                        Math.max(
-                          3000,
-                          Math.min(30000, Number(e.target.value) || 3000),
-                        ),
-                      )
+                      setTimeoutMs(Math.max(3000, Math.min(30000, Number(e.target.value) || 3000)))
                     }
                     className="w-24 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
                   />

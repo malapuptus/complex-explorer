@@ -44,9 +44,7 @@ describe("scoreSession", () => {
       makeTrial("water", "  ", 700, 2),
     ];
     const result = scoreSession(trials);
-    const emptyFlags = result.trialFlags.filter((f) =>
-      f.flags.includes("empty_response"),
-    );
+    const emptyFlags = result.trialFlags.filter((f) => f.flags.includes("empty_response"));
     expect(emptyFlags).toHaveLength(2);
     expect(result.summary.emptyResponseCount).toBe(2);
   });
@@ -59,9 +57,7 @@ describe("scoreSession", () => {
       makeTrial("sky", "green", 650, 3),
     ];
     const result = scoreSession(trials);
-    const repeated = result.trialFlags.filter((f) =>
-      f.flags.includes("repeated_response"),
-    );
+    const repeated = result.trialFlags.filter((f) => f.flags.includes("repeated_response"));
     expect(repeated).toHaveLength(2); // indices 1 and 3
     expect(result.summary.repeatedResponseCount).toBe(2);
   });
@@ -77,9 +73,7 @@ describe("scoreSession", () => {
       makeTrial("g", "t", 15000, 6), // extreme outlier
     ];
     const result = scoreSession(trials);
-    const slow = result.trialFlags.filter((f) =>
-      f.flags.includes("timing_outlier_slow"),
-    );
+    const slow = result.trialFlags.filter((f) => f.flags.includes("timing_outlier_slow"));
     expect(slow.length).toBe(1);
     expect(slow[0].trialIndex).toBe(6);
   });
@@ -92,9 +86,7 @@ describe("scoreSession", () => {
       makeTrial("d", "w", 5000, 3), // would be outlier with more data
     ];
     const result = scoreSession(trials);
-    const slow = result.trialFlags.filter((f) =>
-      f.flags.includes("timing_outlier_slow"),
-    );
+    const slow = result.trialFlags.filter((f) => f.flags.includes("timing_outlier_slow"));
     expect(slow).toHaveLength(0);
   });
 
@@ -106,9 +98,7 @@ describe("scoreSession", () => {
       makeTrial("d", "w", 50, 3), // suspiciously fast
     ];
     const result = scoreSession(trials);
-    const fast = result.trialFlags.filter((f) =>
-      f.flags.includes("timing_outlier_fast"),
-    );
+    const fast = result.trialFlags.filter((f) => f.flags.includes("timing_outlier_fast"));
     expect(fast.length).toBe(1);
     expect(fast[0].trialIndex).toBe(3);
   });
@@ -124,9 +114,7 @@ describe("scoreSession", () => {
     ];
     const result = scoreSession(trials);
     const outliers = result.trialFlags.filter(
-      (f) =>
-        f.flags.includes("timing_outlier_slow") ||
-        f.flags.includes("timing_outlier_fast"),
+      (f) => f.flags.includes("timing_outlier_slow") || f.flags.includes("timing_outlier_fast"),
     );
     expect(outliers).toHaveLength(0);
   });
@@ -141,18 +129,13 @@ describe("scoreSession", () => {
       makeTrial("e", "v", 5000, 4), // outlier
     ];
     const result = scoreSession(trials);
-    const slow = result.trialFlags.filter((f) =>
-      f.flags.includes("timing_outlier_slow"),
-    );
+    const slow = result.trialFlags.filter((f) => f.flags.includes("timing_outlier_slow"));
     expect(slow.length).toBe(1);
     expect(slow[0].trialIndex).toBe(4);
   });
 
   it("computes correct summary stats", () => {
-    const trials = [
-      makeTrial("a", "x", 400, 0),
-      makeTrial("b", "y", 600, 1),
-    ];
+    const trials = [makeTrial("a", "x", 400, 0), makeTrial("b", "y", 600, 1)];
     const result = scoreSession(trials);
     expect(result.summary.totalTrials).toBe(2);
     expect(result.summary.meanReactionTimeMs).toBe(500);
@@ -200,9 +183,7 @@ describe("scoreSession", () => {
       makeTrial("house", "blue", 600, 2, false),
     ];
     const result = scoreSession(trials);
-    const repeated = result.trialFlags.filter((f) =>
-      f.flags.includes("repeated_response"),
-    );
+    const repeated = result.trialFlags.filter((f) => f.flags.includes("repeated_response"));
     expect(repeated).toHaveLength(0);
   });
 
@@ -213,9 +194,7 @@ describe("scoreSession", () => {
       makeTrial("c", "z", 500, 2, false, { backspaceCount: 4 }),
     ];
     const result = scoreSession(trials);
-    const highEdit = result.trialFlags.filter((f) =>
-      f.flags.includes("high_editing"),
-    );
+    const highEdit = result.trialFlags.filter((f) => f.flags.includes("high_editing"));
     expect(highEdit).toHaveLength(2);
     expect(result.summary.highEditingCount).toBe(2);
   });
@@ -226,16 +205,12 @@ describe("scoreSession", () => {
       makeTrial("b", "y", 500, 1, false, { backspaceCount: 0 }),
     ];
     const result = scoreSession(trials);
-    const highEdit = result.trialFlags.filter((f) =>
-      f.flags.includes("high_editing"),
-    );
+    const highEdit = result.trialFlags.filter((f) => f.flags.includes("high_editing"));
     expect(highEdit).toHaveLength(0);
   });
 
   it("preserves tFirstKeyMs and editCount in trial data", () => {
-    const trials = [
-      makeTrial("a", "x", 500, 0, false, { tFirstKeyMs: 150, editCount: 3 }),
-    ];
+    const trials = [makeTrial("a", "x", 500, 0, false, { tFirstKeyMs: 150, editCount: 3 })];
     const result = scoreSession(trials);
     expect(result.summary.totalTrials).toBe(1);
     // Metrics are on trial data, not scoring — just verify scoring doesn't break
@@ -249,12 +224,8 @@ describe("scoreSession", () => {
       makeTrial("c", "z", 600, 2),
     ];
     const result = scoreSession(trials);
-    const timeoutFlags = result.trialFlags.filter((f) =>
-      f.flags.includes("timeout"),
-    );
-    const emptyFlags = result.trialFlags.filter((f) =>
-      f.flags.includes("empty_response"),
-    );
+    const timeoutFlags = result.trialFlags.filter((f) => f.flags.includes("timeout"));
+    const emptyFlags = result.trialFlags.filter((f) => f.flags.includes("empty_response"));
     expect(timeoutFlags).toHaveLength(1);
     expect(timeoutFlags[0].trialIndex).toBe(1);
     expect(emptyFlags).toHaveLength(0);
@@ -272,21 +243,14 @@ describe("scoreSession", () => {
     ];
     const result = scoreSession(trials);
     // The timeout trial should NOT cause other trials to be flagged as outliers
-    const slow = result.trialFlags.filter((f) =>
-      f.flags.includes("timing_outlier_slow"),
-    );
+    const slow = result.trialFlags.filter((f) => f.flags.includes("timing_outlier_slow"));
     expect(slow).toHaveLength(0);
   });
 
   it("user-submitted empty is empty_response, not timeout", () => {
-    const trials = [
-      makeTrial("a", "", 500, 0, false),
-      makeTrial("b", "y", 600, 1),
-    ];
+    const trials = [makeTrial("a", "", 500, 0, false), makeTrial("b", "y", 600, 1)];
     const result = scoreSession(trials);
-    expect(
-      result.trialFlags[0].flags.includes("empty_response"),
-    ).toBe(true);
+    expect(result.trialFlags[0].flags.includes("empty_response")).toBe(true);
     expect(result.trialFlags[0].flags.includes("timeout")).toBe(false);
     expect(result.summary.timeoutCount).toBe(0);
   });

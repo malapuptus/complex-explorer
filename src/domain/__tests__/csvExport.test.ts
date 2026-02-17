@@ -23,7 +23,14 @@ describe("sessionTrialsToCsv", () => {
 
   it("includes scoring_version in header", () => {
     const csv = sessionTrialsToCsv(
-      trials, flags, "s1", "demo-10", "1.0.0", 42, "abc123", "scoring_v2_mad_3.5",
+      trials,
+      flags,
+      "s1",
+      "demo-10",
+      "1.0.0",
+      42,
+      "abc123",
+      "scoring_v2_mad_3.5",
     );
     const header = csv.split("\n")[0];
     expect(header).toContain("scoring_version");
@@ -31,16 +38,21 @@ describe("sessionTrialsToCsv", () => {
 
   it("includes scoring_version value in data row", () => {
     const csv = sessionTrialsToCsv(
-      trials, flags, "s1", "demo-10", "1.0.0", 42, "abc123", "scoring_v2_mad_3.5",
+      trials,
+      flags,
+      "s1",
+      "demo-10",
+      "1.0.0",
+      42,
+      "abc123",
+      "scoring_v2_mad_3.5",
     );
     const row = csv.split("\n")[1];
     expect(row).toContain("scoring_v2_mad_3.5");
   });
 
   it("scoring_version is empty when not provided", () => {
-    const csv = sessionTrialsToCsv(
-      trials, flags, "s1", "demo-10", "1.0.0", 42,
-    );
+    const csv = sessionTrialsToCsv(trials, flags, "s1", "demo-10", "1.0.0", 42);
     const row = csv.split("\n")[1];
     // session_id,fingerprint,scoring_version — third field should be empty
     const fields = row.split(",");

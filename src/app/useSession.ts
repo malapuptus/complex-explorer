@@ -4,12 +4,7 @@
  */
 
 import { useState, useCallback, useRef, useMemo } from "react";
-import type {
-  Trial,
-  StimulusWord,
-  SessionScoring,
-  OrderPolicy,
-} from "@/domain";
+import type { Trial, StimulusWord, SessionScoring, OrderPolicy } from "@/domain";
 import { scoreSession, seededShuffle, randomSeed } from "@/domain";
 
 export type SessionPhase = "idle" | "running" | "done";
@@ -71,10 +66,7 @@ export function useSession(words: string[], options?: UseSessionOptions) {
       let seedUsed: number | null = null;
 
       if (orderPolicy === "seeded") {
-        seedUsed =
-          overrides?.seed != null
-            ? overrides.seed
-            : (options?.seed ?? randomSeed());
+        seedUsed = overrides?.seed != null ? overrides.seed : (options?.seed ?? randomSeed());
         scoredWords = seededShuffle(baseWords, seedUsed);
       } else {
         scoredWords = [...baseWords];
@@ -98,14 +90,7 @@ export function useSession(words: string[], options?: UseSessionOptions) {
         trialTimeoutMs: timeoutMs,
       };
     },
-    [
-      baseWords,
-      practiceWords,
-      practiceCount,
-      defaultOrderPolicy,
-      options?.seed,
-      defaultTimeoutMs,
-    ],
+    [baseWords, practiceWords, practiceCount, defaultOrderPolicy, options?.seed, defaultTimeoutMs],
   );
 
   const [state, setState] = useState<SessionState>(() => buildState("idle"));
@@ -161,10 +146,7 @@ export function useSession(words: string[], options?: UseSessionOptions) {
           association: {
             response: response.trim(),
             reactionTimeMs: Math.round(reactionTimeMs),
-            tFirstKeyMs:
-              metrics.tFirstKeyMs !== null
-                ? Math.round(metrics.tFirstKeyMs)
-                : null,
+            tFirstKeyMs: metrics.tFirstKeyMs !== null ? Math.round(metrics.tFirstKeyMs) : null,
             backspaceCount: metrics.backspaceCount,
             editCount: metrics.editCount,
             compositionCount: metrics.compositionCount ?? 0,

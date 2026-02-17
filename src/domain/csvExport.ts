@@ -80,7 +80,16 @@ export function sessionTrialsToCsv(
   for (let i = 0; i < trials.length; i++) {
     const flags = trialFlags[i]?.flags ?? [];
     rows.push(
-      trialToCsvRow(sessionId, sessionFingerprint ?? null, scoringVersion ?? null, packId, packVersion, seed, trials[i], flags),
+      trialToCsvRow(
+        sessionId,
+        sessionFingerprint ?? null,
+        scoringVersion ?? null,
+        packId,
+        packVersion,
+        seed,
+        trials[i],
+        flags,
+      ),
     );
   }
   return rows.join("\n");
@@ -95,7 +104,16 @@ export function sessionResultsToCsv(sessions: SessionResult[]): string {
     for (let i = 0; i < s.trials.length; i++) {
       const flags = s.scoring.trialFlags[i]?.flags ?? [];
       rows.push(
-        trialToCsvRow(s.id, s.sessionFingerprint ?? null, s.scoringVersion ?? null, packId, packVersion, s.seedUsed, s.trials[i], flags),
+        trialToCsvRow(
+          s.id,
+          s.sessionFingerprint ?? null,
+          s.scoringVersion ?? null,
+          packId,
+          packVersion,
+          s.seedUsed,
+          s.trials[i],
+          flags,
+        ),
       );
     }
   }
