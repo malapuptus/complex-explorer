@@ -142,6 +142,25 @@ export function ResultsView({
             {csvMeta.breakEveryN !== undefined && (
               <><dt className="text-muted-foreground">Break every</dt><dd className="text-foreground">{csvMeta.breakEveryN} trials</dd></>
             )}
+            {/* 0257: import provenance — only when present */}
+            {sessionResult?.importedFrom && (
+              <>
+                <dt className="text-muted-foreground">Imported from</dt>
+                <dd className="font-mono text-foreground">{sessionResult.importedFrom.packageVersion}</dd>
+                <dt className="text-muted-foreground">Package hash</dt>
+                <dd className="font-mono text-foreground break-all">
+                  {sessionResult.importedFrom.packageHash.slice(0, 16)}…
+                </dd>
+                {sessionResult.importedFrom.originalSessionId && (
+                  <>
+                    <dt className="text-muted-foreground">Original session id</dt>
+                    <dd className="font-mono text-foreground break-all">
+                      {sessionResult.importedFrom.originalSessionId}
+                    </dd>
+                  </>
+                )}
+              </>
+            )}
           </dl>
         </div>
       )}

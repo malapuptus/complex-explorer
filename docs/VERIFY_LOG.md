@@ -4,7 +4,34 @@
 
 ---
 
-## Tickets 0249–0253 — Import Refactor, Clipboard Fallback, originalSessionId, SSoT Gating
+## Tickets 0254–0258 — SCHEMAS sync, model/UI contract tests, ResultsView provenance, anonymize invariants
+
+**Date:** 2026-02-17 | **Oracle:** `npx vitest run src` → **342/342 PASS**
+
+| # | Check | Result |
+|---|-------|--------|
+| 1 | All tests pass | ✅ 342/342 |
+| 2 | `docs/SCHEMAS.md` updated: `importedFrom.originalSessionId`, `appVersion`, `pkg_v1` key table, error codes, diagnostics payload | ✅ |
+| 3 | `src/app/__tests__/importPreviewModel.test.ts` (29 tests): analyzeImport, extractPackFromBundle, getAvailableActions, formatKB, diagnostics payload shape | ✅ |
+| 4 | `src/app/__tests__/importSection.test.tsx` (13 tests): gating parity, copy success/failure, fallback textarea, integrity rows | ✅ |
+| 5 | `src/app/__tests__/resultsViewImportedFrom.test.tsx` (4 tests): Imported from, Package hash, Original session id rows appear; absent for local sessions | ✅ |
+| 6 | `src/domain/__tests__/anonymizeInvariants.test.ts` (11 tests): anonymize preserves all importedFrom fields; collision IDs are distinct; safe when importedFrom absent | ✅ |
+| 7 | `buildBundleObject` passes `importedFrom` through to bundle's sessionResult | ✅ |
+| 8 | `ResultsView` shows provenance section only when `importedFrom` present | ✅ |
+
+**Canary (0254):** `SCHEMAS.md` now documents `importedFrom?: { packageVersion, packageHash, originalSessionId? } | null`, `appVersion` column in rb_v3 table, `pkg_v1` key table with all 7 required keys, and error codes with `expected vs computed` semantics.
+
+**Canary (0255):** `analyzeImport` on pack/bundle/pkg fixtures returns correct `type`, `wordCount`, `hash`; `getAvailableActions` returns exact action lists per fixture; diagnostics payload shape includes `{ code, expectedHash, computedHash, packageVersion }`.
+
+**Canary (0256):** Full pkg UI → both "Import as Session" + "Extract Pack" buttons rendered; tampered pkg → both absent, "Copy diagnostics" enabled; clipboard success → "Copied ✓"; clipboard fail → textarea with valid JSON.
+
+**Canary (0257):** `ResultsView` with `importedFrom` renders "Imported from: pkg_v1", "Package hash: deadbeefcafe1234…", "Original session id: original-before-collision". Non-imported session renders none of these.
+
+**Canary (0258):** `anonymizeBundle` changes `id` to `anon_<fingerprint>`, preserves `importedFrom.packageHash`, `packageVersion`, `originalSessionId`; blanks timestamps. Collision rewrite `id__import_deadbeef` keeps same `originalSessionId`.
+
+---
+
+
 
 **Date:** 2026-02-17 | **Oracle:** `npx vitest run src` → **291/291 PASS**
 

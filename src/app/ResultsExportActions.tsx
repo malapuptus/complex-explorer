@@ -225,6 +225,10 @@ export function buildBundleObject(
         appVersion: sessionResult.appVersion ?? null,
         startedAt: sessionResult.startedAt,
         completedAt: sessionResult.completedAt,
+        // 0257: preserve importedFrom provenance in bundle
+        ...(sessionResult.importedFrom !== undefined
+          ? { importedFrom: sessionResult.importedFrom }
+          : {}),
       }
     : {
         id: csvMeta.sessionId,
