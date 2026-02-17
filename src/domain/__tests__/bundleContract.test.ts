@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import type { SessionResult } from "@/domain/types";
 
 /**
- * Ticket 0190 — Bundle completeness contract test.
+ * Ticket 0190/0202 — Bundle completeness contract test.
  * Asserts the Research Bundle includes all fields required for
- * reproducibility and analysis.
+ * reproducibility and analysis, including rb_v2 pack snapshot.
  */
 
 function makeFullSession(): SessionResult {
@@ -71,7 +71,7 @@ function makeFullSession(): SessionResult {
 describe("Bundle completeness contract", () => {
   const session = makeFullSession();
 
-  // Simulate bundle construction (mirrors ResultsView logic)
+  // Simulate bundle construction (mirrors ResultsView rb_v2 logic)
   const bundle = {
     sessionResult: {
       id: session.id,
@@ -89,8 +89,12 @@ describe("Bundle completeness contract", () => {
     protocolDocVersion: "PROTOCOL.md@2026-02-13",
     appVersion: session.appVersion,
     scoringAlgorithm: "MAD-modified-z@3.5 + fast<200ms + timeout excluded",
-    exportSchemaVersion: "rb_v1",
+    exportSchemaVersion: "rb_v2",
     exportedAt: new Date().toISOString(),
+    stimulusPackSnapshot: {
+      stimulusListHash: "abc123hash",
+      provenance: session.provenanceSnapshot,
+    },
   };
 
   describe("top-level bundle keys", () => {
@@ -101,6 +105,7 @@ describe("Bundle completeness contract", () => {
       "scoringAlgorithm",
       "exportedAt",
       "sessionResult",
+      "stimulusPackSnapshot",
     ];
     for (const key of required) {
       it(`includes ${key}`, () => {
@@ -110,20 +115,22 @@ describe("Bundle completeness contract", () => {
     }
   });
 
+  it("exportSchemaVersion is rb_v2", () => {
+    expect(bundle.exportSchemaVersion).toBe("rb_v2");
+  });
+
+  it("stimulusPackSnapshot has hash and provenance", () => {
+    expect(bundle.stimulusPackSnapshot).toHaveProperty("stimulusListHash");
+    expect(bundle.stimulusPackSnapshot).toHaveProperty("provenance");
+    expect(bundle.stimulusPackSnapshot.provenance).toHaveProperty("listId");
+  });
+
   describe("sessionResult completeness", () => {
     const sr = bundle.sessionResult;
     const requiredFields = [
-      "id",
-      "config",
-      "trials",
-      "scoring",
-      "stimulusOrder",
-      "seedUsed",
-      "provenanceSnapshot",
-      "sessionFingerprint",
-      "scoringVersion",
-      "startedAt",
-      "completedAt",
+      "id", "config", "trials", "scoring", "stimulusOrder",
+      "seedUsed", "provenanceSnapshot", "sessionFingerprint",
+      "scoringVersion", "startedAt", "completedAt",
     ];
     for (const field of requiredFields) {
       it(`sessionResult includes ${field}`, () => {

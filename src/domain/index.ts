@@ -28,4 +28,10 @@ export { seededShuffle, randomSeed } from "./shuffle";
 
 export type { StimulusList, StimulusListProvenance, StimulusListValidationError } from "./stimuli";
 
-export { validateStimulusList, getStimulusList, listAvailableStimulusLists } from "./stimuli";
+export {
+  validateStimulusList,
+  getStimulusList,
+  listAvailableStimulusLists,
+  STIMULUS_SCHEMA_VERSION,
+  computeWordsSha256,
+} from "./stimuli";

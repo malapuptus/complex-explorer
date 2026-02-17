@@ -1,3 +1,4 @@
 export type { StimulusList, StimulusListProvenance, StimulusListValidationError } from "./types";
-export { validateStimulusList } from "./types";
+export { validateStimulusList, STIMULUS_SCHEMA_VERSION } from "./types";
 export { getStimulusList, listAvailableStimulusLists } from "./registry";
+export { computeWordsSha256 } from "./integrity";

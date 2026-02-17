@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { validateStimulusList } from "../stimuli/types";
+import { validateStimulusList, STIMULUS_SCHEMA_VERSION } from "../stimuli/types";
+import { computeWordsSha256 } from "../stimuli/integrity";
 import { localStorageStimulusStore } from "@/infra/localStorageStimulusStore";
 import type { StimulusList } from "../stimuli/types";
 
 /**
- * Ticket 0194 — Custom stimulus pack validation + storage tests.
+ * Ticket 0194/0201 — Custom stimulus pack validation, storage, and hash tests.
  */
 
 function makeValidPack(overrides?: Partial<StimulusList>): StimulusList {
@@ -50,9 +51,7 @@ describe("Custom pack validation", () => {
     const errors = validateStimulusList(
       makeValidPack({ words: ["alpha", "beta", "Alpha"] }),
     );
-    expect(errors.some((e) => e.field === "words" && e.message.includes("duplicate"))).toBe(
-      true,
-    );
+    expect(errors.some((e) => e.field === "words" && e.message.includes("duplicate"))).toBe(true);
   });
 
   it("detects blank words", () => {
@@ -97,5 +96,38 @@ describe("Custom pack storage", () => {
 
   it("returns undefined for non-existent pack", () => {
     expect(localStorageStimulusStore.load("nope", "1.0.0")).toBeUndefined();
+  });
+
+  it("exists() detects saved packs", () => {
+    expect(localStorageStimulusStore.exists("test-custom", "1.0.0")).toBe(false);
+    localStorageStimulusStore.save(makeValidPack());
+    expect(localStorageStimulusStore.exists("test-custom", "1.0.0")).toBe(true);
+  });
+
+  it("stamps stimulusSchemaVersion on save", () => {
+    localStorageStimulusStore.save(makeValidPack());
+    const loaded = localStorageStimulusStore.load("test-custom", "1.0.0");
+    expect(loaded!.stimulusSchemaVersion).toBe(STIMULUS_SCHEMA_VERSION);
+  });
+});
+
+describe("Stimulus list hash", () => {
+  it("produces consistent SHA-256 for word list", async () => {
+    const hash = await computeWordsSha256(["alpha", "beta", "gamma"]);
+    expect(typeof hash).toBe("string");
+    expect(hash).toHaveLength(64);
+    // Same input → same output
+    const hash2 = await computeWordsSha256(["alpha", "beta", "gamma"]);
+    expect(hash2).toBe(hash);
+  });
+
+  it("different words produce different hash", async () => {
+    const h1 = await computeWordsSha256(["alpha", "beta"]);
+    const h2 = await computeWordsSha256(["alpha", "gamma"]);
+    expect(h1).not.toBe(h2);
+  });
+
+  it("STIMULUS_SCHEMA_VERSION is sp_v1", () => {
+    expect(STIMULUS_SCHEMA_VERSION).toBe("sp_v1");
   });
 });

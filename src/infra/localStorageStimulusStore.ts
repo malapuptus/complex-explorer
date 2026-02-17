@@ -4,6 +4,7 @@
  */
 
 import type { StimulusList } from "@/domain/stimuli/types";
+import { STIMULUS_SCHEMA_VERSION } from "@/domain/stimuli/types";
 
 const STORAGE_KEY = "complex-mapper-custom-packs";
 
@@ -41,11 +42,19 @@ export interface CustomPackEntry {
 export const localStorageStimulusStore = {
   save(list: StimulusList): void {
     const envelope = readEnvelope();
-    envelope.packs[packKey(list.id, list.version)] = {
+    const enriched = {
       ...list,
+      stimulusSchemaVersion: list.stimulusSchemaVersion ?? STIMULUS_SCHEMA_VERSION,
       importedAt: new Date().toISOString(),
     };
+    envelope.packs[packKey(list.id, list.version)] = enriched;
     writeEnvelope(envelope);
+  },
+
+  /** Returns true if a pack with the same (id, version) already exists. */
+  exists(id: string, version: string): boolean {
+    const envelope = readEnvelope();
+    return packKey(id, version) in envelope.packs;
   },
 
   load(id: string, version: string): StimulusList | undefined {

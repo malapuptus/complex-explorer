@@ -15,6 +15,8 @@ export interface StimulusListProvenance {
   readonly licenseNote: string;
 }
 
+export const STIMULUS_SCHEMA_VERSION = "sp_v1";
+
 /** A versioned, attributable stimulus word list. */
 export interface StimulusList {
   /** Unique identifier for this list. */
@@ -29,6 +31,10 @@ export interface StimulusList {
   readonly provenance: StimulusListProvenance;
   /** The ordered list of stimulus words. */
   readonly words: readonly string[];
+  /** Schema version for the pack format (e.g. "sp_v1"). Optional for legacy. */
+  readonly stimulusSchemaVersion?: string;
+  /** SHA-256 hash of canonical word list (words.join("\\n")). Optional for legacy. */
+  readonly stimulusListHash?: string;
 }
 
 export interface StimulusListValidationError {

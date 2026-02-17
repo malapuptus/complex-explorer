@@ -1,15 +1,16 @@
 /**
  * ProtocolScreen — standardized pre-session instructions.
  * Includes an Advanced section for experimental controls.
- * Supports custom pack import/export.
+ * Supports custom pack import/export with collision detection.
  */
 
 import { useState, useRef } from "react";
 import type { ReactNode } from "react";
 import type { OrderPolicy } from "@/domain";
-import { validateStimulusList } from "@/domain";
+import { validateStimulusList, STIMULUS_SCHEMA_VERSION, computeWordsSha256 } from "@/domain";
 import type { StimulusList } from "@/domain";
 import { localStorageStimulusStore } from "@/infra";
+import { CustomPackManager } from "./CustomPackManager";
 
 /** Config produced by the Advanced settings panel. */
 export interface AdvancedConfig {
@@ -24,12 +25,9 @@ interface ProtocolScreenProps {
   practiceCount: number;
   source: string;
   estimatedMinutes: string;
-  /** If true, break/timeout controls are shown (hidden for tiny packs). */
   isLongPack: boolean;
   onReady: (config: AdvancedConfig) => void;
-  /** Called when a custom pack is imported to refresh pack list. */
   onPackImported?: () => void;
-  /** The currently selected pack (for export). */
   selectedPack?: StimulusList | null;
   children?: ReactNode;
 }
@@ -45,15 +43,8 @@ const INSTRUCTIONS = [
 const DEFAULT_BREAK_EVERY = 20;
 
 export function ProtocolScreen({
-  wordCount,
-  practiceCount,
-  source,
-  estimatedMinutes,
-  isLongPack,
-  onReady,
-  onPackImported,
-  selectedPack,
-  children,
+  wordCount, practiceCount, source, estimatedMinutes,
+  isLongPack, onReady, onPackImported, selectedPack, children,
 }: ProtocolScreenProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [orderPolicy, setOrderPolicy] = useState<OrderPolicy>("fixed");
@@ -63,16 +54,15 @@ export function ProtocolScreen({
   const [timeoutMs, setTimeoutMs] = useState(8000);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
+  const [showManager, setShowManager] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleReady = () => {
     const parsedSeed =
       orderPolicy === "seeded" && seedInput.trim() !== "" ? parseInt(seedInput.trim(), 10) : null;
     const finalSeed = parsedSeed !== null && !Number.isNaN(parsedSeed) ? parsedSeed : null;
-
     onReady({
-      orderPolicy,
-      seed: finalSeed,
+      orderPolicy, seed: finalSeed,
       breakEveryN: isLongPack ? breakEvery : 0,
       trialTimeoutMs: timeoutEnabled ? timeoutMs : undefined,
     });
@@ -90,32 +80,62 @@ export function ProtocolScreen({
         const parsed = JSON.parse(reader.result as string);
         const errors = validateStimulusList(parsed);
         if (errors.length > 0) {
-          setImportError(errors.map((e) => `${e.field}: ${e.message}`).join("; "));
+          setImportError(errors.map((err) => `${err.field}: ${err.message}`).join("; "));
           return;
         }
-        localStorageStimulusStore.save(parsed as StimulusList);
-        setImportSuccess(`Imported "${parsed.id}" (${parsed.words.length} words)`);
-        onPackImported?.();
+        // Collision check: reject if same (id, version) exists
+        if (localStorageStimulusStore.exists(parsed.id, parsed.version)) {
+          setImportError(
+            `Pack "${parsed.id}@${parsed.version}" already exists. Delete it first to re-import.`,
+          );
+          return;
+        }
+        // Compute and attach hash + schema version if missing
+        void computeWordsSha256(parsed.words).then((hash) => {
+          const enriched: StimulusList = {
+            ...parsed,
+            stimulusSchemaVersion: parsed.stimulusSchemaVersion ?? STIMULUS_SCHEMA_VERSION,
+            stimulusListHash: parsed.stimulusListHash ?? hash,
+          };
+          // If hash was provided, verify it matches
+          if (parsed.stimulusListHash && parsed.stimulusListHash !== hash) {
+            setImportError(
+              `Hash mismatch: expected ${parsed.stimulusListHash}, computed ${hash}. Pack may be corrupted.`,
+            );
+            return;
+          }
+          localStorageStimulusStore.save(enriched);
+          setImportSuccess(`Imported "${parsed.id}" (${parsed.words.length} words)`);
+          onPackImported?.();
+        });
       } catch {
         setImportError("Invalid JSON file.");
       }
     };
     reader.readAsText(file);
-    // Reset input so same file can be re-imported
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleExportPack = () => {
     if (!selectedPack) return;
-    const json = JSON.stringify(selectedPack, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `pack-${selectedPack.id}-${selectedPack.version}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    void computeWordsSha256(selectedPack.words).then((hash) => {
+      const exported = {
+        ...selectedPack,
+        stimulusSchemaVersion: selectedPack.stimulusSchemaVersion ?? STIMULUS_SCHEMA_VERSION,
+        stimulusListHash: selectedPack.stimulusListHash ?? hash,
+      };
+      const json = JSON.stringify(exported, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `pack-${selectedPack.id}-${selectedPack.version}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
   };
+
+  const customPacks = localStorageStimulusStore.list();
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8 px-4">
@@ -127,11 +147,9 @@ export function ProtocolScreen({
           words, then see <strong className="text-foreground">{wordCount}</strong> scored words. For
           each word, type the first association that comes to mind.
         </p>
-
         <p className="text-center text-sm text-muted-foreground">
           Estimated time: <strong className="text-foreground">{estimatedMinutes}</strong>
         </p>
-
         <ul className="space-y-2 rounded-md border border-border bg-muted/40 p-4">
           {INSTRUCTIONS.map((text, i) => (
             <li key={i} className="flex gap-2 text-sm text-foreground">
@@ -140,39 +158,43 @@ export function ProtocolScreen({
             </li>
           ))}
         </ul>
-
         <p className="text-center text-xs text-muted-foreground italic">
           This is not a diagnostic tool. Results are for personal reflection only.
         </p>
-
         <p className="text-center text-xs text-muted-foreground">Source: {source}</p>
       </div>
 
       {children}
 
-      {/* Pack tools: import + export */}
+      {/* Pack tools: import + export + manage */}
       <div className="flex flex-wrap items-center justify-center gap-3">
         <label className="cursor-pointer rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted">
           Import Pack (JSON)
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleImport}
-            className="hidden"
-          />
+          <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
         </label>
         {selectedPack && (
+          <button onClick={handleExportPack} className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted">
+            Export Pack JSON
+          </button>
+        )}
+        {customPacks.length > 0 && (
           <button
-            onClick={handleExportPack}
+            onClick={() => setShowManager((v) => !v)}
             className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
           >
-            Export Pack JSON
+            {showManager ? "Hide custom packs" : "Manage custom packs"}
           </button>
         )}
       </div>
       {importError && <p className="text-xs text-destructive">{importError}</p>}
       {importSuccess && <p className="text-xs text-primary">{importSuccess}</p>}
+
+      {showManager && (
+        <CustomPackManager
+          packs={customPacks}
+          onChanged={() => { onPackImported?.(); }}
+        />
+      )}
 
       {/* Advanced settings toggle */}
       <button
@@ -185,24 +207,15 @@ export function ProtocolScreen({
 
       {showAdvanced && (
         <AdvancedPanel
-          orderPolicy={orderPolicy}
-          setOrderPolicy={setOrderPolicy}
-          seedInput={seedInput}
-          setSeedInput={setSeedInput}
-          isLongPack={isLongPack}
-          breakEvery={breakEvery}
-          setBreakEvery={setBreakEvery}
-          timeoutEnabled={timeoutEnabled}
-          setTimeoutEnabled={setTimeoutEnabled}
-          timeoutMs={timeoutMs}
-          setTimeoutMs={setTimeoutMs}
+          orderPolicy={orderPolicy} setOrderPolicy={setOrderPolicy}
+          seedInput={seedInput} setSeedInput={setSeedInput}
+          isLongPack={isLongPack} breakEvery={breakEvery} setBreakEvery={setBreakEvery}
+          timeoutEnabled={timeoutEnabled} setTimeoutEnabled={setTimeoutEnabled}
+          timeoutMs={timeoutMs} setTimeoutMs={setTimeoutMs}
         />
       )}
 
-      <button
-        onClick={handleReady}
-        className="rounded-md bg-primary px-8 py-3 text-lg text-primary-foreground hover:opacity-90"
-      >
+      <button onClick={handleReady} className="rounded-md bg-primary px-8 py-3 text-lg text-primary-foreground hover:opacity-90">
         I'm ready
       </button>
     </div>
@@ -211,29 +224,15 @@ export function ProtocolScreen({
 
 /** Extracted advanced settings panel. */
 function AdvancedPanel({
-  orderPolicy,
-  setOrderPolicy,
-  seedInput,
-  setSeedInput,
-  isLongPack,
-  breakEvery,
-  setBreakEvery,
-  timeoutEnabled,
-  setTimeoutEnabled,
-  timeoutMs,
-  setTimeoutMs,
+  orderPolicy, setOrderPolicy, seedInput, setSeedInput,
+  isLongPack, breakEvery, setBreakEvery,
+  timeoutEnabled, setTimeoutEnabled, timeoutMs, setTimeoutMs,
 }: {
-  orderPolicy: OrderPolicy;
-  setOrderPolicy: (v: OrderPolicy) => void;
-  seedInput: string;
-  setSeedInput: (v: string) => void;
-  isLongPack: boolean;
-  breakEvery: number;
-  setBreakEvery: (v: number) => void;
-  timeoutEnabled: boolean;
-  setTimeoutEnabled: (v: boolean) => void;
-  timeoutMs: number;
-  setTimeoutMs: (v: number) => void;
+  orderPolicy: OrderPolicy; setOrderPolicy: (v: OrderPolicy) => void;
+  seedInput: string; setSeedInput: (v: string) => void;
+  isLongPack: boolean; breakEvery: number; setBreakEvery: (v: number) => void;
+  timeoutEnabled: boolean; setTimeoutEnabled: (v: boolean) => void;
+  timeoutMs: number; setTimeoutMs: (v: number) => void;
 }) {
   return (
     <div className="w-full max-w-md space-y-4 rounded-md border border-border bg-muted/30 p-4">
@@ -248,65 +247,39 @@ function AdvancedPanel({
           <option value="seeded">Randomized</option>
         </select>
       </div>
-
       {orderPolicy === "seeded" && (
         <div className="flex items-center gap-3">
           <label className="w-28 shrink-0 text-sm text-muted-foreground">Seed:</label>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={seedInput}
-            onChange={(e) => setSeedInput(e.target.value)}
-            placeholder="Auto-generate"
+          <input type="text" inputMode="numeric" value={seedInput}
+            onChange={(e) => setSeedInput(e.target.value)} placeholder="Auto-generate"
             className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground/60"
           />
         </div>
       )}
-
       {isLongPack && (
         <div className="flex items-center gap-3">
           <label className="w-28 shrink-0 text-sm text-muted-foreground">Break every:</label>
-          <input
-            type="number"
-            min={5}
-            max={100}
-            value={breakEvery}
-            onChange={(e) =>
-              setBreakEvery(Math.max(5, Math.min(100, Number(e.target.value) || 5)))
-            }
+          <input type="number" min={5} max={100} value={breakEvery}
+            onChange={(e) => setBreakEvery(Math.max(5, Math.min(100, Number(e.target.value) || 5)))}
             className="w-20 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
           />
           <span className="text-sm text-muted-foreground">trials</span>
         </div>
       )}
-
       {isLongPack && (
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <label className="w-28 shrink-0 text-sm text-muted-foreground">Trial timeout:</label>
-            <button
-              type="button"
-              onClick={() => setTimeoutEnabled(!timeoutEnabled)}
-              className={`rounded-md border px-3 py-1.5 text-sm ${
-                timeoutEnabled
-                  ? "border-primary bg-primary/10 text-foreground"
-                  : "border-input bg-background text-muted-foreground"
-              }`}
+            <button type="button" onClick={() => setTimeoutEnabled(!timeoutEnabled)}
+              className={`rounded-md border px-3 py-1.5 text-sm ${timeoutEnabled ? "border-primary bg-primary/10 text-foreground" : "border-input bg-background text-muted-foreground"}`}
             >
               {timeoutEnabled ? "On" : "Off"}
             </button>
           </div>
           {timeoutEnabled && (
             <div className="flex items-center gap-3 pl-[7.75rem]">
-              <input
-                type="number"
-                min={3000}
-                max={30000}
-                step={1000}
-                value={timeoutMs}
-                onChange={(e) =>
-                  setTimeoutMs(Math.max(3000, Math.min(30000, Number(e.target.value) || 3000)))
-                }
+              <input type="number" min={3000} max={30000} step={1000} value={timeoutMs}
+                onChange={(e) => setTimeoutMs(Math.max(3000, Math.min(30000, Number(e.target.value) || 3000)))}
                 className="w-24 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
               />
               <span className="text-sm text-muted-foreground">ms</span>
