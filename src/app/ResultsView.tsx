@@ -10,8 +10,11 @@ interface ResearchBundle {
   protocolDocVersion: string;
   appVersion: string | null;
   scoringAlgorithm: string;
+  exportSchemaVersion: string;
   exportedAt: string;
 }
+
+const EXPORT_SCHEMA_VERSION = "rb_v1";
 
 const PROTOCOL_DOC_VERSION = "PROTOCOL.md@2026-02-13";
 const SCORING_VERSION = "scoring_v2_mad_3.5";
@@ -130,6 +133,10 @@ export function ResultsView({
             <dd className="text-foreground">{csvMeta.orderPolicy ?? "unknown"}</dd>
             <dt className="text-muted-foreground">Scoring</dt>
             <dd className="font-mono text-foreground">{SCORING_VERSION}</dd>
+            <dt className="text-muted-foreground">App version</dt>
+            <dd className="font-mono text-foreground">
+              {sessionResult?.appVersion ?? APP_VERSION ?? "unknown"}
+            </dd>
             {csvMeta.trialTimeoutMs !== undefined && (
               <>
                 <dt className="text-muted-foreground">Timeout</dt>
@@ -276,6 +283,7 @@ export function ResultsView({
                   protocolDocVersion: PROTOCOL_DOC_VERSION,
                   appVersion: APP_VERSION,
                   scoringAlgorithm: SCORING_ALGORITHM,
+                  exportSchemaVersion: EXPORT_SCHEMA_VERSION,
                   exportedAt: new Date().toISOString(),
                 };
                 const fp = csvMeta.sessionFingerprint?.slice(0, 8) ?? "";

@@ -14,7 +14,7 @@
 npm ci
 
 # 2. Run all 8 oracles
-node tools/verify.mjs
+node tools/verify.mjs        # ⚠️ Local only — does NOT run in Lovable
 ```
 
 That's it. The script fails fast on the first broken oracle.
@@ -48,25 +48,77 @@ Vite tree-shakes differently from `tsc`. Check for side-effect imports or Node-o
 
 ## Cross-platform notes
 
-- **macOS / Linux:** `bash tools/verify` works (delegates to `verify.mjs`).
-- **Windows:** Use `node tools/verify.mjs` directly (the bash wrapper may not work without WSL/Git Bash).
+- **macOS / Linux:** `bash tools/verify` works (delegates to `verify.mjs`). ⚠️ **Local only.**
+- **Windows:** Use `node tools/verify.mjs` directly (the bash wrapper may not work without WSL/Git Bash). ⚠️ **Local only.**
 
-## Proxy verify (Lovable / restricted environments)
+## Proxy verify — `tools/verify-proxy.mjs` ⚠️ Local only
 
-When `node tools/verify.mjs` is unavailable (e.g. Lovable sandbox), use the proxy runner:
+> **This script does NOT run in Lovable.** It requires shell access (`node`, `npx`).
+> It is designed for local environments where `verify.mjs` may partially fail.
 
 ```sh
-node tools/verify-proxy.mjs
+node tools/verify-proxy.mjs   # ⚠️ Local only — does NOT run in Lovable
 ```
 
-This attempts all 8 oracles, catching "command unavailable" errors and printing a summary table with PASS/SKIP/FAIL per oracle. In Lovable, only Oracle 8 (tests via `npx vitest run`) is expected to run; the rest will show SKIP.
+This attempts all 8 oracles, catching "command unavailable" errors and printing a summary table with PASS/SKIP/FAIL per oracle.
 
-## Canary mode
+---
+
+## Lovable Verify Policy
+
+> When working in **Lovable** (sandbox), `verify.mjs` and `verify-proxy.mjs` are **not runnable**. The sandbox only exposes the Vitest test runner. This section defines the minimum verification requirements for Lovable-only work.
+
+### Minimum required commands
+
+| Command | What it covers | How to run in Lovable |
+|---------|---------------|----------------------|
+| `npx vitest run src` | Oracle 8 (tests) | Via Lovable's test runner |
+
+Oracles 1–7 (hygiene, format, lint, typecheck, boundaries, load-smoke, build) **cannot run** in Lovable. Build correctness is partially confirmed by the Lovable preview loading successfully (covers Oracle 4 typecheck and Oracle 7 build implicitly).
+
+### Required canary artifacts (per ticket close-out)
+
+Every VERIFY_LOG entry must include **all three**:
+
+1. **CSV header + one data row** — proving export columns are intact (can be generated programmatically via exportParity test or from a real session)
+2. **Research Bundle snippet** — showing required top-level keys: `sessionResult`, `protocolDocVersion`, `appVersion`, `scoringAlgorithm`, `exportedAt`, `exportSchemaVersion`
+3. **Break-trigger proof** — either:
+   - breakLogic.test.ts passing output (threshold=2 test), OR
+   - Manual observation with breakEveryN=2 showing exactly one break per threshold
+
+### Required "Unrun Oracles" table
+
+Every Lovable VERIFY_LOG entry **must** include the oracle table with columns:
+
+| # | Oracle | Runnable in Lovable | Evidence provided | Notes |
+|---|--------|---------------------|-------------------|-------|
+
+Mark each oracle as:
+- **Y** — ran and passed (with evidence reference)
+- **Y (implicit)** — covered by preview/build success
+- **N** — not runnable (state reason)
+
+### Policy checklist (copy into each VERIFY_LOG entry)
+
+```
+- [ ] `npx vitest run src` passed (paste raw output)
+- [ ] Oracle table included (8 rows, Y/N per oracle)
+- [ ] CSV canary: header + one data row pasted
+- [ ] Bundle canary: snippet with required keys pasted
+- [ ] Break canary: test output or manual observation pasted
+- [ ] Environment line present: "Lovable (tests only)" or "Local (full verify)"
+```
+
+---
+
+## Canary mode ⚠️ Local only
+
+> **This does NOT run in Lovable.**
 
 To prove the boundary oracle actually catches violations:
 
 ```sh
-CANARY=1 node tools/verify.mjs
+CANARY=1 node tools/verify.mjs   # ⚠️ Local only
 ```
 
 This creates a temporary illegal import, verifies the oracle rejects it, then cleans up.
