@@ -101,7 +101,12 @@ SHA-256( words.join("\n") )
     "stimulusListHash": "string | null",
     "stimulusSchemaVersion": "string | null",
     "provenance": { "ProvenanceSnapshot | null" },
-    "words": ["string[] (full word list when available)"]
+    "words": ["string[] (present in Full mode only)"]
+  },
+  "privacy": {
+    "mode": "full | minimal | redacted",
+    "includesStimulusWords": "boolean",
+    "includesResponses": "boolean"
   }
 }
 ```
@@ -112,7 +117,7 @@ SHA-256( words.join("\n") )
 |-------|------|-------------|
 | `id` | string | Session ID |
 | `config` | SessionConfig | Full configuration including pack ID, version, order policy, seed |
-| `trials` | Trial[] | All scored trials |
+| `trials` | Trial[] | All scored trials (responses blanked in redacted mode) |
 | `scoring` | SessionScoring | `trialFlags` + `summary` (with mean/median RT, counts) |
 | `stimulusOrder` | string[] | Exact scored stimulus order |
 | `seedUsed` | number\|null | Seed used for shuffle |
@@ -129,18 +134,47 @@ SHA-256( words.join("\n") )
 | `stimulusListHash` | string\|null | SHA-256 of canonical word list |
 | `stimulusSchemaVersion` | string\|null | Pack schema version (e.g. `"sp_v1"`) |
 | `provenance` | ProvenanceSnapshot\|null | Full provenance metadata |
-| `words` | string[]\|undefined | Full word list (present in Full mode; absent in Minimal mode) |
+| `words` | string[]\|undefined | Full word list (present in Full mode; absent in Minimal/Redacted) |
+
+### `privacy` manifest
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mode` | `"full"` \| `"minimal"` \| `"redacted"` | Export mode used |
+| `includesStimulusWords` | boolean | Whether `words` array is present in snapshot |
+| `includesResponses` | boolean | Whether trial responses contain actual data |
 
 ### Export modes
 
-- **Full** (`Export Bundle (Full)`): includes `words` — enables pack restoration directly from bundle.
-- **Minimal** (`Export Bundle (Minimal)`): omits `words` — share-safe, preserves hash + provenance for integrity verification.
+| Mode | Words | Responses | Use case |
+|------|-------|-----------|----------|
+| **Full** | ✓ | ✓ | Archiving, full reproducibility |
+| **Minimal** | ✗ | ✓ | Sharing without leaking stimulus list |
+| **Redacted** | ✗ | ✗ | Sharing timing/structure without personal content |
 
-Both modes use `exportSchemaVersion: "rb_v3"`.
+All modes use `exportSchemaVersion: "rb_v3"`.
 
 ### Redacted CSV
 
 `Export CSV (Redacted)` replaces the `response` column with empty strings while preserving all timing, flag, and metadata columns. No schema column changes — still `csv_v1`.
+
+---
+
+## pkg_v1 — Session Package Schema
+
+**Current version:** `pkg_v1`
+
+A single JSON envelope containing all export artifacts for a session.
+
+```json
+{
+  "packageVersion": "pkg_v1",
+  "bundle": { "rb_v3 Research Bundle object" },
+  "csv": "full CSV string",
+  "csvRedacted": "redacted CSV string",
+  "exportedAt": "ISO-8601 timestamp"
+}
+```
 
 ### Changes from rb_v1
 

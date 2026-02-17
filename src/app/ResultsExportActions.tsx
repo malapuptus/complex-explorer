@@ -1,14 +1,22 @@
 /**
  * ResultsExportActions — export/restore/reproduce buttons for ResultsView.
- * Extracted from ResultsView (Ticket 0213) to keep line counts manageable.
+ * Extracted from ResultsView (Ticket 0213). Privacy manifest added (0223).
+ * Redacted bundle (0224), session package (0227) added.
  */
 
 import { useMemo } from "react";
 import type { Trial, TrialFlag, OrderPolicy, SessionResult, StimulusPackSnapshot, StimulusList } from "@/domain";
-import { sessionTrialsToCsv, getStimulusList, type CsvExportOptions } from "@/domain";
+import { sessionTrialsToCsv, getStimulusList } from "@/domain";
 import { localStorageStimulusStore } from "@/infra";
 
 declare const __APP_VERSION__: string;
+
+/** Privacy manifest embedded in every bundle. */
+export interface PrivacyManifest {
+  mode: "full" | "minimal" | "redacted";
+  includesStimulusWords: boolean;
+  includesResponses: boolean;
+}
 
 /** Self-contained research bundle for offline reproducibility. */
 interface ResearchBundle {
@@ -19,6 +27,7 @@ interface ResearchBundle {
   exportSchemaVersion: string;
   exportedAt: string;
   stimulusPackSnapshot?: (StimulusPackSnapshot & { words?: readonly string[] }) | null;
+  privacy: PrivacyManifest;
 }
 
 export const EXPORT_SCHEMA_VERSION = "rb_v3";
@@ -53,6 +62,16 @@ function SizeLabel({ bytes }: { bytes: number }) {
       ({formatBytes(bytes)}{warn ? " ⚠" : ""})
     </span>
   );
+}
+
+/** Short privacy summary for a bundle mode. */
+function PrivacyNote({ mode }: { mode: "full" | "minimal" | "redacted" }) {
+  const text = mode === "full"
+    ? "Includes stimulus words + responses"
+    : mode === "minimal"
+    ? "Omits stimulus words, includes responses"
+    : "Omits responses, omits stimulus words";
+  return <span className="block text-xs text-muted-foreground">{text}</span>;
 }
 
 interface Props {
@@ -90,16 +109,24 @@ function resolvePackWords(
   csvMeta: Props["csvMeta"],
   sessionResult?: SessionResult,
 ): readonly string[] | null {
-  // 1. Try installed pack
   const builtIn = getStimulusList(csvMeta.packId, csvMeta.packVersion);
   if (builtIn) return builtIn.words;
   const custom = localStorageStimulusStore.load(csvMeta.packId, csvMeta.packVersion);
   if (custom) return custom.words;
-  // 2. Fall back to session's stimulus order (scored words only)
   if (sessionResult?.stimulusOrder && sessionResult.stimulusOrder.length > 0) {
     return sessionResult.stimulusOrder;
   }
   return null;
+}
+
+type BundleMode = "full" | "minimal" | "redacted";
+
+/** Redact trials: blank all responses. */
+function redactTrials(trials: Trial[]): Trial[] {
+  return trials.map((t) => ({
+    ...t,
+    association: { ...t.association, response: "" },
+  }));
 }
 
 export function ExportActions({
@@ -120,12 +147,16 @@ export function ExportActions({
     [trials, trialFlags, csvMeta],
   );
 
-  const buildBundleJson = useMemo(() => {
-    return (mode: "full" | "minimal") => {
+  /** Build bundle JSON for a given mode. Exported for testing. */
+  const buildBundle = useMemo(() => {
+    return (mode: BundleMode): ResearchBundle => {
+      const isRedacted = mode === "redacted";
+      const sessionTrials = isRedacted ? redactTrials(sessionResult?.trials ?? trials) : (sessionResult?.trials ?? trials);
+
       const bundleSession = sessionResult
         ? {
             id: sessionResult.id, config: sessionResult.config,
-            trials: sessionResult.trials, scoring: sessionResult.scoring,
+            trials: sessionTrials, scoring: sessionResult.scoring,
             sessionFingerprint: sessionResult.sessionFingerprint,
             provenanceSnapshot: sessionResult.provenanceSnapshot,
             stimulusOrder: sessionResult.stimulusOrder,
@@ -142,7 +173,8 @@ export function ExportActions({
               ...(csvMeta.trialTimeoutMs !== undefined && { trialTimeoutMs: csvMeta.trialTimeoutMs }),
               ...(csvMeta.breakEveryN !== undefined && { breakEveryN: csvMeta.breakEveryN }),
             },
-            trials, scoring: { trialFlags, summary: { meanReactionTimeMs, medianReactionTimeMs } },
+            trials: isRedacted ? redactTrials(trials) : trials,
+            scoring: { trialFlags, summary: { meanReactionTimeMs, medianReactionTimeMs } },
             sessionFingerprint: csvMeta.sessionFingerprint ?? null,
           };
 
@@ -152,43 +184,55 @@ export function ExportActions({
         provenance: sessionResult?.provenanceSnapshot ?? null,
       };
 
-      if (mode === "full") {
+      const includesWords = mode === "full";
+      let snapshot: ResearchBundle["stimulusPackSnapshot"];
+      if (includesWords) {
         const words = resolvePackWords(csvMeta, sessionResult);
-        const snapshotWithWords = { ...baseSnapshot, ...(words ? { words } : {}) };
-        const bundle: ResearchBundle = {
-          sessionResult: bundleSession, protocolDocVersion: PROTOCOL_DOC_VERSION,
-          appVersion: APP_VERSION, scoringAlgorithm: SCORING_ALGORITHM,
-          exportSchemaVersion: EXPORT_SCHEMA_VERSION, exportedAt: new Date().toISOString(),
-          stimulusPackSnapshot: snapshotWithWords,
-        };
-        return JSON.stringify(bundle, null, 2);
+        snapshot = { ...baseSnapshot, ...(words ? { words } : {}) };
       } else {
-        // Minimal: omit words, keep hash + provenance + schema version
-        const minimalSnapshot = {
+        snapshot = {
           stimulusListHash: baseSnapshot.stimulusListHash,
           stimulusSchemaVersion: baseSnapshot.stimulusSchemaVersion,
           provenance: baseSnapshot.provenance,
         };
-        const bundle: ResearchBundle = {
-          sessionResult: bundleSession, protocolDocVersion: PROTOCOL_DOC_VERSION,
-          appVersion: APP_VERSION, scoringAlgorithm: SCORING_ALGORITHM,
-          exportSchemaVersion: EXPORT_SCHEMA_VERSION, exportedAt: new Date().toISOString(),
-          stimulusPackSnapshot: minimalSnapshot,
-        };
-        return JSON.stringify(bundle, null, 2);
       }
+
+      const privacy: PrivacyManifest = {
+        mode,
+        includesStimulusWords: includesWords,
+        includesResponses: !isRedacted,
+      };
+
+      return {
+        sessionResult: bundleSession, protocolDocVersion: PROTOCOL_DOC_VERSION,
+        appVersion: APP_VERSION, scoringAlgorithm: SCORING_ALGORITHM,
+        exportSchemaVersion: EXPORT_SCHEMA_VERSION, exportedAt: new Date().toISOString(),
+        stimulusPackSnapshot: snapshot, privacy,
+      };
     };
   }, [trials, trialFlags, meanReactionTimeMs, medianReactionTimeMs, sessionResult, csvMeta, persistedSnapshot]);
 
-  const bundleJsonFull = useMemo(() => buildBundleJson("full"), [buildBundleJson]);
-  const bundleJsonMinimal = useMemo(() => buildBundleJson("minimal"), [buildBundleJson]);
+  const bundleJsonFull = useMemo(() => JSON.stringify(buildBundle("full"), null, 2), [buildBundle]);
+  const bundleJsonMinimal = useMemo(() => JSON.stringify(buildBundle("minimal"), null, 2), [buildBundle]);
+  const bundleJsonRedacted = useMemo(() => JSON.stringify(buildBundle("redacted"), null, 2), [buildBundle]);
+
+  /** Session Package (pkg_v1): single envelope with bundle + optional CSV. */
+  const packageJson = useMemo(() => {
+    const pkg = {
+      packageVersion: "pkg_v1",
+      bundle: buildBundle("full"),
+      csv: csvContent,
+      csvRedacted,
+      exportedAt: new Date().toISOString(),
+    };
+    return JSON.stringify(pkg, null, 2);
+  }, [buildBundle, csvContent, csvRedacted]);
 
   const snapshotJson = useMemo(() =>
     persistedSnapshot ? JSON.stringify(persistedSnapshot, null, 2) : null,
     [persistedSnapshot],
   );
 
-  // Restore gating: only when we have provenance + words from stimulusOrder
   const canRestore = !!(
     persistedSnapshot && !packIsInstalled &&
     persistedSnapshot.provenance &&
@@ -211,78 +255,115 @@ export function ExportActions({
     };
     if (localStorageStimulusStore.exists(restoredPack.id, restoredPack.version)) return;
     localStorageStimulusStore.save(restoredPack);
-    alert(`Pack "${restoredPack.id}@${restoredPack.version}" restored from this session (${restoredPack.words.length} words). Note: only scored words are included; practice words are not in the snapshot.`);
+    alert(`Pack "${restoredPack.id}@${restoredPack.version}" restored (${restoredPack.words.length} words).`);
   };
 
-  const makeBundleFn = (mode: "full" | "minimal") => () => {
-    const json = mode === "full" ? bundleJsonFull : bundleJsonMinimal;
+  const makeBundleFn = (mode: BundleMode) => () => {
+    const json = mode === "full" ? bundleJsonFull : mode === "minimal" ? bundleJsonMinimal : bundleJsonRedacted;
     const fp = csvMeta.sessionFingerprint?.slice(0, 8) ?? "";
     const seedPart = csvMeta.seed != null ? `seed${csvMeta.seed}` : "noseed";
     const datePart = new Date().toISOString().slice(0, 10);
-    const suffix = mode === "minimal" ? "-minimal" : "";
+    const suffix = mode === "full" ? "" : `-${mode}`;
     const filename = ["bundle", datePart, csvMeta.packId, seedPart, ...(fp ? [fp] : [])].join("-") + suffix + ".json";
     downloadFile(json, "application/json", filename);
   };
 
+  const handlePackage = () => {
+    const fp = csvMeta.sessionFingerprint?.slice(0, 8) ?? "";
+    const datePart = new Date().toISOString().slice(0, 10);
+    const filename = ["session-package", datePart, csvMeta.packId, ...(fp ? [fp] : [])].join("-") + ".json";
+    downloadFile(packageJson, "application/json", filename);
+  };
+
   return (
-    <div className="mt-6 flex flex-wrap gap-3">
-      <button
-        onClick={() => downloadFile(csvContent, "text/csv", `session-${csvMeta.sessionId}.csv`)}
-        className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
-      >
-        Export CSV <SizeLabel bytes={csvContent.length} />
-      </button>
-      <button
-        onClick={() => downloadFile(csvRedacted, "text/csv", `session-${csvMeta.sessionId}-redacted.csv`)}
-        className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
-      >
-        Export CSV (Redacted) <SizeLabel bytes={csvRedacted.length} />
-      </button>
-      <button onClick={makeBundleFn("full")}
-        className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
-      >
-        Export Bundle (Full) <SizeLabel bytes={bundleJsonFull.length} />
-      </button>
-      <button onClick={makeBundleFn("minimal")}
-        className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
-      >
-        Export Bundle (Minimal) <SizeLabel bytes={bundleJsonMinimal.length} />
-      </button>
-      {snapshotJson && (
+    <div className="mt-6 space-y-3">
+      <div className="flex flex-wrap gap-3">
         <button
-          onClick={() => downloadFile(snapshotJson, "application/json", `pack-snapshot-${csvMeta.packId}.json`)}
+          onClick={() => downloadFile(csvContent, "text/csv", `session-${csvMeta.sessionId}.csv`)}
           className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
         >
-          Export Pack Snapshot <SizeLabel bytes={snapshotJson.length} />
+          Export CSV <SizeLabel bytes={csvContent.length} />
         </button>
-      )}
-      {canRestore && (
-        <button onClick={handleRestore}
-          className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
-        >
-          Restore pack from this session
-        </button>
-      )}
-      {persistedSnapshot && !packIsInstalled && !canRestore && (
-        <p className="text-xs text-muted-foreground italic">
-          Pack not installed. Snapshot contains only hash + provenance — insufficient to restore the full word list.
-        </p>
-      )}
-      {onReproduce && (
         <button
-          onClick={() => onReproduce({
-            packId: csvMeta.packId, packVersion: csvMeta.packVersion,
-            seed: csvMeta.seed, orderPolicy: csvMeta.orderPolicy ?? "fixed",
-            trialTimeoutMs: csvMeta.trialTimeoutMs, breakEveryN: csvMeta.breakEveryN,
-          })}
+          onClick={() => downloadFile(csvRedacted, "text/csv", `session-${csvMeta.sessionId}-redacted.csv`)}
           className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
         >
-          Run again with same settings
+          Export CSV (Redacted) <SizeLabel bytes={csvRedacted.length} />
         </button>
-      )}
-      <button onClick={onReset} className="rounded-md bg-primary px-6 py-2 text-primary-foreground hover:opacity-90">
-        Start Over
-      </button>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <div>
+          <button onClick={makeBundleFn("full")}
+            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+          >
+            Bundle (Full) <SizeLabel bytes={bundleJsonFull.length} />
+          </button>
+          <PrivacyNote mode="full" />
+        </div>
+        <div>
+          <button onClick={makeBundleFn("minimal")}
+            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+          >
+            Bundle (Minimal) <SizeLabel bytes={bundleJsonMinimal.length} />
+          </button>
+          <PrivacyNote mode="minimal" />
+        </div>
+        <div>
+          <button onClick={makeBundleFn("redacted")}
+            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+          >
+            Bundle (Redacted) <SizeLabel bytes={bundleJsonRedacted.length} />
+          </button>
+          <PrivacyNote mode="redacted" />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <button onClick={handlePackage}
+          className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+        >
+          Export Session Package <SizeLabel bytes={packageJson.length} />
+        </button>
+        {snapshotJson && (
+          <button
+            onClick={() => downloadFile(snapshotJson, "application/json", `pack-snapshot-${csvMeta.packId}.json`)}
+            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+          >
+            Export Pack Snapshot <SizeLabel bytes={snapshotJson.length} />
+          </button>
+        )}
+        {canRestore && (
+          <button onClick={handleRestore}
+            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+          >
+            Restore pack from this session
+          </button>
+        )}
+        {persistedSnapshot && !packIsInstalled && !canRestore && (
+          <p className="text-xs text-muted-foreground italic">
+            Pack not installed. Snapshot insufficient to restore.
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        {onReproduce && (
+          <button
+            onClick={() => onReproduce({
+              packId: csvMeta.packId, packVersion: csvMeta.packVersion,
+              seed: csvMeta.seed, orderPolicy: csvMeta.orderPolicy ?? "fixed",
+              trialTimeoutMs: csvMeta.trialTimeoutMs, breakEveryN: csvMeta.breakEveryN,
+            })}
+            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+          >
+            Run again with same settings
+          </button>
+        )}
+        <button onClick={onReset} className="rounded-md bg-primary px-6 py-2 text-primary-foreground hover:opacity-90">
+          Start Over
+        </button>
+      </div>
     </div>
   );
 }

@@ -151,6 +151,7 @@ describe("Export button wiring", () => {
         ...testSession.stimulusPackSnapshot,
         words: testSession.stimulusOrder,
       },
+      privacy: { mode: "full" as const, includesStimulusWords: true, includesResponses: true },
     };
 
     it("includes exportSchemaVersion rb_v3", () => {
@@ -163,13 +164,9 @@ describe("Export button wiring", () => {
 
     it("includes all required top-level keys", () => {
       const required = [
-        "sessionResult",
-        "protocolDocVersion",
-        "appVersion",
-        "scoringAlgorithm",
-        "exportSchemaVersion",
-        "exportedAt",
-        "stimulusPackSnapshot",
+        "sessionResult", "protocolDocVersion", "appVersion",
+        "scoringAlgorithm", "exportSchemaVersion", "exportedAt",
+        "stimulusPackSnapshot", "privacy",
       ];
       for (const key of required) {
         expect(bundle).toHaveProperty(key);
@@ -185,6 +182,37 @@ describe("Export button wiring", () => {
     it("snapshot is present for historical sessions", () => {
       expect(bundle.stimulusPackSnapshot.stimulusListHash).toBe("testhash123");
       expect(bundle.stimulusPackSnapshot.stimulusSchemaVersion).toBe("sp_v1");
+    });
+
+    it("privacy manifest matches full mode", () => {
+      expect(bundle.privacy.mode).toBe("full");
+      expect(bundle.privacy.includesStimulusWords).toBe(true);
+      expect(bundle.privacy.includesResponses).toBe(true);
+    });
+  });
+
+  describe("Session Package structure", () => {
+    const pkg = {
+      packageVersion: "pkg_v1",
+      bundle: {
+        exportSchemaVersion: "rb_v3",
+        sessionResult: { id: testSession.id },
+        privacy: { mode: "full", includesStimulusWords: true, includesResponses: true },
+      },
+      csv: "csv_schema_version,...",
+      csvRedacted: "csv_schema_version,...",
+      exportedAt: new Date().toISOString(),
+    };
+
+    it("has pkg_v1 version", () => {
+      expect(pkg.packageVersion).toBe("pkg_v1");
+    });
+
+    it("includes bundle and csv", () => {
+      expect(pkg).toHaveProperty("bundle");
+      expect(pkg).toHaveProperty("csv");
+      expect(pkg).toHaveProperty("csvRedacted");
+      expect(pkg).toHaveProperty("exportedAt");
     });
   });
 });
