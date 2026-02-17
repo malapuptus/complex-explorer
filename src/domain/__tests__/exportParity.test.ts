@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { sessionTrialsToCsv, CSV_SCHEMA_VERSION } from "../csvExport";
-import type { Trial, TrialFlag } from "../types";
+import { buildBundleObject, anonymizeBundle } from "@/app/ResultsExportActions";
+import type { Trial, TrialFlag, SessionResult } from "../types";
 
 /**
  * Export parity regression test — locks CSV header and Research Bundle
@@ -202,6 +203,54 @@ describe("Export parity", () => {
         privacy: { mode: "full", includesStimulusWords: true, includesResponses: true },
       };
       expect(bundle.privacy.mode).toBe("full");
+    });
+  });
+
+  describe("buildBundleObject sessionResult completeness (0238)", () => {
+    it("Full bundle sessionResult includes all required fields", () => {
+      const session: SessionResult = {
+        id: "s1", config: { stimulusListId: "demo-10", stimulusListVersion: "1.0.0", maxResponseTimeMs: 0, orderPolicy: "fixed", seed: null },
+        trials: [makeTrial("sun", 0)], startedAt: "2026-01-01T00:00:00Z", completedAt: "2026-01-01T00:01:00Z",
+        scoring: { trialFlags: [{ trialIndex: 0, flags: [] }], summary: { totalTrials: 1, meanReactionTimeMs: 400, medianReactionTimeMs: 400, stdDevReactionTimeMs: 0, emptyResponseCount: 0, repeatedResponseCount: 0, timingOutlierCount: 0, highEditingCount: 0, timeoutCount: 0 } },
+        seedUsed: null, stimulusOrder: ["sun"], provenanceSnapshot: null,
+        sessionFingerprint: "fp123", scoringVersion: "scoring_v2_mad_3.5",
+        appVersion: "1.2.3", stimulusPackSnapshot: null,
+      };
+      const csvMeta = { sessionId: "s1", packId: "demo-10", packVersion: "1.0.0", seed: null as number | null, sessionFingerprint: "fp123", orderPolicy: "fixed" as const };
+      const bundle = buildBundleObject("full", session.trials, session.scoring.trialFlags, 400, 400, session, csvMeta, null, "2026-01-01T00:00:00Z");
+
+      const sr = bundle.sessionResult as Record<string, unknown>;
+      const requiredFields = ["id", "config", "trials", "scoring", "stimulusOrder", "seedUsed", "provenanceSnapshot", "sessionFingerprint", "scoringVersion", "appVersion", "startedAt", "completedAt"];
+      for (const field of requiredFields) {
+        expect(sr).toHaveProperty(field);
+      }
+      expect(sr.appVersion).toBe("1.2.3");
+      expect(sr.startedAt).toBe("2026-01-01T00:00:00Z");
+      expect(sr.completedAt).toBe("2026-01-01T00:01:00Z");
+      expect(sr.scoringVersion).toBe("scoring_v2_mad_3.5");
+    });
+
+    it("Anonymized bundle still has all keys (values may be blanked)", () => {
+      const session: SessionResult = {
+        id: "s1", config: { stimulusListId: "demo-10", stimulusListVersion: "1.0.0", maxResponseTimeMs: 0, orderPolicy: "fixed", seed: null },
+        trials: [makeTrial("sun", 0)], startedAt: "2026-01-01T00:00:00Z", completedAt: "2026-01-01T00:01:00Z",
+        scoring: { trialFlags: [{ trialIndex: 0, flags: [] }], summary: { totalTrials: 1, meanReactionTimeMs: 400, medianReactionTimeMs: 400, stdDevReactionTimeMs: 0, emptyResponseCount: 0, repeatedResponseCount: 0, timingOutlierCount: 0, highEditingCount: 0, timeoutCount: 0 } },
+        seedUsed: null, stimulusOrder: ["sun"], provenanceSnapshot: null,
+        sessionFingerprint: "fp123", scoringVersion: "scoring_v2_mad_3.5",
+        appVersion: "1.0.0", stimulusPackSnapshot: null,
+      };
+      const csvMeta = { sessionId: "s1", packId: "demo-10", packVersion: "1.0.0", seed: null as number | null, sessionFingerprint: "fp123", orderPolicy: "fixed" as const };
+      const bundle = buildBundleObject("full", session.trials, session.scoring.trialFlags, 400, 400, session, csvMeta, null, "");
+      const anon = anonymizeBundle(bundle);
+      const sr = anon.sessionResult as Record<string, unknown>;
+
+      expect(sr).toHaveProperty("id");
+      expect(sr).toHaveProperty("startedAt");
+      expect(sr).toHaveProperty("completedAt");
+      expect(sr).toHaveProperty("appVersion");
+      expect(sr.startedAt).toBe("");
+      expect(sr.completedAt).toBe("");
+      expect((sr.id as string).startsWith("anon_")).toBe(true);
     });
   });
 });

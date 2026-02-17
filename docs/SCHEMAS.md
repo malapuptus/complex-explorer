@@ -115,7 +115,7 @@ SHA-256( words.join("\n") )
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Session ID |
+| `id` | string | Session ID (or `anon_<fingerprint[0:12]>` when anonymized) |
 | `config` | SessionConfig | Full configuration including pack ID, version, order policy, seed |
 | `trials` | Trial[] | All scored trials (responses blanked in redacted mode) |
 | `scoring` | SessionScoring | `trialFlags` + `summary` (with mean/median RT, counts) |
@@ -124,8 +124,9 @@ SHA-256( words.join("\n") )
 | `provenanceSnapshot` | ProvenanceSnapshot\|null | Pack provenance at session time |
 | `sessionFingerprint` | string\|null | Deterministic SHA-256 fingerprint |
 | `scoringVersion` | string\|null | Scoring algorithm version |
-| `startedAt` | string | ISO-8601 session start time |
-| `completedAt` | string | ISO-8601 session end time |
+| `appVersion` | string\|null | Application version at time of session |
+| `startedAt` | string | ISO-8601 session start time (empty string when anonymized) |
+| `completedAt` | string | ISO-8601 session end time (empty string when anonymized) |
 
 ### `stimulusPackSnapshot` fields
 
@@ -166,21 +167,47 @@ All modes use `exportSchemaVersion: "rb_v3"`.
 
 A single JSON envelope containing all export artifacts for a session.
 
+### Top-level structure
+
 ```json
 {
   "packageVersion": "pkg_v1",
-  "packageHash": "SHA-256 hex digest of canonical package (excluding packageHash itself)",
+  "packageHash": "SHA-256 hex digest (64 chars)",
   "hashAlgorithm": "sha-256",
   "exportedAt": "ISO-8601 timestamp",
-  "bundle": { "rb_v3 Research Bundle object (privacy mode matches selector)" },
+  "bundle": { "rb_v3 Research Bundle object" },
   "csv": "full or redacted CSV string (matches privacy mode)",
   "csvRedacted": "redacted CSV string"
 }
 ```
 
+### Required top-level keys
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `packageVersion` | `"pkg_v1"` | Schema version |
+| `packageHash` | string | SHA-256 hex of canonical package (excluding `packageHash` itself) |
+| `hashAlgorithm` | `"sha-256"` | Hash algorithm used |
+| `exportedAt` | string | ISO-8601 export timestamp |
+| `bundle` | object | Complete rb_v3 Research Bundle |
+| `csv` | string | CSV export (full or redacted, matching privacy mode) |
+| `csvRedacted` | string | Redacted CSV export |
+
 ### Integrity verification
 
-The `packageHash` is computed over a canonical JSON of the package with `packageHash` removed and keys ordered: `packageVersion`, `hashAlgorithm`, `exportedAt`, `bundle`, `csv`, `csvRedacted`. Consumers can recompute and compare to detect tampering.
+The `packageHash` is computed as follows:
+1. Remove `packageHash` from the package object
+2. Serialize with stable key order: `packageVersion`, `hashAlgorithm`, `exportedAt`, `bundle`, `csv`, `csvRedacted`
+3. Compute SHA-256 hex digest of the canonical JSON string
+4. Compare against stored `packageHash`
+
+### Error codes
+
+| Code | Meaning |
+|------|---------|
+| `ERR_INTEGRITY_MISMATCH` | Computed hash does not match `packageHash`. File is corrupted or tampered. Import is blocked. |
+
+If the hash algorithm ever changes, it requires a schema version bump (e.g. `pkg_v2`) and migration support.
 
 ### Privacy mode integration (0229)
 
@@ -192,22 +219,26 @@ The privacy mode selector (Full / Minimal / Redacted) governs:
 
 When importing a `pkg_v1` file, the import flow runs `verifyPackageIntegrity()` before allowing the import to proceed. If the hash does not match, the import preview shows **"Integrity: FAIL — ERR_INTEGRITY_MISMATCH"** and the Import button is disabled. This prevents importing corrupted or tampered packages.
 
-### Anonymize identifiers (0235)
+### Anonymize identifiers (0235 + 0241)
 
 An "Anonymize identifiers" toggle (default OFF) governs all export outputs:
-- **session_id** → `"anon_session"`
+- **session_id** → `"anon_<sessionFingerprint[0:12]>"` (collision-safe; fallback: `"anon_<timestamp>"` if fingerprint missing)
 - **startedAt / completedAt / exportedAt** → `""` (empty string)
-- **sessionFingerprint** → preserved (needed for reproducibility verification)
+- **sessionFingerprint** → preserved (needed for reproducibility verification and as anonymized ID source)
 - **Hashes and scoring** → preserved unchanged
+- Importing multiple anonymized packages produces distinct session IDs (no overwrites)
 
-### Atomic saves (0236)
+### Atomic saves (0236 + 0242)
 
-All `localStorage.setItem()` calls for sessions and drafts use a staging-key → commit-key pattern:
+All `localStorage.setItem()` calls for sessions, drafts, and custom packs use a staging-key → commit-key pattern:
 1. Write to `<key>__staging`
 2. Write to `<key>` (commit)
 3. Remove `<key>__staging`
 
-On read, if `__staging` exists without a main key, the staging is discarded (incomplete write). If both exist, the main key is authoritative and staging is cleaned up.
+On read, if `__staging` exists without a main key, the staging is discarded (incomplete write). If both exist, the main key is authoritative and staging is cleaned up. This covers:
+- Session saves (`complex-mapper-sessions`)
+- Draft saves (`complex-mapper-draft`)
+- Custom pack saves (`complex-mapper-custom-packs`)
 
 ### Deterministic ordering (0228)
 

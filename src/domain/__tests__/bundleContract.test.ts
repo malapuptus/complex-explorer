@@ -92,6 +92,7 @@ describe("Bundle completeness contract", () => {
       stimulusOrder: session.stimulusOrder,
       seedUsed: session.seedUsed,
       scoringVersion: session.scoringVersion,
+      appVersion: session.appVersion ?? null,
       startedAt: session.startedAt,
       completedAt: session.completedAt,
     },
@@ -237,13 +238,17 @@ describe("Bundle completeness contract", () => {
     const requiredFields = [
       "id", "config", "trials", "scoring", "stimulusOrder",
       "seedUsed", "provenanceSnapshot", "sessionFingerprint",
-      "scoringVersion", "startedAt", "completedAt",
+      "scoringVersion", "appVersion", "startedAt", "completedAt",
     ];
     for (const field of requiredFields) {
       it(`sessionResult includes ${field}`, () => {
         expect(sr).toHaveProperty(field);
       });
     }
+
+    it("sessionResult.appVersion matches top-level appVersion", () => {
+      expect(sr.appVersion).toBe(bundle.appVersion);
+    });
 
     it("scoring includes summary", () => {
       expect(sr.scoring).toHaveProperty("summary");

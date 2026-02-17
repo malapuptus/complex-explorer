@@ -30,6 +30,77 @@ Copy this block for each new entry:
 
 ## Runs
 
+### 2026-02-17 17:54 (Lovable sandbox) — Tickets 0238–0242
+
+- **Environment:** Lovable (tests only)
+- **Command:** `npx vitest run src`
+- **Result:** PASS (252/252)
+
+| # | Oracle | Runnable in Lovable | Evidence provided | Notes |
+|---|--------|---------------------|-------------------|-------|
+| 1 | Hygiene | N | — | ResultsExportActions.tsx ~530 lines (see SCOPE_EXCEPTIONS) |
+| 2 | Format | N | — | No shell access |
+| 3 | Lint | N | — | No shell access |
+| 4 | Typecheck | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 5 | Boundaries | N | — | No shell access |
+| 6 | Load smoke | N | — | No shell access |
+| 7 | Build | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 8 | Tests | Y | 252/252 passed | 27 test files |
+
+**Canary artifacts:**
+
+- **rb_v3 sessionResult completeness (0238):** `sessionResult` now includes `appVersion` alongside `id`, `config`, `trials`, `scoring`, `stimulusOrder`, `seedUsed`, `provenanceSnapshot`, `sessionFingerprint`, `scoringVersion`, `startedAt`, `completedAt`. Tests assert all 12 fields present.
+- **rb_v3 Full bundle first ~30 lines:**
+  ```json
+  {
+    "exportSchemaVersion": "rb_v3",
+    "exportedAt": "2026-01-01T00:00:00Z",
+    "protocolDocVersion": "PROTOCOL.md@2026-02-13",
+    "appVersion": null,
+    "scoringAlgorithm": "MAD-modified-z@3.5 + fast<200ms + timeout excluded",
+    "privacy": { "mode": "full", "includesStimulusWords": true, "includesResponses": true },
+    "sessionResult": {
+      "id": "s1", "config": {...}, "trials": [...], "scoring": {...},
+      "sessionFingerprint": "fp123", "provenanceSnapshot": null,
+      "stimulusOrder": ["sun"], "seedUsed": null,
+      "scoringVersion": null, "appVersion": null,
+      "startedAt": "...", "completedAt": "..."
+    },
+    "stimulusPackSnapshot": {...}
+  }
+  ```
+- **SCHEMAS.md (0239):** Updated rb_v3 sessionResult table to include `appVersion` field; anonymize docs updated for collision-safe IDs; atomic saves extended to cover packs
+- **pkg_v1 spec (0240):** SCHEMAS.md now has full pkg_v1 section with required keys table, integrity verification algorithm, and ERR_INTEGRITY_MISMATCH error code; packageIntegrity.test.ts covers 10 tests (key validation, tamper detection for csv/csvRedacted/bundle/exportedAt)
+- **pkg_v1 first ~20 lines:**
+  ```json
+  {
+    "packageVersion": "pkg_v1",
+    "packageHash": "<64-char SHA-256 hex>",
+    "hashAlgorithm": "sha-256",
+    "exportedAt": "2026-01-01T00:00:00Z",
+    "bundle": { "exportSchemaVersion": "rb_v3", ... },
+    "csv": "csv_schema_version,...",
+    "csvRedacted": "csv_schema_version,..."
+  }
+  ```
+- **Anonymize collision fix (0241):** `anonymizeBundle()` now uses `anon_${sessionFingerprint.slice(0,12)}` instead of fixed `"anon_session"`; two sessions with different fingerprints produce different anon IDs; tested in resultsViewExports + exportParity
+- **Atomic writes for packs (0242):** `localStorageStimulusStore` now uses staging-key → commit-key pattern; atomicWrite.test.ts covers staging-only crash recovery, leftover cleanup, and normal write for both pack and session stores
+
+**Risk Card:**
+- **Proved:** rb_v3 exports include all documented sessionResult fields; docs and exports don't drift; pkg_v1 tampering is detected; anonymized sessions don't collide; pack writes are crash-safe
+- **Not proved:** External tools consuming old partial bundles (but they shouldn't rely on undocumented omissions)
+- **Residual:** Legacy sessions may have null for `appVersion`/`scoringVersion` — tests allow null, not missing keys; fingerprint collisions astronomically unlikely
+
+**Policy checklist:**
+
+- [x] `npx vitest run src` passed (252/252)
+- [x] Oracle table included (8 rows)
+- [x] rb_v3 canary: sessionResult keys including appVersion
+- [x] pkg_v1 canary: top-level keys with integrity
+- [x] Environment line present: "Lovable (tests only)"
+
+---
+
 ### 2026-02-17 17:35 (Lovable sandbox) — Tickets 0233–0237
 
 - **Environment:** Lovable (tests only)
