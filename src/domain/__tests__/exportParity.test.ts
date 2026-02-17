@@ -122,6 +122,7 @@ describe("Export parity", () => {
       "exportSchemaVersion",
       "exportedAt",
       "stimulusPackSnapshot",
+      "privacy",
     ] as const;
 
     it("required keys are defined in the contract", () => {
@@ -135,6 +136,7 @@ describe("Export parity", () => {
         stimulusPackSnapshot: {
           stimulusListHash: null, stimulusSchemaVersion: null, provenance: null, words: ["test"],
         },
+        privacy: { mode: "full", includesStimulusWords: true, includesResponses: true },
       };
 
       for (const key of REQUIRED_BUNDLE_KEYS) {
@@ -154,6 +156,7 @@ describe("Export parity", () => {
         stimulusPackSnapshot: {
           stimulusListHash: null, stimulusSchemaVersion: null, provenance: null, words: ["w"],
         },
+        privacy: { mode: "full", includesStimulusWords: true, includesResponses: true },
       };
       expect(bundle).toHaveProperty("appVersion");
       expect(bundle.appVersion).toBeTruthy();
@@ -170,6 +173,7 @@ describe("Export parity", () => {
         stimulusPackSnapshot: {
           stimulusListHash: null, stimulusSchemaVersion: null, provenance: null, words: ["w"],
         },
+        privacy: { mode: "full", includesStimulusWords: true, includesResponses: true },
       };
       expect(bundle.exportSchemaVersion).toBe("rb_v3");
     });
@@ -188,8 +192,16 @@ describe("Export parity", () => {
             sourceName: "S", sourceYear: "2026", sourceCitation: "c", licenseNote: "l", wordCount: 1 },
           words: ["alpha", "beta"],
         },
+        privacy: { mode: "full", includesStimulusWords: true, includesResponses: true },
       };
       expect(bundle.stimulusPackSnapshot.words).toEqual(["alpha", "beta"]);
+    });
+
+    it("privacy manifest present and valid for full mode", () => {
+      const bundle = {
+        privacy: { mode: "full", includesStimulusWords: true, includesResponses: true },
+      };
+      expect(bundle.privacy.mode).toBe("full");
     });
   });
 });

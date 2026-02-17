@@ -30,7 +30,42 @@ Copy this block for each new entry:
 
 ## Runs
 
-### 2026-02-17 16:34 (Lovable sandbox) — Tickets 0213–0217
+### 2026-02-17 17:14 (Lovable sandbox) — Tickets 0223–0227
+
+- **Environment:** Lovable (tests only)
+- **Command:** `npx vitest run src`
+- **Result:** PASS (218/218)
+
+| # | Oracle | Runnable in Lovable | Evidence provided | Notes |
+|---|--------|---------------------|-------------------|-------|
+| 1 | Hygiene | N | — | ResultsExportActions.tsx under 350 lines ✓ |
+| 2 | Format | N | — | No shell access |
+| 3 | Lint | N | — | No shell access |
+| 4 | Typecheck | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 5 | Boundaries | N | — | No shell access |
+| 6 | Load smoke | N | — | No shell access |
+| 7 | Build | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 8 | Tests | Y | 218/218 passed | 23 test files |
+
+**Canary artifacts:**
+
+- **Privacy manifest (0223):** `{ "privacy": { "mode": "full", "includesStimulusWords": true, "includesResponses": true } }` — embedded in every bundle; UI shows 1-line summary per button
+- **Redacted bundle (0224):** `trials[].association.response = ""`, `privacy.mode = "redacted"`, `privacy.includesResponses = false`; timing/flags preserved
+- **Quota exceeded (0225):** DemoSession catches `QuotaExceededError` on draft save and session save; shows deterministic alert with recovery actions
+- **Schema compat harness (0226):** schemaCompat.test.ts covers sp_v1, rb_v2, rb_v3 full/minimal/redacted fixtures; JSON round-trip stability verified
+- **Session package (0227):** `{ "packageVersion": "pkg_v1", "bundle": <rb_v3>, "csv": "...", "csvRedacted": "...", "exportedAt": "..." }`
+
+**Policy checklist:**
+
+- [x] `npx vitest run src` passed (218/218)
+- [x] Oracle table included (8 rows)
+- [x] CSV canary: header present
+- [x] Bundle canary: rb_v3 + privacy manifest
+- [x] Environment line present: "Lovable (tests only)"
+
+---
+
+
 
 - **Environment:** Lovable (tests only)
 - **Command:** `npx vitest run src`

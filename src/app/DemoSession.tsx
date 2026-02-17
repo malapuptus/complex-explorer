@@ -75,7 +75,13 @@ export function DemoSession() {
       trialTimeoutMs: session.trialTimeoutMs,
       breakEveryN,
     };
-    localStorageSessionStore.saveDraft(draft);
+    try {
+      localStorageSessionStore.saveDraft(draft);
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "QuotaExceededError") {
+        alert("Storage full — draft could not be saved. Export your data and delete old sessions or orphan packs to free space.");
+      }
+    }
     localStorageSessionStore.acquireDraftLock(tabIdRef.current);
   }, [
     session.phase, session.trials, session.currentIndex,
@@ -132,7 +138,13 @@ export function DemoSession() {
         appVersion: appVer,
         stimulusPackSnapshot: packSnapshot,
       };
-      localStorageSessionStore.save(result);
+      try {
+        await localStorageSessionStore.save(result);
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "QuotaExceededError") {
+          alert("Storage full — session could not be saved. Export the bundle below, then delete old sessions or orphan packs to free space.");
+        }
+      }
       setSessionFingerprint(fingerprint);
     })();
   }, [

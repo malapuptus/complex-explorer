@@ -104,6 +104,7 @@ describe("Bundle completeness contract", () => {
       ...session.stimulusPackSnapshot,
       words: session.stimulusOrder,
     },
+    privacy: { mode: "full" as const, includesStimulusWords: true, includesResponses: true },
   };
 
   describe("top-level bundle keys", () => {
@@ -115,6 +116,7 @@ describe("Bundle completeness contract", () => {
       "exportedAt",
       "sessionResult",
       "stimulusPackSnapshot",
+      "privacy",
     ];
     for (const key of required) {
       it(`includes ${key}`, () => {
@@ -151,8 +153,8 @@ describe("Bundle completeness contract", () => {
         stimulusListHash: session.stimulusPackSnapshot!.stimulusListHash,
         stimulusSchemaVersion: session.stimulusPackSnapshot!.stimulusSchemaVersion,
         provenance: session.stimulusPackSnapshot!.provenance,
-        // No words array
       },
+      privacy: { mode: "minimal" as const, includesStimulusWords: false, includesResponses: true },
     };
 
     it("minimal bundle has no words", () => {
@@ -165,13 +167,59 @@ describe("Bundle completeness contract", () => {
       expect(minimalBundle.stimulusPackSnapshot.provenance).toBeDefined();
     });
 
-    it("minimal bundle has all required top-level keys", () => {
-      const required = ["exportSchemaVersion", "appVersion", "protocolDocVersion",
-        "scoringAlgorithm", "exportedAt", "sessionResult", "stimulusPackSnapshot"];
-      for (const key of required) {
-        expect(minimalBundle).toHaveProperty(key);
+    it("privacy manifest is correct for minimal", () => {
+      expect(minimalBundle.privacy.mode).toBe("minimal");
+      expect(minimalBundle.privacy.includesStimulusWords).toBe(false);
+      expect(minimalBundle.privacy.includesResponses).toBe(true);
+    });
+  });
+
+  describe("Redacted bundle mode", () => {
+    const redactedBundle = {
+      sessionResult: {
+        ...bundle.sessionResult,
+        trials: session.trials.map((t) => ({
+          ...t, association: { ...t.association, response: "" },
+        })),
+      },
+      protocolDocVersion: bundle.protocolDocVersion,
+      appVersion: bundle.appVersion,
+      scoringAlgorithm: bundle.scoringAlgorithm,
+      exportSchemaVersion: "rb_v3",
+      exportedAt: bundle.exportedAt,
+      stimulusPackSnapshot: {
+        stimulusListHash: session.stimulusPackSnapshot!.stimulusListHash,
+        stimulusSchemaVersion: session.stimulusPackSnapshot!.stimulusSchemaVersion,
+        provenance: session.stimulusPackSnapshot!.provenance,
+      },
+      privacy: { mode: "redacted" as const, includesStimulusWords: false, includesResponses: false },
+    };
+
+    it("responses are blanked", () => {
+      for (const t of redactedBundle.sessionResult.trials) {
+        expect(t.association.response).toBe("");
       }
     });
+
+    it("timing data is preserved", () => {
+      expect(redactedBundle.sessionResult.trials[0].association.reactionTimeMs).toBe(400);
+    });
+
+    it("privacy manifest is correct for redacted", () => {
+      expect(redactedBundle.privacy.mode).toBe("redacted");
+      expect(redactedBundle.privacy.includesStimulusWords).toBe(false);
+      expect(redactedBundle.privacy.includesResponses).toBe(false);
+    });
+
+    it("hashes are preserved", () => {
+      expect(redactedBundle.stimulusPackSnapshot.stimulusListHash).toBeTruthy();
+    });
+  });
+
+  it("privacy manifest for full bundle is correct", () => {
+    expect(bundle.privacy.mode).toBe("full");
+    expect(bundle.privacy.includesStimulusWords).toBe(true);
+    expect(bundle.privacy.includesResponses).toBe(true);
   });
 
 
