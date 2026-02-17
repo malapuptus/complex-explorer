@@ -51,6 +51,16 @@ Vite tree-shakes differently from `tsc`. Check for side-effect imports or Node-o
 - **macOS / Linux:** `bash tools/verify` works (delegates to `verify.mjs`).
 - **Windows:** Use `node tools/verify.mjs` directly (the bash wrapper may not work without WSL/Git Bash).
 
+## Proxy verify (Lovable / restricted environments)
+
+When `node tools/verify.mjs` is unavailable (e.g. Lovable sandbox), use the proxy runner:
+
+```sh
+node tools/verify-proxy.mjs
+```
+
+This attempts all 8 oracles, catching "command unavailable" errors and printing a summary table with PASS/SKIP/FAIL per oracle. In Lovable, only Oracle 8 (tests via `npx vitest run`) is expected to run; the rest will show SKIP.
+
 ## Canary mode
 
 To prove the boundary oracle actually catches violations:

@@ -5,6 +5,8 @@ import type { Trial, TrialFlag } from "../types";
 /**
  * Export parity regression test — locks CSV header and Research Bundle
  * structure so refactors can't silently drift exports.
+ * Tolerant to additive schema changes: new columns are allowed as long
+ * as required columns exist in expected relative order.
  */
 
 function makeTrial(word: string, index: number): Trial {
@@ -22,6 +24,27 @@ function makeTrial(word: string, index: number): Trial {
   };
 }
 
+/** Required CSV columns in expected relative order. */
+const REQUIRED_CSV_COLUMNS = [
+  "session_id",
+  "session_fingerprint",
+  "scoring_version",
+  "pack_id",
+  "pack_version",
+  "seed",
+  "order_index",
+  "word",
+  "warmup",
+  "response",
+  "t_first_input_ms",
+  "t_submit_ms",
+  "backspaces",
+  "edits",
+  "compositions",
+  "timed_out",
+  "flags",
+] as const;
+
 describe("Export parity", () => {
   const trials: Trial[] = [makeTrial("tree", 0), makeTrial("house", 1)];
   const flags: TrialFlag[] = [
@@ -32,23 +55,29 @@ describe("Export parity", () => {
   describe("CSV header", () => {
     const csv = sessionTrialsToCsv(trials, flags, "s1", "demo-10", "1.0.0", 42, "fp123", "sv1");
     const header = csv.split("\n")[0];
+    const columns = header.split(",");
 
-    it("contains scoring_version column", () => {
-      expect(header).toContain("scoring_version");
+    it("contains all required columns", () => {
+      for (const col of REQUIRED_CSV_COLUMNS) {
+        expect(columns).toContain(col);
+      }
     });
 
-    it("contains session_fingerprint column", () => {
-      expect(header).toContain("session_fingerprint");
+    it("required columns appear in expected relative order", () => {
+      let lastIndex = -1;
+      for (const col of REQUIRED_CSV_COLUMNS) {
+        const idx = columns.indexOf(col);
+        expect(idx).toBeGreaterThan(lastIndex);
+        lastIndex = idx;
+      }
     });
 
-    it("has exactly 17 columns", () => {
-      expect(header.split(",")).toHaveLength(17);
+    it("has at least the required number of columns", () => {
+      expect(columns.length).toBeGreaterThanOrEqual(REQUIRED_CSV_COLUMNS.length);
     });
   });
 
   describe("Research Bundle structure", () => {
-    // The bundle is constructed in ResultsView.tsx — we test the contract here
-    // by verifying the required top-level keys.
     const REQUIRED_BUNDLE_KEYS = [
       "sessionResult",
       "protocolDocVersion",
@@ -57,12 +86,10 @@ describe("Export parity", () => {
     ] as const;
 
     it("required keys are defined in the contract", () => {
-      // This test locks the expected shape. If the interface changes,
-      // this test must be updated intentionally.
       const bundle = {
         sessionResult: {},
         protocolDocVersion: "PROTOCOL.md@2026-02-13",
-        appVersion: null,
+        appVersion: "0.0.0",
         scoringAlgorithm: "MAD-modified-z@3.5 + fast<200ms + timeout excluded",
         exportedAt: new Date().toISOString(),
       };
@@ -82,6 +109,7 @@ describe("Export parity", () => {
         exportedAt: "2026-01-01",
       };
       expect(bundle).toHaveProperty("appVersion");
+      expect(bundle.appVersion).toBeTruthy();
     });
   });
 });
