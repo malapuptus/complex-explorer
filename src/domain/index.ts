@@ -56,3 +56,6 @@ export {
   getCompositions,
   getFirstKeyMs,
 } from "./trialFields";
+
+export type { CiCode } from "./ciCodes";
+export { computeCiCodesForTrial, aggregateCiCounts, CI_CODE_ORDER, CI_CODE_LABELS } from "./ciCodes";

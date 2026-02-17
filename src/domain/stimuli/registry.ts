@@ -163,12 +163,50 @@ const KENT_ROSANOFF_1910_V1: StimulusList = {
   ],
 };
 
+// ── Practice-100 ─────────────────────────────────────────────────────
+
+/**
+ * Practice-100 — 100-word clinician-provided stimulus list.
+ * Not derived from any published clinical instrument.
+ * For practice / piloting use only (not clinically validated).
+ *
+ * Ticket 0276. Source: internal clinician-provided spreadsheet.
+ */
+const PRACTICE_100_V1: StimulusList = {
+  id: "practice-100",
+  version: "1.0.0",
+  language: "en",
+  source: "Clinician-provided list (not clinically validated)",
+  provenance: {
+    sourceName: "Complex Mapper Project (clinician-provided)",
+    sourceYear: "2025",
+    sourceCitation:
+      "Internal clinician-provided word list — not derived from any clinical instrument.",
+    licenseNote: "Project-internal; not for clinical use.",
+  },
+  words: [
+    "head", "green", "water", "sing", "dead", "long", "ship", "pay", "window",
+    "friendly", "ask", "cold", "stem", "dance", "village", "lake", "sick",
+    "pride", "cook", "ink", "angry", "needle", "swim", "travel", "blue", "lamp",
+    "sin", "bread", "rich", "tree", "pencil", "sleep", "spite", "hold", "flower",
+    "injustice", "mountain", "salt", "new", "habit", "mouse", "courage",
+    "shallow", "child", "method", "white", "fear", "paper", "distress", "soul",
+    "crush", "family", "worry", "queen", "kiss", "fight", "laugh", "honor",
+    "doubt", "woman", "thief", "joy", "patient", "success", "prayer", "book",
+    "despise", "afraid", "king", "music", "love", "danger", "doctor", "praise",
+    "wound", "fire", "obey", "money", "song", "high", "glass", "cow", "illness",
+    "command", "hatred", "hair", "shame", "heavy", "black", "work", "stupid",
+    "country", "part", "truth", "pin",
+  ],
+};
+
 // ── Registry ─────────────────────────────────────────────────────────
 
 /** All known stimulus lists, keyed by `${id}@${version}`. */
 const REGISTRY: ReadonlyMap<string, StimulusList> = new Map([
   [key(DEMO_LIST_V1), DEMO_LIST_V1],
   [key(KENT_ROSANOFF_1910_V1), KENT_ROSANOFF_1910_V1],
+  [key(PRACTICE_100_V1), PRACTICE_100_V1],
 ]);
 
 function key(list: StimulusList): string {

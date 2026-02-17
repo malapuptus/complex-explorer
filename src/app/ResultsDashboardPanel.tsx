@@ -9,12 +9,16 @@ import type { SessionInsights, SessionContext, SessionInsights as SI } from "@/d
 import { computeQualityIndex, getMicroGoal } from "@/domain";
 import { RtTimeline, RtHistogram, FlagBreakdownChart, ResponseClusters } from "./ResultsCharts";
 import { TrialDetailPanel } from "./TrialDetailPanel";
+import { CiBreakdownChart } from "./CiBreakdownChart";
+
 
 interface Props {
   insights: SessionInsights;
   sessionContext?: SessionContext | null;
   /** 0274: Baseline insights for overlay markers */
   baselineInsights?: SI | null;
+  /** 0279: Session ID for annotation persistence */
+  sessionId?: string;
 }
 
 function StatRow({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
@@ -37,7 +41,7 @@ function DashCard({ title, children }: { title: string; children: React.ReactNod
   );
 }
 
-export function ResultsDashboardPanel({ insights, sessionContext, baselineInsights }: Props) {
+export function ResultsDashboardPanel({ insights, sessionContext, baselineInsights, sessionId }: Props) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
   const deviceLabel = useMemo(() => {
@@ -120,7 +124,7 @@ export function ResultsDashboardPanel({ insights, sessionContext, baselineInsigh
         />
       </div>
 
-      {/* 0272: Session Patterns */}
+      {/* 0272 + 0278: Session Patterns */}
       <div data-testid="session-patterns-heading" className="space-y-3">
         <p className="text-xs font-semibold text-muted-foreground">Session Patterns</p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -133,7 +137,15 @@ export function ResultsDashboardPanel({ insights, sessionContext, baselineInsigh
             <ResponseClusters clusters={insights.responseClusters} />
           </div>
         </div>
+        {/* 0278: CI Breakdown */}
+        {Object.keys(insights.ciCounts).length > 0 && (
+          <div>
+            <p className="mb-1.5 text-[11px] text-muted-foreground">CI Code Breakdown</p>
+            <CiBreakdownChart counts={insights.ciCounts} />
+          </div>
+        )}
       </div>
+
 
       {/* Anomalies */}
       {insights.topSlowTrials.length > 0 && (
@@ -159,6 +171,7 @@ export function ResultsDashboardPanel({ insights, sessionContext, baselineInsigh
       <TrialDetailPanel
         trialRef={selectedRef}
         onClose={() => setSelectedIdx(null)}
+        sessionId={sessionId}
       />
     </div>
   );
