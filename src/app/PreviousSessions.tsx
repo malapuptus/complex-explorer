@@ -100,6 +100,7 @@ export function PreviousSessions() {
             orderPolicy: selected.config.orderPolicy,
             trialTimeoutMs: selected.config.trialTimeoutMs,
             breakEveryN: selected.config.breakEveryN,
+            stimulusListHash: selected.stimulusPackSnapshot?.stimulusListHash ?? null,
           }}
         />
       </div>

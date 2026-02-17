@@ -65,6 +65,15 @@ function makeFullSession(): SessionResult {
     sessionFingerprint: "abc123",
     scoringVersion: "scoring_v2_mad_3.5",
     appVersion: "1.0.0",
+    stimulusPackSnapshot: {
+      stimulusListHash: "abc123hash",
+      stimulusSchemaVersion: "sp_v1",
+      provenance: {
+        listId: "demo-10", listVersion: "1.0.0", language: "en",
+        source: "test", sourceName: "Test", sourceYear: "2026",
+        sourceCitation: "Test citation", licenseNote: "Test license", wordCount: 1,
+      },
+    },
   };
 }
 
@@ -91,8 +100,9 @@ describe("Bundle completeness contract", () => {
     scoringAlgorithm: "MAD-modified-z@3.5 + fast<200ms + timeout excluded",
     exportSchemaVersion: "rb_v2",
     exportedAt: new Date().toISOString(),
-    stimulusPackSnapshot: {
+    stimulusPackSnapshot: session.stimulusPackSnapshot ?? {
       stimulusListHash: "abc123hash",
+      stimulusSchemaVersion: "sp_v1",
       provenance: session.provenanceSnapshot,
     },
   };
@@ -119,10 +129,12 @@ describe("Bundle completeness contract", () => {
     expect(bundle.exportSchemaVersion).toBe("rb_v2");
   });
 
-  it("stimulusPackSnapshot has hash and provenance", () => {
+  it("stimulusPackSnapshot has hash, schema version, and provenance", () => {
     expect(bundle.stimulusPackSnapshot).toHaveProperty("stimulusListHash");
+    expect(bundle.stimulusPackSnapshot).toHaveProperty("stimulusSchemaVersion");
     expect(bundle.stimulusPackSnapshot).toHaveProperty("provenance");
     expect(bundle.stimulusPackSnapshot.provenance).toHaveProperty("listId");
+    expect(bundle.stimulusPackSnapshot.stimulusSchemaVersion).toBe("sp_v1");
   });
 
   describe("sessionResult completeness", () => {

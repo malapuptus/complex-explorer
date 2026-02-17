@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useState } from "react";
-import type { Trial, TrialFlag, OrderPolicy, SessionScoring, SessionResult } from "@/domain";
+import type { Trial, TrialFlag, OrderPolicy, SessionScoring, SessionResult, StimulusPackSnapshot } from "@/domain";
 import { generateReflectionPrompts, sessionTrialsToCsv } from "@/domain";
 import { SessionSummaryCard } from "./SessionSummaryCard";
 
@@ -13,10 +13,7 @@ interface ResearchBundle {
   scoringAlgorithm: string;
   exportSchemaVersion: string;
   exportedAt: string;
-  stimulusPackSnapshot?: {
-    stimulusListHash: string | null;
-    provenance: unknown;
-  };
+  stimulusPackSnapshot?: StimulusPackSnapshot | null;
 }
 
 const EXPORT_SCHEMA_VERSION = "rb_v2";
@@ -80,6 +77,19 @@ export function ResultsView({
     [trials, trialFlags],
   );
 
+  // Prefer persisted snapshot from sessionResult; fall back to csvMeta hash
+  const persistedSnapshot: StimulusPackSnapshot | null = useMemo(() => {
+    if (sessionResult?.stimulusPackSnapshot) return sessionResult.stimulusPackSnapshot;
+    if (csvMeta?.stimulusListHash) {
+      return {
+        stimulusListHash: csvMeta.stimulusListHash,
+        stimulusSchemaVersion: null,
+        provenance: sessionResult?.provenanceSnapshot ?? null,
+      };
+    }
+    return null;
+  }, [sessionResult, csvMeta]);
+
   const reproBundle = useMemo(() => {
     if (!csvMeta) return null;
     const lines = [
@@ -124,6 +134,14 @@ export function ResultsView({
             <dd className="font-mono text-foreground">
               {sessionResult?.appVersion ?? APP_VERSION ?? "unknown (legacy)"}
             </dd>
+            {persistedSnapshot && (
+              <>
+                <dt className="text-muted-foreground">Pack hash</dt>
+                <dd className="font-mono text-foreground break-all">{persistedSnapshot.stimulusListHash ?? "n/a"}</dd>
+                <dt className="text-muted-foreground">Pack schema</dt>
+                <dd className="font-mono text-foreground">{persistedSnapshot.stimulusSchemaVersion ?? "n/a"}</dd>
+              </>
+            )}
             {csvMeta.trialTimeoutMs !== undefined && (
               <><dt className="text-muted-foreground">Timeout</dt><dd className="text-foreground">{csvMeta.trialTimeoutMs}ms</dd></>
             )}
@@ -237,8 +255,9 @@ export function ResultsView({
                       trials, scoring: { trialFlags, summary: { meanReactionTimeMs, medianReactionTimeMs } },
                       sessionFingerprint: csvMeta.sessionFingerprint ?? null,
                     };
-                const packSnapshot = {
+                const packSnapshot = persistedSnapshot ?? {
                   stimulusListHash: csvMeta.stimulusListHash ?? null,
+                  stimulusSchemaVersion: null,
                   provenance: sessionResult?.provenanceSnapshot ?? null,
                 };
                 const bundle: ResearchBundle = {
@@ -260,6 +279,18 @@ export function ResultsView({
             >
               Export Research Bundle
             </button>
+            {persistedSnapshot && (
+              <button
+                onClick={() => {
+                  const snapshotJson = JSON.stringify(persistedSnapshot, null, 2);
+                  const packId = csvMeta.packId ?? "unknown";
+                  downloadFile(snapshotJson, "application/json", `pack-snapshot-${packId}.json`);
+                }}
+                className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+              >
+                Export Pack Snapshot
+              </button>
+            )}
           </>
         )}
         <button onClick={onReset} className="rounded-md bg-primary px-6 py-2 text-primary-foreground hover:opacity-90">

@@ -76,6 +76,7 @@ function migrateSessionToV3(raw: Record<string, unknown>): SessionResult {
     sessionFingerprint: (raw.sessionFingerprint as string | null) ?? null,
     scoringVersion: (raw.scoringVersion as string | null) ?? null,
     appVersion: (raw.appVersion as string | null) ?? null,
+    stimulusPackSnapshot: (raw.stimulusPackSnapshot as SessionResult["stimulusPackSnapshot"]) ?? null,
   };
 }
 

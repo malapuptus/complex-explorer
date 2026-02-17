@@ -8,7 +8,7 @@ import type { Trial, TrialFlag, OrderPolicy, SessionResult } from "@/domain";
 declare const __APP_VERSION__: string;
 
 const SCORING_VERSION = "scoring_v2_mad_3.5";
-const EXPORT_SCHEMA_VERSION = "rb_v1";
+const EXPORT_SCHEMA_VERSION = "rb_v2";
 const APP_VERSION: string | null =
   typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : null;
 

@@ -30,6 +30,43 @@ Copy this block for each new entry:
 
 ## Runs
 
+### 2026-02-17 16:02 (Lovable sandbox) — Tickets 0203–0207
+
+- **Environment:** Lovable (tests only)
+- **Command:** `npx vitest run src`
+- **Result:** PASS (160/160)
+
+| # | Oracle | Runnable in Lovable | Evidence provided | Notes |
+|---|--------|---------------------|-------------------|-------|
+| 1 | Hygiene | N | — | DemoSession.tsx 293 lines (under 350 ✓) |
+| 2 | Format | N | — | No shell access |
+| 3 | Lint | N | — | No shell access |
+| 4 | Typecheck | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 5 | Boundaries | N | — | No shell access |
+| 6 | Load smoke | N | — | No shell access |
+| 7 | Build | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 8 | Tests | Y | 160/160 passed | 19 test files |
+
+**Canary artifacts:**
+
+- **stimulusPackSnapshot persistence:** sessionPersistence.test.ts — 8/8 passed (round-trip + legacy→null migration)
+- **Deletion safety:** customPackDeletionSafety.test.ts — 2/2 passed (snapshot survives pack deletion; exported bundle includes snapshot after deletion)
+- **Bundle canary (rb_v2 with snapshot):** `{ "sessionResult": {...}, "protocolDocVersion": "PROTOCOL.md@2026-02-13", "appVersion": "1.0.0", "scoringAlgorithm": "MAD-modified-z@3.5 + fast<200ms + timeout excluded", "exportSchemaVersion": "rb_v2", "exportedAt": "...", "stimulusPackSnapshot": { "stimulusListHash": "abc123hash", "stimulusSchemaVersion": "sp_v1", "provenance": { "listId": "demo-10", ... } } }`
+- **CSV header:** `csv_schema_version,session_id,session_fingerprint,scoring_version,pack_id,pack_version,seed,order_index,word,warmup,response,t_first_input_ms,t_submit_ms,backspaces,edits,compositions,timed_out,flags`
+- **Schema docs:** docs/SCHEMAS.md created with sp_v1, csv_v1, rb_v2 definitions + version bump rules
+- **Custom pack deleted, historical export still includes snapshot hash:** ✓ (customPackDeletionSafety.test.ts)
+
+**Policy checklist:**
+
+- [x] `npx vitest run src` passed (160/160)
+- [x] Oracle table included (8 rows)
+- [x] CSV canary: header present
+- [x] Bundle canary: snippet with rb_v2 + stimulusPackSnapshot (including stimulusSchemaVersion)
+- [x] Break canary: test output (9/9)
+- [x] Environment line present: "Lovable (tests only)"
+
+---
+
 ### 2026-02-17 11:46 (Lovable sandbox) — Tickets 0198–0202
 
 - **Environment:** Lovable (tests only)

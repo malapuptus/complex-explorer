@@ -76,6 +76,18 @@ export interface SessionResult {
   readonly scoringVersion?: string | null;
   /** App version at time of session (null for legacy sessions). */
   readonly appVersion?: string | null;
+  /** Snapshot of the stimulus pack used (hash + provenance + schema version). Null for legacy. */
+  readonly stimulusPackSnapshot?: StimulusPackSnapshot | null;
+}
+
+/** Frozen snapshot of stimulus pack metadata for reproducibility. */
+export interface StimulusPackSnapshot {
+  /** SHA-256 hash of canonical word list. */
+  readonly stimulusListHash: string | null;
+  /** Schema version of the pack format (e.g. "sp_v1"). */
+  readonly stimulusSchemaVersion: string | null;
+  /** Provenance metadata at time of session. */
+  readonly provenance: ProvenanceSnapshot | null;
 }
 
 /** Frozen copy of stimulus pack metadata at time of session. */

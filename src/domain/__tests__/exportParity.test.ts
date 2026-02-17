@@ -102,7 +102,7 @@ describe("Export parity", () => {
         scoringAlgorithm: "MAD-modified-z@3.5 + fast<200ms + timeout excluded",
         exportSchemaVersion: "rb_v2",
         exportedAt: new Date().toISOString(),
-        stimulusPackSnapshot: { stimulusListHash: null, provenance: null },
+        stimulusPackSnapshot: { stimulusListHash: null, stimulusSchemaVersion: null, provenance: null },
       };
 
       for (const key of REQUIRED_BUNDLE_KEYS) {
@@ -119,7 +119,7 @@ describe("Export parity", () => {
         scoringAlgorithm: "test",
         exportSchemaVersion: "rb_v2",
         exportedAt: "2026-01-01",
-        stimulusPackSnapshot: { stimulusListHash: null, provenance: null },
+        stimulusPackSnapshot: { stimulusListHash: null, stimulusSchemaVersion: null, provenance: null },
       };
       expect(bundle).toHaveProperty("appVersion");
       expect(bundle.appVersion).toBeTruthy();
@@ -133,7 +133,7 @@ describe("Export parity", () => {
         scoringAlgorithm: "test",
         exportSchemaVersion: "rb_v2",
         exportedAt: "2026-01-01",
-        stimulusPackSnapshot: { stimulusListHash: null, provenance: null },
+        stimulusPackSnapshot: { stimulusListHash: null, stimulusSchemaVersion: null, provenance: null },
       };
       expect(bundle.exportSchemaVersion).toBe("rb_v2");
     });
