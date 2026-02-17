@@ -150,14 +150,17 @@ export function PreviousSessions() {
                       {entry.totalTrials} trials &middot;{" "}
                       {new Date(entry.completedAt).toLocaleString()}
                     </span>
-                    {/* 0246: importedFrom detail row */}
-                    {isImported && (entry as unknown as { importedFrom?: { packageVersion: string; packageHash: string } | null }).importedFrom && (
-                      <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                        Imported from{" "}
-                        {(entry as unknown as { importedFrom: { packageVersion: string; packageHash: string } }).importedFrom.packageVersion}{" "}
-                        (hash: {(entry as unknown as { importedFrom: { packageVersion: string; packageHash: string } }).importedFrom.packageHash.slice(0, 8)}…)
-                      </span>
-                    )}
+                    {/* 0246 + 0252: importedFrom detail row */}
+                    {isImported && (() => {
+                      const imp = (entry as unknown as { importedFrom?: { packageVersion: string; packageHash: string; originalSessionId?: string } | null }).importedFrom;
+                      if (!imp) return null;
+                      return (
+                        <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                          Imported from {imp.packageVersion} (hash: {imp.packageHash.slice(0, 8)}…
+                          {imp.originalSessionId ? `, original: ${imp.originalSessionId.slice(0, 8)}…` : ""})
+                        </span>
+                      );
+                    })()}
                   </button>
                 </li>
               );

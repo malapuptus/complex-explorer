@@ -1,142 +1,19 @@
 /**
- * ImportPreviewPanel — extracted from ProtocolScreen (0244).
- * Renders import preview metadata, integrity diagnostics, and action buttons.
- * Tickets: 0244 (extract + diagnostics), 0245 (Extract Pack), 0248 (Available actions).
+ * ImportPreviewPanel — render-only component for import previews.
+ * Pure logic lives in importPreviewModel.ts (Ticket 0250).
+ * Tickets: 0244 (diagnostics), 0245 (Extract Pack), 0248 (Available actions),
+ *          0251 (clipboard fallback), 0253 (SSoT gating via getAvailableActions).
  */
 
-import type { StimulusList } from "@/domain";
-import type { SessionResult } from "@/domain";
+import { useState } from "react";
+import type { ImportPreview } from "./importPreviewModel";
+import { formatKB, getAvailableActions } from "./importPreviewModel";
 
-// ── Types ────────────────────────────────────────────────────────────
-
-/** Detected import type for preview. */
-export type ImportType = "pack" | "bundle" | "package";
-
-/** Import preview data shown before confirmation. */
-export interface ImportPreview {
-  type: ImportType;
-  packData: Partial<StimulusList>;
-  wordCount: number;
-  hash: string | null;
-  schemaVersion: string | null;
-  sizeBytes: number;
-  rawJson: string;
-  /** For pkg_v1: integrity check result (includes expected + actual hashes). */
-  integrityResult?: { valid: boolean; expected: string; actual: string } | null;
-  /** For pkg_v1: the full session result to import. */
-  sessionToImport?: SessionResult | null;
-  /** For pkg_v1: the package version string (e.g. "pkg_v1"). */
-  packageVersion?: string;
-  /** For pkg_v1: the package hash (for collision safety). */
-  packageHash?: string;
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────
-
-export function formatKB(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  return `${(bytes / 1024).toFixed(1)} KB`;
-}
-
-/**
- * Try to extract a pack from a Research Bundle JSON (rb_v3+).
- * Returns null if the JSON is not a bundle or lacks pack payload.
- */
-export function extractPackFromBundle(parsed: Record<string, unknown>): Partial<StimulusList> | null {
-  if (typeof parsed.exportSchemaVersion !== "string") return null;
-  const snapshot = parsed.stimulusPackSnapshot as Record<string, unknown> | undefined;
-  if (!snapshot) return null;
-  const words = snapshot.words as string[] | undefined;
-  const prov = snapshot.provenance as Record<string, unknown> | undefined;
-  if (!Array.isArray(words) || words.length === 0 || !prov) return null;
-  return {
-    id: prov.listId as string,
-    version: prov.listVersion as string,
-    language: prov.language as string,
-    source: prov.source as string,
-    provenance: {
-      sourceName: prov.sourceName as string,
-      sourceYear: prov.sourceYear as string,
-      sourceCitation: prov.sourceCitation as string,
-      licenseNote: prov.licenseNote as string,
-    },
-    words,
-    stimulusSchemaVersion: snapshot.stimulusSchemaVersion as string | undefined,
-    stimulusListHash: snapshot.stimulusListHash as string | undefined,
-  };
-}
-
-/** Detect type and extract pack data for preview. */
-export function analyzeImport(parsed: Record<string, unknown>, rawJson: string): ImportPreview | null {
-  let type: ImportType = "pack";
-  let packData: Partial<StimulusList> | null = null;
-  let packageVersion: string | undefined;
-  let packageHash: string | undefined;
-
-  // Session package?
-  if (typeof parsed.packageVersion === "string" && parsed.bundle) {
-    type = "package";
-    packageVersion = parsed.packageVersion;
-    packageHash = typeof parsed.packageHash === "string" ? parsed.packageHash : undefined;
-    const bundle = parsed.bundle as Record<string, unknown>;
-    packData = extractPackFromBundle(bundle);
-  }
-  // Research bundle?
-  else if (typeof parsed.exportSchemaVersion === "string") {
-    type = "bundle";
-    packData = extractPackFromBundle(parsed);
-  }
-  // Direct pack JSON
-  else {
-    packData = parsed as Partial<StimulusList>;
-  }
-
-  if (!packData) {
-    // For packages with no extractable pack (minimal/redacted), still allow session import
-    if (type === "package") {
-      packData = {};
-    } else {
-      return null;
-    }
-  }
-
-  return {
-    type,
-    packData,
-    wordCount: Array.isArray(packData.words) ? packData.words.length : 0,
-    hash: (packData.stimulusListHash as string) ?? null,
-    schemaVersion: (packData.stimulusSchemaVersion as string) ?? null,
-    sizeBytes: rawJson.length,
-    rawJson,
-    packageVersion,
-    packageHash,
-  };
-}
+// Re-export types so existing imports from ImportPreviewPanel still work.
+export type { ImportType, ImportPreview } from "./importPreviewModel";
+export { analyzeImport, extractPackFromBundle, formatKB } from "./importPreviewModel";
 
 // ── Component ────────────────────────────────────────────────────────
-
-/**
- * Compute the "Available actions" list for the preview summary row.
- * Tickets 0245 + 0248.
- */
-function computeAvailableActions(
-  preview: ImportPreview,
-  integrityFailed: boolean,
-): string[] {
-  if (integrityFailed) return ["Blocked: Integrity mismatch"];
-
-  if (preview.type === "package") {
-    const actions: string[] = [];
-    if (preview.sessionToImport) actions.push("Import as Session");
-    if (preview.wordCount > 0) actions.push("Extract Pack");
-    if (actions.length === 0) actions.push("Import as Session");
-    return actions;
-  }
-
-  // bundle or pack
-  if (preview.wordCount > 0) return ["Import Pack"];
-  return ["Import Pack"];
-}
 
 export function ImportPreviewPanel({
   preview,
@@ -151,6 +28,10 @@ export function ImportPreviewPanel({
   onImportSession?: () => void;
   onExtractPack?: () => void;
 }) {
+  // 0251: clipboard feedback state
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const [diagnosticsJson, setDiagnosticsJson] = useState<string | null>(null);
+
   const typeLabel =
     preview.type === "pack"
       ? "Pack JSON"
@@ -159,16 +40,17 @@ export function ImportPreviewPanel({
         : "Session Package";
 
   const integrityFailed = !!(preview.integrityResult && !preview.integrityResult.valid);
-  const hasSession = !!preview.sessionToImport;
+
+  // 0253: derive actions from the single source of truth
+  const availableActions = getAvailableActions(preview, integrityFailed);
 
   // 0245: show "Extract Pack" only for package + words present + integrity OK
   const showExtractPack =
     preview.type === "package" && preview.wordCount > 0 && !integrityFailed;
 
-  // 0248: Available actions list
-  const availableActions = computeAvailableActions(preview, integrityFailed);
+  const hasSession = !!preview.sessionToImport;
 
-  // 0244: Copy diagnostics handler
+  // 0244 + 0251: Copy diagnostics handler with success/fail feedback
   const handleCopyDiagnostics = () => {
     if (!preview.integrityResult) return;
     const payload = {
@@ -177,8 +59,14 @@ export function ImportPreviewPanel({
       computedHash: preview.integrityResult.actual,
       packageVersion: preview.packageVersion ?? null,
     };
-    void navigator.clipboard.writeText(JSON.stringify(payload, null, 2)).catch(() => {
-      // Clipboard may be unavailable — diagnostics still visible in UI
+    const json = JSON.stringify(payload, null, 2);
+    void navigator.clipboard.writeText(json).then(() => {
+      setCopyStatus("copied");
+      setTimeout(() => setCopyStatus("idle"), 2000);
+    }).catch(() => {
+      // 0251: clipboard unavailable — show manual copy fallback
+      setCopyStatus("failed");
+      setDiagnosticsJson(json);
     });
   };
 
@@ -264,7 +152,7 @@ export function ImportPreviewPanel({
           </>
         )}
 
-        {/* 0248: Available actions row */}
+        {/* 0248 / 0253: Available actions row — derived from getAvailableActions() */}
         <dt className="text-muted-foreground">Available actions</dt>
         <dd>
           <ul className="list-disc list-inside space-y-0.5">
@@ -325,14 +213,14 @@ export function ImportPreviewPanel({
           </button>
         )}
 
-        {/* 0244: Copy diagnostics button (only when integrity result present) */}
+        {/* 0244 + 0251: Copy diagnostics button (only when integrity result present) */}
         {preview.integrityResult && (
           <button
             onClick={handleCopyDiagnostics}
             className="rounded-md border border-border px-4 py-1.5 text-sm text-muted-foreground hover:bg-muted"
             aria-label="Copy integrity diagnostics to clipboard"
           >
-            Copy diagnostics
+            {copyStatus === "copied" ? "Copied ✓" : "Copy diagnostics"}
           </button>
         )}
 
@@ -343,6 +231,23 @@ export function ImportPreviewPanel({
           Cancel
         </button>
       </div>
+
+      {/* 0251: Manual copy fallback when clipboard API fails */}
+      {copyStatus === "failed" && diagnosticsJson && (
+        <div className="mt-2 space-y-1">
+          <p className="text-xs text-destructive">
+            Clipboard unavailable — copy the JSON below manually:
+          </p>
+          <textarea
+            readOnly
+            value={diagnosticsJson}
+            rows={6}
+            className="w-full rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[10px] text-foreground resize-none"
+            aria-label="Diagnostics JSON for manual copy"
+            onFocus={(e) => e.target.select()}
+          />
+        </div>
+      )}
     </div>
   );
 }

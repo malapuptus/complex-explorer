@@ -85,6 +85,8 @@ export interface SessionResult {
   readonly importedFrom?: {
     readonly packageVersion: string;
     readonly packageHash: string;
+    /** Original session ID from the package before any collision rewrite (0252). */
+    readonly originalSessionId?: string;
   } | null;
 }
 
