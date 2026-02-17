@@ -13,9 +13,13 @@ interface ResearchBundle {
   scoringAlgorithm: string;
   exportSchemaVersion: string;
   exportedAt: string;
+  stimulusPackSnapshot?: {
+    stimulusListHash: string | null;
+    provenance: unknown;
+  };
 }
 
-const EXPORT_SCHEMA_VERSION = "rb_v1";
+const EXPORT_SCHEMA_VERSION = "rb_v2";
 
 const PROTOCOL_DOC_VERSION = "PROTOCOL.md@2026-02-13";
 const SCORING_VERSION = "scoring_v2_mad_3.5";
@@ -29,9 +33,7 @@ interface Props {
   meanReactionTimeMs: number;
   medianReactionTimeMs: number;
   onReset: () => void;
-  /** Full persisted session (from PreviousSessions). When provided, Research Bundle uses it directly. */
   sessionResult?: SessionResult;
-  /** Metadata needed for CSV export. If omitted, CSV button is hidden. */
   csvMeta?: {
     sessionId: string;
     packId: string;
@@ -41,19 +43,18 @@ interface Props {
     orderPolicy?: OrderPolicy;
     trialTimeoutMs?: number;
     breakEveryN?: number;
+    stimulusListHash?: string | null;
   };
 }
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
-
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback: select the text so user can Ctrl+C
       const el = document.createElement("textarea");
       el.value = text;
       el.style.position = "fixed";
@@ -63,25 +64,16 @@ function CopyButton({ text }: { text: string }) {
       document.body.removeChild(el);
     }
   }, [text]);
-
   return (
-    <button
-      onClick={handleCopy}
-      className="ml-2 rounded border border-border px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted"
-    >
+    <button onClick={handleCopy} className="ml-2 rounded border border-border px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted">
       {copied ? "Copied!" : "Copy"}
     </button>
   );
 }
 
 export function ResultsView({
-  trials,
-  trialFlags,
-  meanReactionTimeMs,
-  medianReactionTimeMs,
-  onReset,
-  sessionResult,
-  csvMeta,
+  trials, trialFlags, meanReactionTimeMs, medianReactionTimeMs,
+  onReset, sessionResult, csvMeta,
 }: Props) {
   const reflectionPrompts = useMemo(
     () => generateReflectionPrompts(trials, trialFlags),
@@ -97,12 +89,8 @@ export function ResultsView({
       `Order: ${csvMeta.orderPolicy ?? "unknown"}`,
       `Scoring: ${SCORING_VERSION}`,
     ];
-    if (csvMeta.trialTimeoutMs !== undefined) {
-      lines.push(`Timeout: ${csvMeta.trialTimeoutMs}ms`);
-    }
-    if (csvMeta.breakEveryN !== undefined) {
-      lines.push(`Break every: ${csvMeta.breakEveryN}`);
-    }
+    if (csvMeta.trialTimeoutMs !== undefined) lines.push(`Timeout: ${csvMeta.trialTimeoutMs}ms`);
+    if (csvMeta.breakEveryN !== undefined) lines.push(`Break every: ${csvMeta.breakEveryN}`);
     return lines.join("\n");
   }, [csvMeta]);
 
@@ -121,13 +109,9 @@ export function ResultsView({
           </div>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
             <dt className="text-muted-foreground">Fingerprint</dt>
-            <dd className="font-mono text-foreground break-all">
-              {csvMeta.sessionFingerprint ?? "n/a"}
-            </dd>
+            <dd className="font-mono text-foreground break-all">{csvMeta.sessionFingerprint ?? "n/a"}</dd>
             <dt className="text-muted-foreground">Pack</dt>
-            <dd className="text-foreground">
-              {csvMeta.packId}@{csvMeta.packVersion}
-            </dd>
+            <dd className="text-foreground">{csvMeta.packId}@{csvMeta.packVersion}</dd>
             <dt className="text-muted-foreground">Seed</dt>
             <dd className="font-mono text-foreground">{csvMeta.seed ?? "none"}</dd>
             <dt className="text-muted-foreground">Order</dt>
@@ -135,26 +119,16 @@ export function ResultsView({
             <dt className="text-muted-foreground">Scoring</dt>
             <dd className="font-mono text-foreground">{SCORING_VERSION}</dd>
             <dt className="text-muted-foreground">
-              {sessionResult?.appVersion
-                ? "Saved app version"
-                : APP_VERSION
-                  ? "Current app version (fallback)"
-                  : "App version"}
+              {sessionResult?.appVersion ? "Saved app version" : APP_VERSION ? "Current app version (fallback)" : "App version"}
             </dt>
             <dd className="font-mono text-foreground">
               {sessionResult?.appVersion ?? APP_VERSION ?? "unknown (legacy)"}
             </dd>
             {csvMeta.trialTimeoutMs !== undefined && (
-              <>
-                <dt className="text-muted-foreground">Timeout</dt>
-                <dd className="text-foreground">{csvMeta.trialTimeoutMs}ms</dd>
-              </>
+              <><dt className="text-muted-foreground">Timeout</dt><dd className="text-foreground">{csvMeta.trialTimeoutMs}ms</dd></>
             )}
             {csvMeta.breakEveryN !== undefined && (
-              <>
-                <dt className="text-muted-foreground">Break every</dt>
-                <dd className="text-foreground">{csvMeta.breakEveryN} trials</dd>
-              </>
+              <><dt className="text-muted-foreground">Break every</dt><dd className="text-foreground">{csvMeta.breakEveryN} trials</dd></>
             )}
           </dl>
         </div>
@@ -163,12 +137,9 @@ export function ResultsView({
       {csvMeta && (
         <div className="mb-6">
           <SessionSummaryCard
-            trials={trials}
-            trialFlags={trialFlags}
-            meanReactionTimeMs={meanReactionTimeMs}
-            medianReactionTimeMs={medianReactionTimeMs}
-            sessionResult={sessionResult}
-            csvMeta={csvMeta}
+            trials={trials} trialFlags={trialFlags}
+            meanReactionTimeMs={meanReactionTimeMs} medianReactionTimeMs={medianReactionTimeMs}
+            sessionResult={sessionResult} csvMeta={csvMeta}
           />
         </div>
       )}
@@ -197,21 +168,13 @@ export function ResultsView({
                   <td className="px-3 py-2 text-foreground">
                     {a.response || <span className="italic text-muted-foreground">(empty)</span>}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono text-foreground">
-                    {a.tFirstKeyMs !== null ? a.tFirstKeyMs : "—"}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono text-foreground">
-                    {a.reactionTimeMs}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono text-foreground">
-                    {a.backspaceCount}
-                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-foreground">{a.tFirstKeyMs !== null ? a.tFirstKeyMs : "—"}</td>
+                  <td className="px-3 py-2 text-right font-mono text-foreground">{a.reactionTimeMs}</td>
+                  <td className="px-3 py-2 text-right font-mono text-foreground">{a.backspaceCount}</td>
                   <td className="px-3 py-2">
-                    {flags.length > 0 ? (
-                      <span className="text-xs text-destructive">{flags.join(", ")}</span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
+                    {flags.length > 0
+                      ? <span className="text-xs text-destructive">{flags.join(", ")}</span>
+                      : <span className="text-xs text-muted-foreground">—</span>}
                   </td>
                 </tr>
               );
@@ -224,16 +187,13 @@ export function ResultsView({
         <div className="mt-8">
           <h3 className="mb-3 text-lg font-semibold text-foreground">Explore Further</h3>
           <p className="mb-4 text-xs text-muted-foreground italic">
-            These prompts are for personal reflection only — they are not diagnostic and do not
-            indicate any condition.
+            These prompts are for personal reflection only — they are not diagnostic and do not indicate any condition.
           </p>
           <ul className="space-y-3">
             {reflectionPrompts.map((rp, i) => (
               <li key={i} className="rounded-md border border-border bg-muted/30 px-4 py-3">
                 <p className="text-sm text-foreground">{rp.prompt}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Signal: {rp.flag.replace(/_/g, " ")}
-                </p>
+                <p className="mt-1 text-xs text-muted-foreground">Signal: {rp.flag.replace(/_/g, " ")}</p>
               </li>
             ))}
           </ul>
@@ -245,16 +205,7 @@ export function ResultsView({
           <>
             <button
               onClick={() => {
-                const csv = sessionTrialsToCsv(
-                  trials,
-                  trialFlags,
-                  csvMeta.sessionId,
-                  csvMeta.packId,
-                  csvMeta.packVersion,
-                  csvMeta.seed,
-                  csvMeta.sessionFingerprint,
-                  SCORING_VERSION,
-                );
+                const csv = sessionTrialsToCsv(trials, trialFlags, csvMeta.sessionId, csvMeta.packId, csvMeta.packVersion, csvMeta.seed, csvMeta.sessionFingerprint, SCORING_VERSION);
                 downloadFile(csv, "text/csv", `session-${csvMeta.sessionId}.csv`);
               }}
               className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
@@ -265,10 +216,8 @@ export function ResultsView({
               onClick={() => {
                 const bundleSession = sessionResult
                   ? {
-                      id: sessionResult.id,
-                      config: sessionResult.config,
-                      trials: sessionResult.trials,
-                      scoring: sessionResult.scoring,
+                      id: sessionResult.id, config: sessionResult.config,
+                      trials: sessionResult.trials, scoring: sessionResult.scoring,
                       sessionFingerprint: sessionResult.sessionFingerprint,
                       provenanceSnapshot: sessionResult.provenanceSnapshot,
                       stimulusOrder: sessionResult.stimulusOrder,
@@ -280,24 +229,18 @@ export function ResultsView({
                   : {
                       id: csvMeta.sessionId,
                       config: {
-                        stimulusListId: csvMeta.packId,
-                        stimulusListVersion: csvMeta.packVersion,
-                        orderPolicy: csvMeta.orderPolicy ?? "fixed",
-                        seed: csvMeta.seed,
-                        ...(csvMeta.trialTimeoutMs !== undefined && {
-                          trialTimeoutMs: csvMeta.trialTimeoutMs,
-                        }),
-                        ...(csvMeta.breakEveryN !== undefined && {
-                          breakEveryN: csvMeta.breakEveryN,
-                        }),
+                        stimulusListId: csvMeta.packId, stimulusListVersion: csvMeta.packVersion,
+                        orderPolicy: csvMeta.orderPolicy ?? "fixed", seed: csvMeta.seed,
+                        ...(csvMeta.trialTimeoutMs !== undefined && { trialTimeoutMs: csvMeta.trialTimeoutMs }),
+                        ...(csvMeta.breakEveryN !== undefined && { breakEveryN: csvMeta.breakEveryN }),
                       },
-                      trials,
-                      scoring: {
-                        trialFlags,
-                        summary: { meanReactionTimeMs, medianReactionTimeMs },
-                      },
+                      trials, scoring: { trialFlags, summary: { meanReactionTimeMs, medianReactionTimeMs } },
                       sessionFingerprint: csvMeta.sessionFingerprint ?? null,
                     };
+                const packSnapshot = {
+                  stimulusListHash: csvMeta.stimulusListHash ?? null,
+                  provenance: sessionResult?.provenanceSnapshot ?? null,
+                };
                 const bundle: ResearchBundle = {
                   sessionResult: bundleSession,
                   protocolDocVersion: PROTOCOL_DOC_VERSION,
@@ -305,13 +248,12 @@ export function ResultsView({
                   scoringAlgorithm: SCORING_ALGORITHM,
                   exportSchemaVersion: EXPORT_SCHEMA_VERSION,
                   exportedAt: new Date().toISOString(),
+                  stimulusPackSnapshot: packSnapshot,
                 };
                 const fp = csvMeta.sessionFingerprint?.slice(0, 8) ?? "";
                 const seedPart = csvMeta.seed != null ? `seed${csvMeta.seed}` : "noseed";
                 const datePart = new Date().toISOString().slice(0, 10);
-                const filename =
-                  ["bundle", datePart, csvMeta.packId, seedPart, ...(fp ? [fp] : [])].join("-") +
-                  ".json";
+                const filename = ["bundle", datePart, csvMeta.packId, seedPart, ...(fp ? [fp] : [])].join("-") + ".json";
                 downloadFile(JSON.stringify(bundle, null, 2), "application/json", filename);
               }}
               className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
@@ -320,10 +262,7 @@ export function ResultsView({
             </button>
           </>
         )}
-        <button
-          onClick={onReset}
-          className="rounded-md bg-primary px-6 py-2 text-primary-foreground hover:opacity-90"
-        >
+        <button onClick={onReset} className="rounded-md bg-primary px-6 py-2 text-primary-foreground hover:opacity-90">
           Start Over
         </button>
       </div>

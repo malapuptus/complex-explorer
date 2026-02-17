@@ -5,9 +5,9 @@
 
 declare const __APP_VERSION__: string;
 
-import { getStimulusList, computeSessionFingerprint } from "@/domain";
-import type { SessionResult, ProvenanceSnapshot, DraftSession, StimulusList } from "@/domain";
-import { localStorageSessionStore, localStorageStimulusStore } from "@/infra";
+import type { SessionResult, ProvenanceSnapshot, DraftSession } from "@/domain";
+import { computeSessionFingerprint } from "@/domain";
+import { localStorageSessionStore } from "@/infra";
 import { useSession } from "./useSession";
 import type { SessionSnapshot, StartOverrides } from "./useSession";
 import { ResultsView } from "./ResultsView";
@@ -15,22 +15,16 @@ import { ProtocolScreen } from "./ProtocolScreen";
 import type { AdvancedConfig } from "./ProtocolScreen";
 import { ResumePrompt } from "./ResumePrompt";
 import { RunningTrial } from "./RunningTrial";
-import {
-  generateId,
-  generateTabId,
-  buildPackOptions,
-  PRACTICE_WORDS,
-  DEFAULT_BREAK_EVERY,
-} from "./DemoSessionHelpers";
+import { generateId, generateTabId, PRACTICE_WORDS, DEFAULT_BREAK_EVERY } from "./DemoSessionHelpers";
+import { usePackSelection } from "./usePackSelection";
 import { useEffect, useRef, useState, useCallback } from "react";
 
 export function DemoSession() {
-  const [packOptions, setPackOptions] = useState(() =>
-    buildPackOptions(localStorageStimulusStore.list()),
-  );
-  const [selectedPackKey, setSelectedPackKey] = useState(
-    `${packOptions[0].id}@${packOptions[0].version}`,
-  );
+  const {
+    packOptions, selectedPackKey, setSelectedPackKey,
+    list, isLongPack, refreshPacks, resolveList, selectedOption,
+  } = usePackSelection();
+
   const [activeConfig, setActiveConfig] = useState<AdvancedConfig | null>(null);
   const [onBreak, setOnBreak] = useState(false);
   const lastBreakAtRef = useRef(0);
@@ -41,23 +35,6 @@ export function DemoSession() {
   const draftIdRef = useRef(generateId());
   const tabIdRef = useRef(generateTabId());
   const startedAtRef = useRef<string | null>(null);
-
-  const refreshPacks = useCallback(() => {
-    setPackOptions(buildPackOptions(localStorageStimulusStore.list()));
-  }, []);
-
-  const selectedOption = packOptions.find((p) => `${p.id}@${p.version}` === selectedPackKey)!;
-
-  /** Look up a pack from built-in registry or custom store. */
-  const resolveList = useCallback(
-    (id: string, version: string): StimulusList | undefined => {
-      return getStimulusList(id, version) ?? localStorageStimulusStore.load(id, version);
-    },
-    [],
-  );
-
-  const list = resolveList(selectedOption.id, selectedOption.version)!;
-  const isLongPack = list.words.length > 10;
 
   const session = useSession(list.words as string[], {
     practiceWords: PRACTICE_WORDS,
@@ -70,9 +47,7 @@ export function DemoSession() {
   // Check for existing draft on mount
   useEffect(() => {
     localStorageSessionStore.loadDraft().then((draft) => {
-      if (draft) {
-        setPendingDraft(draft);
-      }
+      if (draft) setPendingDraft(draft);
       setDraftChecked(true);
     });
   }, []);
@@ -103,15 +78,9 @@ export function DemoSession() {
     localStorageSessionStore.saveDraft(draft);
     localStorageSessionStore.acquireDraftLock(tabIdRef.current);
   }, [
-    session.phase,
-    session.trials,
-    session.currentIndex,
-    session.seedUsed,
-    session.stimulusOrder,
-    session.trialTimeoutMs,
-    list,
-    orderPolicy,
-    breakEveryN,
+    session.phase, session.trials, session.currentIndex,
+    session.seedUsed, session.stimulusOrder, session.trialTimeoutMs,
+    list, orderPolicy, breakEveryN,
   ]);
 
   // Clear draft when session completes
@@ -122,10 +91,8 @@ export function DemoSession() {
     localStorageSessionStore.releaseDraftLock(tabIdRef.current);
 
     const provSnapshot: ProvenanceSnapshot = {
-      listId: list.id,
-      listVersion: list.version,
-      language: list.language,
-      source: list.source,
+      listId: list.id, listVersion: list.version,
+      language: list.language, source: list.source,
       sourceName: list.provenance.sourceName,
       sourceYear: list.provenance.sourceYear,
       sourceCitation: list.provenance.sourceCitation,
@@ -133,30 +100,21 @@ export function DemoSession() {
       wordCount: list.words.length,
     };
     const config = {
-      stimulusListId: list.id,
-      stimulusListVersion: list.version,
-      maxResponseTimeMs: 0,
-      orderPolicy,
-      seed: session.seedUsed,
-      trialTimeoutMs: session.trialTimeoutMs,
+      stimulusListId: list.id, stimulusListVersion: list.version,
+      maxResponseTimeMs: 0, orderPolicy,
+      seed: session.seedUsed, trialTimeoutMs: session.trialTimeoutMs,
       breakEveryN,
     };
     void (async () => {
       const fingerprint = await computeSessionFingerprint({
-        config,
-        stimulusOrder: session.stimulusOrder,
-        seedUsed: session.seedUsed,
+        config, stimulusOrder: session.stimulusOrder, seedUsed: session.seedUsed,
       });
-      const appVer =
-        typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : null;
+      const appVer = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : null;
       const result: SessionResult = {
-        id: draftIdRef.current,
-        config,
-        trials: session.trials,
+        id: draftIdRef.current, config, trials: session.trials,
         startedAt: startedAtRef.current ?? new Date().toISOString(),
         completedAt: new Date().toISOString(),
-        scoring: session.scoring,
-        seedUsed: session.seedUsed,
+        scoring: session.scoring, seedUsed: session.seedUsed,
         stimulusOrder: session.stimulusOrder,
         provenanceSnapshot: provSnapshot,
         sessionFingerprint: fingerprint,
@@ -167,34 +125,21 @@ export function DemoSession() {
       setSessionFingerprint(fingerprint);
     })();
   }, [
-    session.phase,
-    session.scoring,
-    session.trials,
-    list,
-    orderPolicy,
-    session.seedUsed,
-    session.stimulusOrder,
-    session.trialTimeoutMs,
-    breakEveryN,
+    session.phase, session.scoring, session.trials, list,
+    orderPolicy, session.seedUsed, session.stimulusOrder,
+    session.trialTimeoutMs, breakEveryN,
   ]);
 
   const handleResume = useCallback(() => {
     if (!pendingDraft) return;
     const acquired = localStorageSessionStore.acquireDraftLock(tabIdRef.current);
-    if (!acquired) {
-      setDraftLocked(true);
-      return;
-    }
-    const draftList = resolveList(
-      pendingDraft.stimulusListId,
-      pendingDraft.stimulusListVersion,
-    );
+    if (!acquired) { setDraftLocked(true); return; }
+    const draftList = resolveList(pendingDraft.stimulusListId, pendingDraft.stimulusListVersion);
     if (!draftList) {
       localStorageSessionStore.deleteDraft();
       setPendingDraft(null);
       return;
     }
-
     const allWords = [...pendingDraft.practiceWords, ...pendingDraft.stimulusOrder];
     const snapshot: SessionSnapshot = {
       words: allWords.map((word, index) => ({ word, index })),
@@ -205,7 +150,6 @@ export function DemoSession() {
       stimulusOrder: [...pendingDraft.stimulusOrder],
       trialTimeoutMs: pendingDraft.trialTimeoutMs,
     };
-
     startedAtRef.current = pendingDraft.startedAt ?? new Date().toISOString();
     draftIdRef.current = pendingDraft.id;
     setSelectedPackKey(`${pendingDraft.stimulusListId}@${pendingDraft.stimulusListVersion}`);
@@ -217,7 +161,7 @@ export function DemoSession() {
     });
     session.restore(snapshot);
     setPendingDraft(null);
-  }, [pendingDraft, session, resolveList]);
+  }, [pendingDraft, session, resolveList, setSelectedPackKey]);
 
   const handleDiscard = useCallback(() => {
     localStorageSessionStore.deleteDraft();
@@ -226,24 +170,17 @@ export function DemoSession() {
     setDraftLocked(false);
   }, []);
 
-  const handleStart = useCallback(
-    (config: AdvancedConfig) => {
-      const acquired = localStorageSessionStore.acquireDraftLock(tabIdRef.current);
-      if (!acquired) {
-        setDraftLocked(true);
-        return;
-      }
-      startedAtRef.current = new Date().toISOString();
-      setActiveConfig(config);
-      const overrides: StartOverrides = {
-        orderPolicy: config.orderPolicy,
-        seed: config.seed,
-        trialTimeoutMs: config.trialTimeoutMs,
-      };
-      session.start(overrides);
-    },
-    [session],
-  );
+  const handleStart = useCallback((config: AdvancedConfig) => {
+    const acquired = localStorageSessionStore.acquireDraftLock(tabIdRef.current);
+    if (!acquired) { setDraftLocked(true); return; }
+    startedAtRef.current = new Date().toISOString();
+    setActiveConfig(config);
+    const overrides: StartOverrides = {
+      orderPolicy: config.orderPolicy, seed: config.seed,
+      trialTimeoutMs: config.trialTimeoutMs,
+    };
+    session.start(overrides);
+  }, [session]);
 
   const handleReset = () => {
     savedRef.current = false;
@@ -261,37 +198,27 @@ export function DemoSession() {
   // Release lock on unmount
   useEffect(() => {
     const tabId = tabIdRef.current;
-    return () => {
-      localStorageSessionStore.releaseDraftLock(tabId);
-    };
+    return () => { localStorageSessionStore.releaseDraftLock(tabId); };
   }, []);
 
   if (!draftChecked) return null;
 
-  // Resume prompt
   if (pendingDraft && session.phase === "idle") {
     return (
       <ResumePrompt
-        pendingDraft={pendingDraft}
-        draftLocked={draftLocked}
-        onResume={handleResume}
-        onDiscard={handleDiscard}
+        pendingDraft={pendingDraft} draftLocked={draftLocked}
+        onResume={handleResume} onDiscard={handleDiscard}
       />
     );
   }
 
-  // Protocol / config screen
   if (session.phase === "idle") {
     return (
       <ProtocolScreen
-        wordCount={list.words.length}
-        practiceCount={PRACTICE_WORDS.length}
-        source={list.source}
-        estimatedMinutes={selectedOption.estimate}
-        isLongPack={isLongPack}
-        onReady={handleStart}
-        onPackImported={refreshPacks}
-        selectedPack={list}
+        wordCount={list.words.length} practiceCount={PRACTICE_WORDS.length}
+        source={list.source} estimatedMinutes={selectedOption.estimate}
+        isLongPack={isLongPack} onReady={handleStart}
+        onPackImported={refreshPacks} selectedPack={list}
       >
         {draftLocked && (
           <p className="text-center text-sm text-destructive">
@@ -318,22 +245,15 @@ export function DemoSession() {
     );
   }
 
-  // Running phase
   if (session.phase === "running" && session.currentWord) {
     return (
       <RunningTrial
-        currentWord={session.currentWord}
-        currentIndex={session.currentIndex}
-        words={session.words}
-        practiceCount={session.practiceCount}
-        breakEveryN={breakEveryN}
-        onBreak={onBreak}
-        setOnBreak={setOnBreak}
-        lastBreakAtRef={lastBreakAtRef}
-        seedUsed={session.seedUsed}
+        currentWord={session.currentWord} currentIndex={session.currentIndex}
+        words={session.words} practiceCount={session.practiceCount}
+        breakEveryN={breakEveryN} onBreak={onBreak} setOnBreak={setOnBreak}
+        lastBreakAtRef={lastBreakAtRef} seedUsed={session.seedUsed}
         trialTimeoutMs={session.trialTimeoutMs}
-        onSubmit={session.submitResponse}
-        onTimeout={session.handleTimeout}
+        onSubmit={session.submitResponse} onTimeout={session.handleTimeout}
       />
     );
   }
@@ -342,18 +262,14 @@ export function DemoSession() {
     const scoredTrials = session.trials.filter((t) => !t.isPractice);
     return (
       <ResultsView
-        trials={scoredTrials}
-        trialFlags={session.scoring.trialFlags}
+        trials={scoredTrials} trialFlags={session.scoring.trialFlags}
         meanReactionTimeMs={session.scoring.summary.meanReactionTimeMs}
         medianReactionTimeMs={session.scoring.summary.medianReactionTimeMs}
         onReset={handleReset}
         csvMeta={{
-          sessionId: draftIdRef.current,
-          packId: list.id,
-          packVersion: list.version,
-          seed: session.seedUsed,
-          sessionFingerprint,
-          orderPolicy,
+          sessionId: draftIdRef.current, packId: list.id,
+          packVersion: list.version, seed: session.seedUsed,
+          sessionFingerprint, orderPolicy,
           trialTimeoutMs: activeConfig?.trialTimeoutMs,
           breakEveryN: isLongPack ? breakEveryN : undefined,
         }}

@@ -91,6 +91,7 @@ describe("Export parity", () => {
       "scoringAlgorithm",
       "exportSchemaVersion",
       "exportedAt",
+      "stimulusPackSnapshot",
     ] as const;
 
     it("required keys are defined in the contract", () => {
@@ -99,8 +100,9 @@ describe("Export parity", () => {
         protocolDocVersion: "PROTOCOL.md@2026-02-13",
         appVersion: "0.0.0",
         scoringAlgorithm: "MAD-modified-z@3.5 + fast<200ms + timeout excluded",
-        exportSchemaVersion: "rb_v1",
+        exportSchemaVersion: "rb_v2",
         exportedAt: new Date().toISOString(),
+        stimulusPackSnapshot: { stimulusListHash: null, provenance: null },
       };
 
       for (const key of REQUIRED_BUNDLE_KEYS) {
@@ -115,24 +117,25 @@ describe("Export parity", () => {
         protocolDocVersion: "test",
         appVersion: "1.0.0",
         scoringAlgorithm: "test",
-        exportSchemaVersion: "rb_v1",
+        exportSchemaVersion: "rb_v2",
         exportedAt: "2026-01-01",
+        stimulusPackSnapshot: { stimulusListHash: null, provenance: null },
       };
       expect(bundle).toHaveProperty("appVersion");
       expect(bundle.appVersion).toBeTruthy();
     });
 
-    it("exportSchemaVersion is a non-empty string", () => {
+    it("exportSchemaVersion is rb_v2", () => {
       const bundle = {
         sessionResult: {},
         protocolDocVersion: "test",
         appVersion: "1.0.0",
         scoringAlgorithm: "test",
-        exportSchemaVersion: "rb_v1",
+        exportSchemaVersion: "rb_v2",
         exportedAt: "2026-01-01",
+        stimulusPackSnapshot: { stimulusListHash: null, provenance: null },
       };
-      expect(typeof bundle.exportSchemaVersion).toBe("string");
-      expect(bundle.exportSchemaVersion.length).toBeGreaterThan(0);
+      expect(bundle.exportSchemaVersion).toBe("rb_v2");
     });
   });
 });

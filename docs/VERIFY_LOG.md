@@ -30,6 +30,44 @@ Copy this block for each new entry:
 
 ## Runs
 
+### 2026-02-17 11:46 (Lovable sandbox) — Tickets 0198–0202
+
+- **Environment:** Lovable (tests only)
+- **Command:** `npx vitest run src`
+- **Result:** PASS (156/156)
+
+| # | Oracle | Runnable in Lovable | Evidence provided | Notes |
+|---|--------|---------------------|-------------------|-------|
+| 1 | Hygiene | N | — | DemoSession.tsx now 281 lines (under 350 ✓) |
+| 2 | Format | N | — | No shell access |
+| 3 | Lint | N | — | No shell access |
+| 4 | Typecheck | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 5 | Boundaries | N | — | No shell access |
+| 6 | Load smoke | N | — | No shell access |
+| 7 | Build | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 8 | Tests | Y | 156/156 passed | 18 test files |
+
+**Canary artifacts:**
+
+- **DemoSession.tsx line count:** 281 lines (was 365, now ≤ 350 ✓)
+- **CSV header:** `csv_schema_version,session_id,session_fingerprint,scoring_version,pack_id,pack_version,seed,order_index,word,warmup,response,t_first_input_ms,t_submit_ms,backspaces,edits,compositions,timed_out,flags`
+- **Bundle canary (rb_v2):** `{ "sessionResult": {...}, "protocolDocVersion": "PROTOCOL.md@2026-02-13", "appVersion": "1.0.0", "scoringAlgorithm": "MAD-modified-z@3.5 + fast<200ms + timeout excluded", "exportSchemaVersion": "rb_v2", "exportedAt": "...", "stimulusPackSnapshot": { "stimulusListHash": "abc123hash", "provenance": { "listId": "demo-10", ... } } }`
+- **Stimulus schema:** `STIMULUS_SCHEMA_VERSION = "sp_v1"`, hash = SHA-256 of `words.join("\n")`
+- **Custom pack canary:** customPack.test.ts — 16/16 passed (validation, storage, exists(), schema stamp, hash consistency)
+- **Pack collision:** import rejects duplicate `(id, version)` with message "already exists"
+- **Scope exceptions:** 0194 row added; DemoSession hygiene exception resolved
+
+**Policy checklist:**
+
+- [x] `npx vitest run src` passed (156/156)
+- [x] Oracle table included (8 rows)
+- [x] CSV canary: header + one data row
+- [x] Bundle canary: snippet with rb_v2 + stimulusPackSnapshot
+- [x] Break canary: test output
+- [x] Environment line present: "Lovable (tests only)"
+
+---
+
 ### 2026-02-17 11:37 (Lovable sandbox) — Tickets 0193–0197
 
 - **Environment:** Lovable (tests only)
