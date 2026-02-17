@@ -4,6 +4,7 @@
  */
 
 import { listAvailableStimulusLists } from "@/domain";
+import type { CustomPackEntry } from "@/infra";
 
 export const PRACTICE_WORDS = ["sun", "table", "road"];
 export const DEFAULT_BREAK_EVERY = 20;
@@ -14,6 +15,7 @@ export interface PackOption {
   label: string;
   wordCount: number;
   estimate: string;
+  isCustom: boolean;
 }
 
 export function generateId(): string {
@@ -31,8 +33,8 @@ export function estimateDuration(wordCount: number): string {
   return `~${loMin}–${hiMin} min`;
 }
 
-export function buildPackOptions(): PackOption[] {
-  return listAvailableStimulusLists().map((meta) => ({
+export function buildPackOptions(customPacks?: CustomPackEntry[]): PackOption[] {
+  const builtIn: PackOption[] = listAvailableStimulusLists().map((meta) => ({
     id: meta.id,
     version: meta.version,
     label:
@@ -41,5 +43,17 @@ export function buildPackOptions(): PackOption[] {
         : `${meta.source} (${meta.wordCount} words)`,
     wordCount: meta.wordCount,
     estimate: estimateDuration(meta.wordCount),
+    isCustom: false,
   }));
+
+  const custom: PackOption[] = (customPacks ?? []).map((p) => ({
+    id: p.id,
+    version: p.version,
+    label: `${p.id} (${p.wordCount} words) (custom)`,
+    wordCount: p.wordCount,
+    estimate: estimateDuration(p.wordCount),
+    isCustom: true,
+  }));
+
+  return [...builtIn, ...custom];
 }

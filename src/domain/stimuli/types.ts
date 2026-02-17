@@ -99,6 +99,23 @@ export function validateStimulusList(list: Partial<StimulusList>): StimulusListV
         message: `${blanks.length} blank or non-string word(s) found`,
       });
     }
+
+    // Duplicate word detection
+    const seen = new Set<string>();
+    const duplicates: string[] = [];
+    for (const w of list.words) {
+      if (typeof w === "string") {
+        const lower = w.trim().toLowerCase();
+        if (seen.has(lower)) duplicates.push(w);
+        seen.add(lower);
+      }
+    }
+    if (duplicates.length > 0) {
+      errors.push({
+        field: "words",
+        message: `${duplicates.length} duplicate word(s): ${duplicates.slice(0, 5).join(", ")}`,
+      });
+    }
   }
 
   return errors;
