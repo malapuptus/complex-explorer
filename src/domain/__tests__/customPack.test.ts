@@ -30,33 +30,42 @@ describe("Custom pack validation", () => {
     expect(validateStimulusList(makeValidPack())).toHaveLength(0);
   });
 
-  it("rejects empty words array", () => {
+  it("rejects empty words array with EMPTY_WORD_LIST code", () => {
     const errors = validateStimulusList(makeValidPack({ words: [] }));
-    expect(errors.some((e) => e.field === "words")).toBe(true);
+    expect(errors.some((e) => e.code === "EMPTY_WORD_LIST")).toBe(true);
   });
 
-  it("rejects missing id", () => {
+  it("rejects missing id with MISSING_ID code", () => {
     const errors = validateStimulusList(makeValidPack({ id: "" }));
-    expect(errors.some((e) => e.field === "id")).toBe(true);
+    expect(errors.some((e) => e.code === "MISSING_ID")).toBe(true);
   });
 
-  it("rejects missing provenance", () => {
+  it("rejects missing provenance with MISSING_PROVENANCE code", () => {
     const pack = { ...makeValidPack() } as Record<string, unknown>;
     delete pack.provenance;
     const errors = validateStimulusList(pack as Partial<StimulusList>);
-    expect(errors.some((e) => e.field === "provenance")).toBe(true);
+    expect(errors.some((e) => e.code === "MISSING_PROVENANCE")).toBe(true);
   });
 
-  it("detects duplicate words", () => {
+  it("detects duplicate words with DUPLICATE_WORDS code", () => {
     const errors = validateStimulusList(
       makeValidPack({ words: ["alpha", "beta", "Alpha"] }),
     );
-    expect(errors.some((e) => e.field === "words" && e.message.includes("duplicate"))).toBe(true);
+    expect(errors.some((e) => e.code === "DUPLICATE_WORDS")).toBe(true);
   });
 
-  it("detects blank words", () => {
+  it("detects blank words with BLANK_WORDS code", () => {
     const errors = validateStimulusList(makeValidPack({ words: ["alpha", "", "beta"] }));
-    expect(errors.some((e) => e.message.includes("blank"))).toBe(true);
+    expect(errors.some((e) => e.code === "BLANK_WORDS")).toBe(true);
+  });
+
+  it("all errors have a code field", () => {
+    const errors = validateStimulusList({});
+    expect(errors.length).toBeGreaterThan(0);
+    for (const e of errors) {
+      expect(e.code).toBeDefined();
+      expect(typeof e.code).toBe("string");
+    }
   });
 });
 

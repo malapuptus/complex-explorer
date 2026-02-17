@@ -5,8 +5,8 @@
 
 declare const __APP_VERSION__: string;
 
-import type { SessionResult, ProvenanceSnapshot, DraftSession, StimulusPackSnapshot } from "@/domain";
-import { computeSessionFingerprint } from "@/domain";
+import type { SessionResult, ProvenanceSnapshot, DraftSession, StimulusPackSnapshot, OrderPolicy } from "@/domain";
+import { computeSessionFingerprint, getStimulusList } from "@/domain";
 import { localStorageSessionStore } from "@/infra";
 import { useSession } from "./useSession";
 import type { SessionSnapshot, StartOverrides } from "./useSession";
@@ -193,7 +193,7 @@ export function DemoSession() {
     session.start(overrides);
   }, [session]);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     savedRef.current = false;
     lastBreakAtRef.current = 0;
     prevTrialCount.current = 0;
@@ -204,7 +204,27 @@ export function DemoSession() {
     setSessionFingerprint(null);
     localStorageSessionStore.releaseDraftLock(tabIdRef.current);
     session.reset();
-  };
+  }, [session]);
+
+  const handleReproduce = useCallback((config: {
+    packId: string; packVersion: string; seed: number | null;
+    orderPolicy: OrderPolicy; trialTimeoutMs?: number; breakEveryN?: number;
+  }) => {
+    const packAvailable = resolveList(config.packId, config.packVersion);
+    if (!packAvailable) {
+      alert(`Pack "${config.packId}@${config.packVersion}" is not installed. Import it first to reproduce this session.`);
+      return;
+    }
+    handleReset();
+    setSelectedPackKey(`${config.packId}@${config.packVersion}`);
+    const advConfig: AdvancedConfig = {
+      orderPolicy: config.orderPolicy,
+      seed: config.seed,
+      breakEveryN: config.breakEveryN ?? DEFAULT_BREAK_EVERY,
+      trialTimeoutMs: config.trialTimeoutMs,
+    };
+    setTimeout(() => handleStart(advConfig), 0);
+  }, [resolveList, handleReset, setSelectedPackKey, handleStart]);
 
   // Release lock on unmount
   useEffect(() => {
@@ -277,6 +297,7 @@ export function DemoSession() {
         meanReactionTimeMs={session.scoring.summary.meanReactionTimeMs}
         medianReactionTimeMs={session.scoring.summary.medianReactionTimeMs}
         onReset={handleReset}
+        onReproduce={handleReproduce}
         csvMeta={{
           sessionId: draftIdRef.current, packId: list.id,
           packVersion: list.version, seed: session.seedUsed,
