@@ -41,3 +41,8 @@ export {
 } from "./stimuli";
 
 export { buildSessionContext, detectDeviceClass, detectOsFamily, detectBrowserFamily, sumCompositionCount } from "./sessionContext";
+
+export type { SessionInsights, TrialRef, TimelinePoint, QualityIndex } from "./sessionInsights";
+export { buildSessionInsights, computeQualityIndex, getMicroGoal } from "./sessionInsights";
+
+export { simulateSession } from "./simulateSession";

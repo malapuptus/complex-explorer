@@ -3,3 +3,4 @@ export { localStorageStimulusStore } from "./localStorageStimulusStore";
 export type { CustomPackEntry } from "./localStorageStimulusStore";
 export { buildStorageReport } from "./storageReport";
 export type { StorageReport } from "./storageReport";
+export { uiPrefs } from "./localStorageUiPrefs";
