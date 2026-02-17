@@ -1,191 +1,487 @@
+# Tickets 0264–0268: Session Insights, Dashboard, Drilldown, Baseline, Fun Loop
 
+## Context
 
-# Tickets 0244-0248: Import Preview Extraction, Diagnostics, Pack Extract, Session Metadata, Collision Safety, and Gating
+All five tickets are additive. No schema bumps, no new npm dependencies. One new infra file for UI preferences (0267). The domain layer already has `scoreSession`, `seededShuffle/mulberry32`, `SessionResult`, `FlagKind`, and `TrialFlag` — all of which `sessionInsights.ts` and `simulateSession.ts` will consume directly.
 
-## Overview
-
-Five tickets that harden the import flow: extract ImportPreviewPanel from ProtocolScreen (reducing its size by ~150 lines), add integrity diagnostics with copyable details, enable pack extraction from packages, persist import provenance on sessions, prevent ID collisions, and unify button gating with an "Available actions" summary.
-
----
-
-## Ticket 0244 -- Extract ImportPreviewPanel + integrity diagnostics
-
-**Files changed:**
-- **NEW** `src/app/ImportPreviewPanel.tsx` (~120 lines)
-- `src/app/ProtocolScreen.tsx` (shrinks by ~150 lines: remove `ImportPreviewPanel`, `ImportPreview` interface, `ImportType`, `analyzeImport`, `extractPackFromBundle`, `formatKB` -- move all to new file)
-- `src/app/__tests__/resultsViewExports.test.ts` (add tests for diagnostics rendering)
-- `docs/VERIFY_LOG.md`
-
-**What moves to ImportPreviewPanel.tsx:**
-- `ImportType` type (line 100)
-- `ImportPreview` interface (lines 103-115)
-- `analyzeImport()` function (lines 117-148)
-- `extractPackFromBundle()` function (lines 75-97)
-- `formatKB()` helper (lines 66-69)
-- `ImportPreviewPanel` component (lines 150-218)
-
-**New diagnostics in ImportPreviewPanel:**
-1. When `integrityResult` is present, show two new `<dl>` rows:
-   - "Expected hash" with monospace value from `integrityResult.expected`
-   - "Computed hash" with monospace value from `integrityResult.actual`
-2. Add a "Copy diagnostics" button that calls `navigator.clipboard.writeText()` with JSON: `{ code: "ERR_INTEGRITY_MISMATCH" | "PASS", expectedHash, computedHash, packageVersion }`.
-3. The packageVersion is extracted from `preview` (needs a new optional field `packageVersion?: string` on `ImportPreview`, set during `analyzeImport` for packages).
-
-**ProtocolScreen.tsx changes:**
-- Import `ImportPreviewPanel`, `ImportPreview`, `analyzeImport`, `extractPackFromBundle`, `formatKB` from `./ImportPreviewPanel`.
-- Remove the moved code (~150 lines removed).
-- ProtocolScreen drops from ~533 lines to ~380 lines.
-
-**Tests:**
-- Assert that when `integrityResult.valid === false`, both expected and computed hashes render.
-- Assert "Copy diagnostics" button exists when integrity result is present.
-- Mock `navigator.clipboard.writeText` and assert payload shape.
+Current `ResultsView.tsx` is 252 lines (budget: 350). `PreviousSessions.tsx` is 270 lines. Both will stay under 350.
 
 ---
 
-## Ticket 0245 -- "Extract Pack" action from pkg_v1
+## Ticket 0264 — `src/domain/sessionInsights.ts` (pure, no I/O)
 
-**Files changed:**
-- `src/app/ImportPreviewPanel.tsx` (add "Extract Pack" button)
-- `src/app/ProtocolScreen.tsx` (wire `onExtractPack` prop)
-- `src/app/__tests__/resultsViewExports.test.ts` (add tests)
-- `docs/VERIFY_LOG.md`
+### Goal
 
-**What changes:**
-1. `ImportPreviewPanel` gains an `onExtractPack?: () => void` prop.
-2. Show "Extract Pack" button when `preview.type === "package"` AND `preview.wordCount > 0` AND integrity is not failed. Hidden otherwise (not disabled -- just not rendered when words are absent).
-3. In `ProtocolScreen.tsx`, `onExtractPack` calls existing `doImport(importPreview.packData)` -- reuses the same validation + collision logic.
-4. The existing "Import Pack" button label changes contextually: for `type === "package"` it says "Extract Pack"; for `type === "pack" | "bundle"` it stays "Import Pack". This simplifies the action naming.
+Create a pure “insights engine” that deterministically summarizes a `SessionResult` into:
 
-**Tests:**
-- Assert button appears when `preview.type === "package"` and `wordCount > 0`.
-- Assert button hidden when `wordCount === 0`.
-- Assert clicking triggers the pack import path.
+- quality metrics
+- speed profile metrics
+- input metrics
+- anomalies (top fast/slow)
+- chart-ready timeline + histogram
+- **drilldown-ready TrialRef lookup**
 
----
+### Key implementation decisions
 
-## Ticket 0246 -- Persist `importedFrom` on imported sessions
+#### Indexing
 
-**Files changed:**
-- `src/domain/types.ts` (add `importedFrom?` to `SessionResult`)
-- `src/infra/localStorageSessionStore.ts` (migration defaults to `null`)
-- `src/app/ProtocolScreen.tsx` (set `importedFrom` when importing session from pkg)
-- `src/app/PreviousSessions.tsx` (show hash prefix in Imported badge)
-- `src/app/__tests__/previousSessions.test.ts` (round-trip + legacy migration)
-- `docs/SCHEMAS.md` (addendum: `sessionResult.importedFrom`)
-- `docs/VERIFY_LOG.md`
+- `sessionTrialIndex` = index in `sessionResult.trials[]` (matches `scoring.trialFlags[].trialIndex`)
+- `orderIndex` = `trial.stimulus.index` (matches CSV `order_index`)
+- `position` = 0-based position within the scored subset (used for x-axis)
 
-**Type change in `src/domain/types.ts`:**
-```typescript
-// Add to SessionResult interface (after stimulusPackSnapshot):
-readonly importedFrom?: {
-  packageVersion: string;
-  packageHash: string;
-} | null;
+#### timedOut detection (priority order)
+
+1. `trial.timedOut === true` (Trial field)
+2. Fallback: flags include **either** `"timeout"` **or** `"timed_out"` from `sessionResult.scoring.trialFlags`
+
+> This supports both spellings for backward compatibility.
+
+#### Speed metric population
+
+Compute speed stats over **scored & !timedOut** RTs only.
+
+#### nonEmptyResponseRate
+
+`nonEmptyResponseRate = (scored && !timedOut && responseLen > 0) / scoredCount`.  
+Return 0 if `scoredCount === 0`.
+
+#### flaggedOtherCount
+
+Count scored trials with ≥1 flag **excluding** empty+timeout categories:
+
+- Exclude `"empty_response"`
+- Exclude `"timeout"` and `"timed_out"`
+
+#### Histogram (deterministic) — over scored & !timedOut RTs
+
+- `n=0` → `{ binEdges: [], counts: [] }`
+- `n=1` → `{ binEdges: [rt, rt+1], counts: [1] }`
+- else: 10 bins, `binWidth=(max-min)/10` (use `1` if `0`), edges = 11 values, bin index = `Math.min(Math.floor((rt-min)/binWidth), 9)`
+
+#### p90 — nearest-rank ceiling method
+
+```
+p90Index = Math.max(0, Math.ceil(0.9 * n) - 1)
+p90 = sorted[p90Index]
+
 ```
 
-**Migration in `localStorageSessionStore.ts` `migrateSessionToV3`:**
-- Add: `importedFrom: (raw.importedFrom as SessionResult["importedFrom"]) ?? null`
+For n=10: `ceil(9)-1=8` → 9th-largest ✓
 
-**ProtocolScreen.tsx import-as-session handler:**
-- When importing from pkg_v1, set `importedFrom: { packageVersion: parsed.packageVersion, packageHash: parsed.packageHash }` on the session object before saving.
+#### Anomalies
 
-**PreviousSessions.tsx:**
-- When session has `importedFrom`, show detail text: `Imported from pkg_v1 (hash: abcdef12...)` below the Imported badge.
+- `topSlowTrials`: top 5 by RT desc, exclude timedOut, exclude practice
+- `topFastTrials`: top 5 by RT asc, exclude timedOut, exclude practice
 
-**Tests:**
-- Persist a session with `importedFrom`, reload, assert fields present.
-- Migrate a legacy session (no `importedFrom`), assert it defaults to `null`.
+### Types (co-located in the file, re-exported via barrel)
+
+#### TrialRef (drilldown-ready)
+
+```
+{
+  sessionTrialIndex: number,
+  orderIndex: number,
+  position: number,
+  word: string,
+  reactionTimeMs: number,
+  flags: FlagKind[],
+  timedOut: boolean,
+  response: string,
+  responseLen: number,
+  tFirstKeyMs: number | null,
+  backspaces: number,
+  edits: number,
+  compositions: number
+}
+
+```
+
+#### TimelinePoint
+
+```
+{
+  sessionTrialIndex: number,
+  x: number,   // position
+  y: number,   // reactionTimeMs
+  timedOut: boolean,
+  flags: FlagKind[]
+}
+
+```
+
+#### SessionInsights (includes trialRefs + lookup)
+
+Includes all quality/speed/input/anomaly/chart fields listed previously **plus**:
+
+- `trialRefs: TrialRef[]` (one per scored trial, in order)
+- `trialRefBySessionTrialIndex: Record<number, TrialRef>` (single source of truth for drilldown)
+
+### buildSessionInsights algorithm (high-level)
+
+1. Build `flagMap: Map<sessionTrialIndex, FlagKind[]>` from `sessionResult.scoring.trialFlags`
+2. Compute `scoredTrials` (non-practice) preserving original indices
+3. For each scored trial:
+  - assemble `TrialRef` (including `response` text)
+  - determine `timedOut` using priority logic (Trial field then flags `"timeout"|"timed_out"`)
+  - add to `trialRefs` and `trialRefBySessionTrialIndex`
+  - add to `timeline` (TimelinePoint)
+  - collect RT into `rtsNonTimeout[]` if `!timedOut`
+4. Compute speed stats from `rtsNonTimeout`
+5. Build histogram from `rtsNonTimeout`
+6. Build anomalies from `trialRefs` filtered `!timedOut`
+7. Count quality metrics (empty, timeout, flagged, flaggedOtherCount, etc.)
+
+Later additions for 0268 (`computeQualityIndex`, `getMicroGoal`) will be appended in the same file.
+
+### Files changed
+
+- **NEW** `src/domain/sessionInsights.ts` (~160 lines)
+- **NEW** `src/domain/__tests__/sessionInsights.test.ts` (~120 lines)
+- **EDIT** `src/domain/index.ts` (barrel exports)
+- **EDIT** `docs/VERIFY_LOG.md` (canary snippet)
+
+### Tests
+
+`src/domain/__tests__/sessionInsights.test.ts`:
+
+- Flag map correctness (`trialIndex` → flags)
+- Median uses average of two middle values for even n
+- p90 nearest-rank: `[100..1000]` → p90 = 900
+- nonEmptyResponseRate excludes timeouts from numerator and respects empty
+- IME detection: any `compositionCount > 0` → `imeUsed = true`
+- Histogram determinism (same input → same edges + counts)
+- Histogram edge cases (n=0, n=1)
+- topSlowTrials sorted desc, length ≤ 5, excludes timedOut + practice
+- topFastTrials excludes timedOut + practice
+- flaggedOtherCount excludes `empty_response` and both timeout spellings
+- trialRefBySessionTrialIndex contains correct TrialRef including `response`
+
+### VERIFY_LOG canary (from `pkg_v1_full_small.json`)
+
+Fixture (3 scored trials: tree/420, house/380, water/510; no timeouts, no empties):
+
+- scoredCount = 3
+- medianRtMs = 420
+- p90RtMs = 510
+- meanRtMs = 436.67
+- spikinessMs = 90
+- emptyResponseCount = 0
+- timeoutCount = 0
+- flaggedOtherCount = 0
+
+### Barrel exports (`src/domain/index.ts`)
+
+```
+export type { SessionInsights, TrialRef, TimelinePoint } from "./sessionInsights";
+export { buildSessionInsights } from "./sessionInsights";
+
+```
 
 ---
 
-## Ticket 0247 -- Import collision safety
+## Ticket 0265 — Results Dashboard v1
 
-**Files changed:**
-- `src/app/ProtocolScreen.tsx` (collision detection in import-as-session handler)
-- `src/infra/localStorageSessionStore.ts` (add `exists(id)` method)
-- `src/domain/sessionStore.ts` (add `exists` to interface)
-- `src/app/__tests__/previousSessions.test.ts` or new test file
-- `docs/VERIFY_LOG.md`
+### Goal
 
-**SessionStore interface addition (~3 lines):**
-```typescript
-/** Check if a session with this ID exists. */
-exists(id: string): Promise<boolean>;
+Add an in-app dashboard (3 cards + 2 SVG charts + anomalies list) that makes results immediately “worth doing.”
+
+### Files changed
+
+- **NEW** `src/app/ResultsDashboardPanel.tsx`
+- **NEW** `src/app/ResultsCharts.tsx`
+- **EDIT** `src/app/ResultsView.tsx`
+- **NEW** `src/app/__tests__/resultsDashboard.test.tsx`
+- **EDIT** `docs/VERIFY_LOG.md`
+
+### ResultsDashboardPanel.tsx
+
+Props:
+
+- `insights: SessionInsights`
+- `sessionContext?: SessionContext | null`
+
+Cards:
+
+1. **Response Quality**  
+Scored, empty, timeouts, flagged, non-empty rate
+2. **Speed Profile**  
+median, p90, spikiness, min/max
+3. **Input / Device**  
+IME used, compositions/backspaces/edits, device label (`unknown` if null)
+
+Below cards:
+
+- `<RtTimeline>` and `<RtHistogram>` from `ResultsCharts.tsx`
+- “Anomalies” list showing top slow trials for drilldown (uses `TrialRef.sessionTrialIndex` attribute)
+
+### ResultsCharts.tsx
+
+`<RtTimeline>`
+
+- props: `points: TimelinePoint[]`, `onPointClick?: (sessionTrialIndex: number) => void`
+- circles include `data-session-trial-index`
+
+`<RtHistogram>`
+
+- props: `histogram`
+
+### Integration into ResultsView.tsx
+
+Compute insights:
+
+```
+const insights = useMemo(
+  () => sessionResult ? buildSessionInsights(sessionResult) : null,
+  [sessionResult]
+);
+
 ```
 
-**Implementation in localStorageSessionStore.ts:**
-```typescript
-async exists(id: string): Promise<boolean> {
-  const envelope = readEnvelope();
-  return id in envelope.sessions;
-},
-```
+Render dashboard **near the top of Results** (recommended for “fun”):
 
-**ProtocolScreen.tsx import handler changes:**
-- Before `localStorageSessionStore.save(imported)`, check `await localStorageSessionStore.exists(session.id)`.
-- If collision: compute new ID as `${session.id}__import_${packageHash.slice(0,8)}` (using `parsed.packageHash`).
-- If that also exists, append `__2`, `__3`, etc. (simple loop, max 10 attempts).
-- Show warning in `importSuccess` message: `"Session ID collision -- imported as <newId>"`.
+- place directly under the Results header (before export/repro blocks)
 
-**Tests:**
-- Import same pkg twice, assert two distinct sessions exist with different IDs.
-- Assert neither overwrites the other's data.
+### Tests (`resultsDashboard.test.tsx`)
+
+- renders expected median/empty/flagged values
+- timeline + histogram exist by testid
+- circle count equals `insights.timeline.length`
+- sessionContext null → device label “unknown”
 
 ---
 
-## Ticket 0248 -- "Available actions" summary + unified gating
+## Ticket 0266 — Trial Drilldown
 
-**Files changed:**
-- `src/app/ImportPreviewPanel.tsx` (add "Available actions" section + gating logic)
-- `src/app/__tests__/resultsViewExports.test.ts` (test 3 fixtures)
-- `docs/VERIFY_LOG.md`
+### Goal
 
-**What changes:**
-1. Add an "Available actions" row to the preview `<dl>`:
-   - Compute action list based on state:
-     - Integrity FAIL: `["Blocked: Integrity mismatch"]`
-     - Package + words + PASS: `["Import as Session", "Extract Pack"]`
-     - Package + no words + PASS: `["Import as Session"]`
-     - Bundle with extractable pack: `["Import Pack"]`
-     - Pack JSON: `["Import Pack"]`
-   - Render as a compact bulleted list within the `<dd>`.
+Click an anomaly row or timeline point → open detail dialog with the actual trial contents.
 
-2. Button gating consolidation (already mostly correct, but formalize):
-   - Integrity FAIL: all import/extract buttons disabled; "Copy diagnostics" and "Cancel" remain enabled.
-   - No words: "Extract Pack" not rendered.
-   - No session: "Import as Session" not rendered.
+### Files changed
 
-3. Tests with 3 fixtures:
-   - valid pkg full (both actions available)
-   - valid pkg minimal/redacted (only Import as Session)
-   - tampered pkg (Blocked)
+- **NEW** `src/app/TrialDetailPanel.tsx`
+- **EDIT** `src/app/ResultsDashboardPanel.tsx`
+- **EDIT** `src/app/ResultsCharts.tsx`
+- **NEW** `src/app/__tests__/trialDrilldown.test.tsx`
+- **EDIT** `docs/VERIFY_LOG.md`
+
+### TrialDetailPanel.tsx
+
+Use existing `Dialog` (`src/components/ui/dialog.tsx`).
+
+Props:
+
+- `{ trialRef: TrialRef | null; onClose: () => void }`
+
+Shows:
+
+- word + orderIndex + position
+- RT, tFirstKeyMs (or “—”), timedOut badge
+- backspaces/edits/compositions
+- flags with human-readable labels:
+  - empty_response → Empty response
+  - timeout → Timed out
+  - timed_out → Timed out
+  - timing_outlier_slow → Unusually slow
+  - timing_outlier_fast → Unusually fast
+  - repeated_response → Repeated response
+  - high_editing → High editing
+- response text or “(empty)”
+
+### ResultsDashboardPanel changes
+
+- state: `selectedSessionTrialIndex: number | null`
+- use `insights.trialRefBySessionTrialIndex[selected]` for dialog content (NOT `insights.timeline`)
+- anomaly row click: set selected to that trial’s sessionTrialIndex
+- timeline point click: set selected to clicked sessionTrialIndex
+- render `TrialDetailPanel` when selected != null
+
+### Tests (`trialDrilldown.test.tsx`)
+
+- click anomaly row → dialog opens with correct word/RT
+- click timeline point → dialog opens
+- labels are human readable (not raw enums)
+- close dialog → disappears
+- null `tFirstKeyMs` renders “—” (no crash)
+
+---
+
+## Ticket 0267 — Baseline + Compare
+
+### Goal
+
+Let you mark a session as baseline and show comparison deltas on other sessions.
+
+### Files changed
+
+- **NEW** `src/infra/localStorageUiPrefs.ts`
+- **EDIT** `src/infra/index.ts`
+- **EDIT** `src/app/ResultsView.tsx`
+- **EDIT** `src/app/PreviousSessions.tsx`
+- **NEW** `src/infra/__tests__/uiPrefs.test.ts`
+- **NEW** `src/app/__tests__/resultsBaselineCompare.test.tsx`
+- **EDIT** `docs/VERIFY_LOG.md`
+
+### localStorageUiPrefs.ts
+
+Key: `complex-mapper-ui-prefs`
+
+```
+interface UiPrefs { baselineSessionId: string | null; }
+
+```
+
+Helpers:
+
+- get/set
+- getBaselineSessionId/setBaselineSessionId
+
+### ResultsView.tsx changes
+
+- baseline button: “Mark as baseline” / “Baseline ✓”
+- load baseline session via effect when baselineId differs
+- if not found: show “Baseline not found” + clear baseline
+
+Compare card when baseline exists & differs:
+
+- median delta
+- empty delta
+- timeout delta
+- flagged delta
+- spike overlap: count of word matches in topSlowTrials (current vs baseline)
+
+### PreviousSessions.tsx
+
+- show “Baseline” badge on the baseline session entry
+
+### Tests
+
+- prefs roundtrip + defaults + merge behavior
+- compare card appears only when appropriate
+- baseline not found flow + clear baseline
+
+---
+
+## Ticket 0268 — Fun Loop (quality index + micro-goal + simulation)
+
+### Goal
+
+Make the product feel like a game: “quality score”, “micro-goal”, and dev-only simulated sessions for fast iteration.
+
+### Files changed
+
+- **EDIT** `src/domain/sessionInsights.ts` (add helpers)
+- **EDIT** `src/domain/index.ts` (export helpers)
+- **EDIT** `src/app/ResultsDashboardPanel.tsx` (render quality card)
+- **NEW** `src/domain/simulateSession.ts`
+- **EDIT** `src/app/PreviousSessions.tsx` (dev-only simulate button)
+- **NEW** `src/domain/__tests__/simulateSession.test.ts`
+- **EDIT** `src/domain/__tests__/sessionInsights.test.ts`
+- **NEW** `src/app/__tests__/simulatedSessionFlow.test.tsx`
+- **EDIT** `docs/VERIFY_LOG.md`
+
+### Additions to sessionInsights.ts
+
+`computeQualityIndex(insights)`
+
+- start 100
+- &nbsp;
+
+- emptyResponseCount * 5
+
+- &nbsp;
+
+- timeoutCount * 10
+
+- &nbsp;
+
+- flaggedOtherCount * 2
+
+- clamp [0, 100]
+- return `{ score, penalties[] }`
+
+`getMicroGoal(insights)`
+
+- if emptyResponseCount > 2 → “aim for ≤ 2 empty responses”
+- else if timeoutCount > 0 → “avoid timeouts”
+- else if spikinessMs > 400 → “steadier pace”
+- else → “baseline repeat”
+
+Export via barrel:
+
+```
+export { computeQualityIndex, getMicroGoal } from "./sessionInsights";
+
+```
+
+### ResultsDashboardPanel UI
+
+Add a “Session Quality” card:
+
+- score /100
+- penalties (max 3 lines)
+- micro-goal line
+
+### simulateSession.ts
+
+Pure deterministic generator:
+
+- deterministic id: `sim_${seed}`
+- fixed word list (10)
+- generate trials + RTs
+- generate occasional timeouts/empties
+- set `trial.timedOut = true` for timeouts
+- **ensure timeout flag compatibility**: either shape data so `scoreSession()` emits the timeout flag, or explicitly ensure timeouts are visible to scoring (preferred outcome: `scoreSession()` should produce a `"timed_out"` (or `"timeout"`) flag for timedOut trials)
+- include `stimulusPackSnapshot.words` so charts work without pack store
+- include minimal provenanceSnapshot `{ sourceName: "simulated", licenseNote: "internal/sim" }`
+- include sessionContext dummy values
+
+### Dev-only button in PreviousSessions.tsx
+
+If `import.meta.env.DEV`:
+
+- “Generate simulated session”
+- `simulateSession(Date.now())`, save, refresh list
+
+### Tests
+
+`simulateSession.test.ts`
+
+- deterministic for a fixed seed
+- correct trial count
+- scoring exists and does not throw
+- words present
+- some non-zero RTs
+
+Extend `sessionInsights.test.ts`
+
+- getMicroGoal table-driven
+- computeQualityIndex arithmetic + clamping
+
+`simulatedSessionFlow.test.tsx`
+
+- build insights from simulated session
+- dashboard renders quality score + micro-goal
 
 ---
 
 ## Execution Order
 
-1. **0244** -- extract + diagnostics (foundational file split, everything else depends on it)
-2. **0245** -- extract pack (adds button to new component)
-3. **0246** -- importedFrom metadata (type + migration + UI)
-4. **0247** -- collision safety (needs `exists()` + import handler change)
-5. **0248** -- gating summary (consolidates all above into clean Available actions)
+1. 0264 — pure insights layer
+2. 0265 — dashboard + charts
+3. 0266 — drilldown
+4. 0267 — baseline compare
+5. 0268 — fun loop + simulation
 
 ---
 
-## Technical Notes
+## Line Budget Summary
 
-- **ProtocolScreen.tsx** is currently 533 lines. After extracting ~150 lines to `ImportPreviewPanel.tsx`, it drops to ~380 lines (well within budget).
-- **ImportPreviewPanel.tsx** will be ~120-140 lines initially, growing to ~160 after tickets 0245 and 0248. Within budget.
-- `SessionResult.importedFrom` does not require a schema version bump since `migrateSessionToV3` already handles unknown fields via `??` defaulting.
-- The `exists()` method is a trivial 3-line addition to `SessionStore`.
-- No new dependencies. Clipboard API is standard browser API.
-- `_imported` flag (existing) is kept for backward compat; `importedFrom` is the richer metadata.
+All projected files remain under 350 lines. `ResultsView.tsx` stays under 350 after baseline compare.
+
+---
 
 ## Risk Card
 
-- **Proved:** Import flow is debuggable, non-destructive, and traceable. ProtocolScreen shrinks materially.
-- **Not proved:** Clipboard API availability in all browsers (fallback: silent fail, diagnostics still visible in UI).
-- **Residual:** ImportPreviewPanel line count grows across tickets but stays within budget.
-- **Detect failure:** Tests assert hash rendering, collision ID generation, action lists, and disabled states.
-
+- Proved: deterministic analysis layer + tests lock behavior; no new deps; drilldown uses existing dialog
+- Not proved: SVG layout across all sizes (v1 fixed height acceptable)
+- Detect failure: tests catch regressions in insight computation, drilldown mapping, and timeout detection compatibility
