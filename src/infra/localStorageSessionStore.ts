@@ -166,6 +166,7 @@ function migrateDraft(raw: Record<string, unknown>): DraftSession {
     trials: (raw.trials as DraftSession["trials"]) ?? [],
     currentIndex: (raw.currentIndex as number) ?? 0,
     savedAt: (raw.savedAt as string) ?? new Date().toISOString(),
+    startedAt: raw.startedAt as string | undefined,
     trialTimeoutMs: raw.trialTimeoutMs as number | undefined,
     breakEveryN: raw.breakEveryN as number | undefined,
   };

@@ -16,5 +16,5 @@ The following files exceed the constitution's 350-line/file or 60-line/function 
 
 | File | Current lines | Limit | Follow-up ticket |
 |------|--------------|-------|-------------------|
-| `src/app/DemoSession.tsx` | ~447 | 350 | Ticket 0162 (planned) |
-| `src/app/ResultsView.tsx` | ~310 | 350 | Within limit but has large functions; allowlisted at 400 as buffer |
+| ~~`src/app/DemoSession.tsx`~~ | ~~447~~ → ~290 | 350 | Ticket 0162 (done — split into DemoSessionHelpers, ResumePrompt, RunningTrial) |
+| `src/app/ResultsView.tsx` | ~310 | 350 | Within limit but allowlisted at 400 as buffer; entry removed in Ticket 0163 |

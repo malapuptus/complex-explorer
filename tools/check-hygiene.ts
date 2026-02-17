@@ -10,10 +10,7 @@ const MAX_FUNC_LINES = 60;
 
 // Temporary allowlist for files documented in docs/SCOPE_EXCEPTIONS.md
 // TODO: Remove entries as files are decomposed (see Ticket 0162+)
-const ALLOWLIST: Record<string, { maxLines?: number; maxFunc?: number }> = {
-  "app/DemoSession.tsx": { maxLines: 500 },
-  "app/ResultsView.tsx": { maxLines: 400 },
-};
+const ALLOWLIST: Record<string, { maxLines?: number; maxFunc?: number }> = {};
 
 function walk(dir: string): string[] {
   const results: string[] = [];
@@ -32,7 +29,7 @@ const violations: string[] = [];
 const files = walk(SRC);
 
 for (const file of files) {
-  const rel = path.relative(SRC, file);
+  const rel = path.relative(SRC, file).replace(/\\/g, "/");
   const content = fs.readFileSync(file, "utf-8");
   const lines = content.split("\n");
 
