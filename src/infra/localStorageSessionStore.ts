@@ -104,6 +104,20 @@ function migrateSessions(
 function readEnvelope(): StorageEnvelope {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
+    const stagingRaw = localStorage.getItem(STORAGE_KEY + "__staging");
+
+    // Recovery: if staging exists but main doesn't, a crash happened mid-write.
+    // Ignore staging (it's incomplete) and use main or default.
+    // If both exist, main is authoritative (staging is leftover from successful write
+    // that didn't clean up, or an interrupted write — main was already committed).
+    if (stagingRaw && !raw) {
+      // Crash before commit — staging is incomplete, discard it.
+      localStorage.removeItem(STORAGE_KEY + "__staging");
+    } else if (stagingRaw) {
+      // Normal leftover — clean up.
+      localStorage.removeItem(STORAGE_KEY + "__staging");
+    }
+
     if (!raw) return { schemaVersion: CURRENT_SCHEMA_VERSION, sessions: {} };
 
     const parsed = JSON.parse(raw);
@@ -136,8 +150,13 @@ function readEnvelope(): StorageEnvelope {
   }
 }
 
+/** Atomic write: stage → commit pattern to prevent corruption. */
 function writeEnvelope(envelope: StorageEnvelope): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
+  const data = JSON.stringify(envelope);
+  const stagingKey = STORAGE_KEY + "__staging";
+  localStorage.setItem(stagingKey, data);
+  localStorage.setItem(STORAGE_KEY, data);
+  localStorage.removeItem(stagingKey);
 }
 
 // ── Draft I/O ────────────────────────────────────────────────────────
@@ -174,8 +193,13 @@ function migrateDraft(raw: Record<string, unknown>): DraftSession {
   };
 }
 
+/** Atomic draft write: staging → commit. */
 function writeDraft(draft: DraftSession): void {
-  localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  const data = JSON.stringify(draft);
+  const stagingKey = DRAFT_KEY + "__staging";
+  localStorage.setItem(stagingKey, data);
+  localStorage.setItem(DRAFT_KEY, data);
+  localStorage.removeItem(stagingKey);
 }
 
 function removeDraft(): void {

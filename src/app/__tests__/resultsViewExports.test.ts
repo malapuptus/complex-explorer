@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { sessionTrialsToCsv, CSV_SCHEMA_VERSION } from "@/domain/csvExport";
+import { buildBundleObject, anonymizeBundle, verifyPackageIntegrity, sha256Hex, stableStringify } from "@/app/ResultsExportActions";
 import type { Trial, TrialFlag, SessionResult, SessionConfig } from "@/domain/types";
 
 /**
  * Ticket 0186/0205 — Minimal integration test for export wiring.
- * Verifies CSV and Research Bundle outputs contain required fields.
- * Updated for privacy switchboard (0229) and package integrity (0231).
+ * Updated for privacy switchboard (0229), package integrity (0231),
+ * anonymize identifiers (0235), and integrity enforcement (0233).
  */
 
 function makeTrial(word: string, index: number): Trial {
@@ -153,6 +154,78 @@ describe("Export button wiring", () => {
       expect(pkg).toHaveProperty("bundle");
       expect(pkg).toHaveProperty("csv");
       expect(pkg).toHaveProperty("csvRedacted");
+    });
+  });
+
+  describe("Anonymize identifiers (0235)", () => {
+    const csvMeta = {
+      sessionId: "s1", packId: "demo-10", packVersion: "1.0.0",
+      seed: null as number | null, sessionFingerprint: "fp123",
+      orderPolicy: "fixed" as const,
+    };
+    const trials = [makeTrial("sun", 0)];
+    const flags: TrialFlag[] = [{ trialIndex: 0, flags: [] }];
+
+    it("anonymizeBundle blanks session ID and timestamps", () => {
+      const bundle = buildBundleObject("full", trials, flags, 400, 400, undefined, csvMeta, null, "2026-01-01T00:00:00Z");
+      const anon = anonymizeBundle(bundle);
+      const sr = anon.sessionResult as Record<string, unknown>;
+      expect(sr.id).toBe("anon_session");
+      expect(sr.startedAt).toBe("");
+      expect(sr.completedAt).toBe("");
+      expect(anon.exportedAt).toBe("");
+    });
+
+    it("anonymizeBundle preserves hashes and scoring", () => {
+      const bundle = buildBundleObject("full", trials, flags, 400, 400, testSession, csvMeta, null, "2026-01-01T00:00:00Z");
+      const anon = anonymizeBundle(bundle);
+      const sr = anon.sessionResult as Record<string, unknown>;
+      expect(sr.sessionFingerprint).toBeTruthy();
+      expect(sr.scoring).toBeDefined();
+    });
+  });
+
+  describe("Import integrity enforcement (0233)", () => {
+    it("tampered package fails verification", async () => {
+      const csvMeta = {
+        sessionId: "s1", packId: "demo-10", packVersion: "1.0.0",
+        seed: null as number | null, sessionFingerprint: "fp123",
+        orderPolicy: "fixed" as const,
+      };
+      const bundle = buildBundleObject("full", [makeTrial("sun", 0)], [{ trialIndex: 0, flags: [] }], 400, 400, undefined, csvMeta, null, "2026-01-01T00:00:00Z");
+      const PACKAGE_KEY_ORDER = ["packageVersion", "packageHash", "hashAlgorithm", "exportedAt", "bundle", "csv", "csvRedacted"];
+      const pkg: Record<string, unknown> = {
+        packageVersion: "pkg_v1", packageHash: "", hashAlgorithm: "sha-256",
+        exportedAt: "2026-01-01T00:00:00Z", bundle, csv: "csv_data", csvRedacted: "csv_redacted",
+      };
+      const forHash = { ...pkg, packageHash: undefined };
+      delete forHash.packageHash;
+      pkg.packageHash = await sha256Hex(stableStringify(forHash, PACKAGE_KEY_ORDER));
+
+      // Tamper 1 byte
+      pkg.csv = "csv_datX";
+      const result = await verifyPackageIntegrity(pkg);
+      expect(result.valid).toBe(false);
+    });
+
+    it("untampered package passes verification", async () => {
+      const csvMeta = {
+        sessionId: "s1", packId: "demo-10", packVersion: "1.0.0",
+        seed: null as number | null, sessionFingerprint: "fp123",
+        orderPolicy: "fixed" as const,
+      };
+      const bundle = buildBundleObject("full", [makeTrial("sun", 0)], [{ trialIndex: 0, flags: [] }], 400, 400, undefined, csvMeta, null, "2026-01-01T00:00:00Z");
+      const PACKAGE_KEY_ORDER = ["packageVersion", "packageHash", "hashAlgorithm", "exportedAt", "bundle", "csv", "csvRedacted"];
+      const pkg: Record<string, unknown> = {
+        packageVersion: "pkg_v1", packageHash: "", hashAlgorithm: "sha-256",
+        exportedAt: "2026-01-01T00:00:00Z", bundle, csv: "csv_data", csvRedacted: "csv_redacted",
+      };
+      const forHash = { ...pkg, packageHash: undefined };
+      delete forHash.packageHash;
+      pkg.packageHash = await sha256Hex(stableStringify(forHash, PACKAGE_KEY_ORDER));
+
+      const result = await verifyPackageIntegrity(pkg);
+      expect(result.valid).toBe(true);
     });
   });
 });

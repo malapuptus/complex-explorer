@@ -168,6 +168,21 @@ function resolvePackWords(
 
 type BundleMode = "full" | "minimal" | "redacted";
 
+/** Anonymize a bundle: blank IDs and timestamps, keep hashes. */
+export function anonymizeBundle(bundle: ResearchBundle): ResearchBundle {
+  const sr = bundle.sessionResult as Record<string, unknown>;
+  return {
+    ...bundle,
+    exportedAt: "",
+    sessionResult: {
+      ...sr,
+      id: "anon_session",
+      startedAt: "",
+      completedAt: "",
+    },
+  };
+}
+
 /** Redact trials: blank all responses. */
 function redactTrials(trials: Trial[]): Trial[] {
   return trials.map((t) => ({
@@ -261,7 +276,7 @@ export function ExportActions({
   onReproduce, onReset,
 }: Props) {
   const [privacyMode, setPrivacyMode] = useState<BundleMode>("full");
-
+  const [anonymize, setAnonymize] = useState(false);
   const csvContent = useMemo(() =>
     sessionTrialsToCsv(trials, trialFlags, csvMeta.sessionId, csvMeta.packId,
       csvMeta.packVersion, csvMeta.seed, csvMeta.sessionFingerprint, SCORING_VERSION),
@@ -276,12 +291,13 @@ export function ExportActions({
   );
 
   /** Build bundle for selected privacy mode. */
-  const bundle = useMemo(() =>
-    buildBundleObject(privacyMode, trials, trialFlags, meanReactionTimeMs,
+  const bundle = useMemo(() => {
+    const b = buildBundleObject(privacyMode, trials, trialFlags, meanReactionTimeMs,
       medianReactionTimeMs, sessionResult, csvMeta, persistedSnapshot,
-      new Date().toISOString()),
-    [privacyMode, trials, trialFlags, meanReactionTimeMs, medianReactionTimeMs, sessionResult, csvMeta, persistedSnapshot],
-  );
+      anonymize ? "" : new Date().toISOString());
+    if (anonymize) return anonymizeBundle(b);
+    return b;
+  }, [privacyMode, trials, trialFlags, meanReactionTimeMs, medianReactionTimeMs, sessionResult, csvMeta, persistedSnapshot, anonymize]);
 
   const bundleJson = useMemo(() => stableStringify(bundle, BUNDLE_KEY_ORDER), [bundle]);
 
@@ -368,12 +384,26 @@ export function ExportActions({
     <div className="mt-6 space-y-3">
       {/* Privacy mode selector (0229) */}
       <div className="flex items-center gap-3">
-        <label className="text-sm text-muted-foreground">Privacy mode:</label>
-        <div className="inline-flex rounded-md border border-border">
+        <label id="privacy-mode-label" className="text-sm text-muted-foreground">Privacy mode:</label>
+        <div className="inline-flex rounded-md border border-border" role="radiogroup" aria-labelledby="privacy-mode-label">
           {(["full", "minimal", "redacted"] as const).map((m) => (
             <button
               key={m}
+              role="radio"
+              aria-checked={privacyMode === m}
               onClick={() => setPrivacyMode(m)}
+              onKeyDown={(e) => {
+                const modes = ["full", "minimal", "redacted"] as const;
+                const idx = modes.indexOf(privacyMode);
+                if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setPrivacyMode(modes[(idx + 1) % 3]);
+                } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setPrivacyMode(modes[(idx + 2) % 3]);
+                }
+              }}
+              tabIndex={privacyMode === m ? 0 : -1}
               className={`px-3 py-1.5 text-xs capitalize ${
                 privacyMode === m
                   ? "bg-primary text-primary-foreground"
@@ -386,6 +416,19 @@ export function ExportActions({
         </div>
       </div>
       <PrivacyNote mode={privacyMode} />
+
+      {/* Anonymize toggle (0235) */}
+      <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+        <input
+          type="checkbox"
+          checked={anonymize}
+          onChange={(e) => setAnonymize(e.target.checked)}
+          className="h-4 w-4 rounded border-border"
+          aria-label="Anonymize identifiers in exports"
+        />
+        Anonymize identifiers
+        <span className="text-xs">(blanks session ID, timestamps; keeps hashes)</span>
+      </label>
 
       {/* CSV exports */}
       <div className="flex flex-wrap gap-3">
