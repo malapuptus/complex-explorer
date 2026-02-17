@@ -90,11 +90,16 @@ export function PreviousSessions() {
           meanReactionTimeMs={selected.scoring.summary.meanReactionTimeMs}
           medianReactionTimeMs={selected.scoring.summary.medianReactionTimeMs}
           onReset={() => setSelected(null)}
+          sessionResult={selected}
           csvMeta={{
             sessionId: selected.id,
             packId: selected.config.stimulusListId,
             packVersion: selected.config.stimulusListVersion,
             seed: selected.seedUsed,
+            sessionFingerprint: selected.sessionFingerprint,
+            orderPolicy: selected.config.orderPolicy,
+            trialTimeoutMs: selected.config.trialTimeoutMs,
+            breakEveryN: selected.config.breakEveryN,
           }}
         />
       </div>
