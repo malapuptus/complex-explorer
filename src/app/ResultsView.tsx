@@ -5,6 +5,7 @@ import { localStorageStimulusStore, localStorageSessionStore, uiPrefs } from "@/
 import { SessionSummaryCard } from "./SessionSummaryCard";
 import { ExportActions, SCORING_VERSION, APP_VERSION } from "./ResultsExportActions";
 import { ResultsDashboardPanel } from "./ResultsDashboardPanel";
+import { SessionsDrawer } from "./SessionsDrawer";
 
 interface Props {
   trials: Trial[];
@@ -146,27 +147,49 @@ export function ResultsView({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <div className="mb-4 flex items-center justify-between">
+      {/* 0269: Header row with Sessions drawer access */}
+      <div className="mb-4 flex items-center justify-between gap-2">
         <h2 className="text-2xl font-bold text-foreground">Session Results</h2>
-        {sessionResult && (
-          <button
-            onClick={handleMarkBaseline}
-            className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
-          >
-            {baselineId === sessionResult.id ? "Baseline ✓" : "Mark as baseline"}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* 0271: Baseline indicator */}
+          {baselineId && baselineId === sessionResult?.id && (
+            <span
+              data-testid="baseline-set-indicator"
+              className="rounded bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary"
+            >
+              Baseline: {sessionResult.id.slice(0, 8)}…
+            </span>
+          )}
+          {sessionResult && (
+            <button
+              onClick={handleMarkBaseline}
+              className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
+            >
+              {baselineId === sessionResult.id ? "Baseline ✓" : "Mark as baseline"}
+            </button>
+          )}
+          {/* 0269: Sessions drawer */}
+          <SessionsDrawer />
+        </div>
       </div>
       <p className="mb-4 text-sm text-muted-foreground">
         Mean RT: {meanReactionTimeMs} ms &middot; Median RT: {medianReactionTimeMs} ms
       </p>
 
-      {/* 0265: Dashboard */}
+      {/* 0265/0271: Insights Dashboard */}
       {insights && (
-        <ResultsDashboardPanel
-          insights={insights}
-          sessionContext={sessionResult?.sessionContext ?? null}
-        />
+        <>
+          <h3
+            data-testid="insights-dashboard-heading"
+            className="mb-3 text-sm font-semibold text-foreground"
+          >
+            Insights Dashboard
+          </h3>
+          <ResultsDashboardPanel
+            insights={insights}
+            sessionContext={sessionResult?.sessionContext ?? null}
+          />
+        </>
       )}
 
       {/* 0267: Baseline not found */}
