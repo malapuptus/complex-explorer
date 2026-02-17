@@ -39,11 +39,12 @@ for (const file of files) {
     violations.push(`${rel}: ${lines.length} lines (max ${fileLimit})`);
   }
 
-  // Check for console.log
+  // Check for console.log (blocked in all src files including tests)
+  // console.warn and console.error are allowed (intentional logging).
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (/console\.log\s*\(/.test(line) && !line.trim().startsWith("//")) {
-      violations.push(`${rel}:${i + 1}: console.log found`);
+      violations.push(`${rel}:${i + 1}: console.log found (use console.warn/error if intentional)`);
     }
   }
 
