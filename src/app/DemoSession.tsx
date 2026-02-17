@@ -68,6 +68,7 @@ export function DemoSession() {
   const [sessionFingerprint, setSessionFingerprint] = useState<string | null>(null);
   const draftIdRef = useRef(generateId());
   const tabIdRef = useRef(generateTabId());
+  const startedAtRef = useRef<string | null>(null);
 
   const selectedOption = packOptions.find((p) => `${p.id}@${p.version}` === selectedPackKey)!;
   const list = getStimulusList(selectedOption.id, selectedOption.version)!;
@@ -110,6 +111,7 @@ export function DemoSession() {
       trials: session.trials,
       currentIndex: session.currentIndex,
       savedAt: new Date().toISOString(),
+      startedAt: startedAtRef.current ?? undefined,
       trialTimeoutMs: session.trialTimeoutMs,
       breakEveryN,
     };
@@ -164,13 +166,14 @@ export function DemoSession() {
           id: draftIdRef.current,
           config,
           trials: session.trials,
-          startedAt: new Date().toISOString(),
+          startedAt: startedAtRef.current ?? new Date().toISOString(),
           completedAt: new Date().toISOString(),
           scoring: session.scoring,
           seedUsed: session.seedUsed,
           stimulusOrder: session.stimulusOrder,
           provenanceSnapshot: provSnapshot,
           sessionFingerprint: fingerprint,
+          scoringVersion: "scoring_v2_mad_3.5",
         };
         localStorageSessionStore.save(result);
         setSessionFingerprint(fingerprint);
@@ -218,6 +221,7 @@ export function DemoSession() {
       trialTimeoutMs: pendingDraft.trialTimeoutMs,
     };
 
+    startedAtRef.current = pendingDraft.startedAt ?? new Date().toISOString();
     draftIdRef.current = pendingDraft.id;
     setSelectedPackKey(`${pendingDraft.stimulusListId}@${pendingDraft.stimulusListVersion}`);
     setActiveConfig({
@@ -245,6 +249,7 @@ export function DemoSession() {
         setDraftLocked(true);
         return;
       }
+      startedAtRef.current = new Date().toISOString();
       setActiveConfig(config);
       const overrides: StartOverrides = {
         orderPolicy: config.orderPolicy,

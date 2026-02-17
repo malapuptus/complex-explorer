@@ -74,6 +74,7 @@ function migrateSessionToV3(raw: Record<string, unknown>): SessionResult {
       trials.filter((t) => !t.isPractice).map((t) => t.stimulus.word),
     provenanceSnapshot: (raw.provenanceSnapshot as SessionResult["provenanceSnapshot"]) ?? null,
     sessionFingerprint: (raw.sessionFingerprint as string | null) ?? null,
+    scoringVersion: (raw.scoringVersion as string | null) ?? null,
   };
 }
 

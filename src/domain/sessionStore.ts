@@ -58,6 +58,8 @@ export interface DraftSession {
   readonly trials: readonly Trial[];
   readonly currentIndex: number;
   readonly savedAt: string;
+  /** ISO-8601 timestamp of when the session was first started. */
+  readonly startedAt?: string;
   /** Per-trial timeout in ms (undefined = no timeout). */
   readonly trialTimeoutMs?: number;
   /** Break interval in scored trials (undefined = no breaks). */

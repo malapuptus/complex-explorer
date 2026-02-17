@@ -1,26 +1,10 @@
 import { useMemo, useCallback, useState } from "react";
-import type { Trial, TrialFlag, OrderPolicy, SessionScoring } from "@/domain";
+import type { Trial, TrialFlag, OrderPolicy, SessionScoring, SessionResult } from "@/domain";
 import { generateReflectionPrompts, sessionTrialsToCsv } from "@/domain";
 
 /** Self-contained research bundle for offline reproducibility. */
 interface ResearchBundle {
-  sessionResult: {
-    id: string;
-    config: {
-      stimulusListId: string;
-      stimulusListVersion: string;
-      orderPolicy: string;
-      seed: number | null;
-      trialTimeoutMs?: number;
-      breakEveryN?: number;
-    };
-    trials: Trial[];
-    scoring: {
-      trialFlags: TrialFlag[];
-      summary: { meanReactionTimeMs: number; medianReactionTimeMs: number };
-    };
-    sessionFingerprint: string | null;
-  };
+  sessionResult: Record<string, unknown>;
   protocolDocVersion: string;
   appVersion: string | null;
   scoringAlgorithm: string;
@@ -37,6 +21,8 @@ interface Props {
   meanReactionTimeMs: number;
   medianReactionTimeMs: number;
   onReset: () => void;
+  /** Full persisted session (from PreviousSessions). When provided, Research Bundle uses it directly. */
+  sessionResult?: SessionResult;
   /** Metadata needed for CSV export. If omitted, CSV button is hidden. */
   csvMeta?: {
     sessionId: string;
@@ -86,6 +72,7 @@ export function ResultsView({
   meanReactionTimeMs,
   medianReactionTimeMs,
   onReset,
+  sessionResult,
   csvMeta,
 }: Props) {
   const reflectionPrompts = useMemo(
@@ -245,28 +232,43 @@ export function ResultsView({
             </button>
             <button
               onClick={() => {
+                const bundleSession = sessionResult
+                  ? {
+                      id: sessionResult.id,
+                      config: sessionResult.config,
+                      trials: sessionResult.trials,
+                      scoring: sessionResult.scoring,
+                      sessionFingerprint: sessionResult.sessionFingerprint,
+                      provenanceSnapshot: sessionResult.provenanceSnapshot,
+                      stimulusOrder: sessionResult.stimulusOrder,
+                      seedUsed: sessionResult.seedUsed,
+                      scoringVersion: sessionResult.scoringVersion,
+                      startedAt: sessionResult.startedAt,
+                      completedAt: sessionResult.completedAt,
+                    }
+                  : {
+                      id: csvMeta.sessionId,
+                      config: {
+                        stimulusListId: csvMeta.packId,
+                        stimulusListVersion: csvMeta.packVersion,
+                        orderPolicy: csvMeta.orderPolicy ?? "fixed",
+                        seed: csvMeta.seed,
+                        ...(csvMeta.trialTimeoutMs !== undefined && {
+                          trialTimeoutMs: csvMeta.trialTimeoutMs,
+                        }),
+                        ...(csvMeta.breakEveryN !== undefined && {
+                          breakEveryN: csvMeta.breakEveryN,
+                        }),
+                      },
+                      trials,
+                      scoring: {
+                        trialFlags,
+                        summary: { meanReactionTimeMs, medianReactionTimeMs },
+                      },
+                      sessionFingerprint: csvMeta.sessionFingerprint ?? null,
+                    };
                 const bundle: ResearchBundle = {
-                  sessionResult: {
-                    id: csvMeta.sessionId,
-                    config: {
-                      stimulusListId: csvMeta.packId,
-                      stimulusListVersion: csvMeta.packVersion,
-                      orderPolicy: csvMeta.orderPolicy ?? "fixed",
-                      seed: csvMeta.seed,
-                      ...(csvMeta.trialTimeoutMs !== undefined && {
-                        trialTimeoutMs: csvMeta.trialTimeoutMs,
-                      }),
-                      ...(csvMeta.breakEveryN !== undefined && {
-                        breakEveryN: csvMeta.breakEveryN,
-                      }),
-                    },
-                    trials,
-                    scoring: {
-                      trialFlags,
-                      summary: { meanReactionTimeMs, medianReactionTimeMs },
-                    },
-                    sessionFingerprint: csvMeta.sessionFingerprint ?? null,
-                  },
+                  sessionResult: bundleSession,
                   protocolDocVersion: PROTOCOL_DOC_VERSION,
                   appVersion: null,
                   scoringAlgorithm: SCORING_ALGORITHM,

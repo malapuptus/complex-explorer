@@ -9,3 +9,12 @@ This is the canonical record of out-of-scope edits made during ticket execution.
 | 0145 | `src/domain/index.ts`, `src/infra/__tests__/draftLock.test.ts` (new) | New `DraftLock` type and `DRAFT_LOCK_TTL_MS` constant needed re-exporting from the domain barrel; lock tests required a new test file under infra. | Expand allowed edits to include barrel re-export files and test directories when adding new domain types. |
 | 0146 | `src/domain/fingerprint.ts` (new), `src/app/DemoSession.tsx` | New fingerprint module needed a dedicated file; `DemoSession` required edits to compute and thread the fingerprint on completion. | Include host/orchestration components and allow new domain files when the ticket introduces a new domain concept. |
 | 0149 | `src/app/DemoSession.tsx` | Reproducibility bundle in `ResultsView` required passing `orderPolicy`, `trialTimeoutMs`, and `breakEveryN` via `csvMeta`, which meant editing the parent component. | Include host/integration components in allowed edits when expanding a child component's props interface. |
+
+## Known Hygiene Exceptions (Ticket 0161)
+
+The following files exceed the constitution's 350-line/file or 60-line/function limits and are temporarily allowlisted in `tools/check-hygiene.ts`. Each requires a follow-up decomposition ticket.
+
+| File | Current lines | Limit | Follow-up ticket |
+|------|--------------|-------|-------------------|
+| `src/app/DemoSession.tsx` | ~447 | 350 | Ticket 0162 (planned) |
+| `src/app/ResultsView.tsx` | ~310 | 350 | Within limit but has large functions; allowlisted at 400 as buffer |
