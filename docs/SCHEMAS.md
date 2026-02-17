@@ -188,6 +188,27 @@ The privacy mode selector (Full / Minimal / Redacted) governs:
 - Which bundle mode is used inside the package
 - Whether `csv` contains full or redacted CSV (redacted mode uses redacted CSV)
 
+### Import integrity enforcement (0233)
+
+When importing a `pkg_v1` file, the import flow runs `verifyPackageIntegrity()` before allowing the import to proceed. If the hash does not match, the import preview shows **"Integrity: FAIL — ERR_INTEGRITY_MISMATCH"** and the Import button is disabled. This prevents importing corrupted or tampered packages.
+
+### Anonymize identifiers (0235)
+
+An "Anonymize identifiers" toggle (default OFF) governs all export outputs:
+- **session_id** → `"anon_session"`
+- **startedAt / completedAt / exportedAt** → `""` (empty string)
+- **sessionFingerprint** → preserved (needed for reproducibility verification)
+- **Hashes and scoring** → preserved unchanged
+
+### Atomic saves (0236)
+
+All `localStorage.setItem()` calls for sessions and drafts use a staging-key → commit-key pattern:
+1. Write to `<key>__staging`
+2. Write to `<key>` (commit)
+3. Remove `<key>__staging`
+
+On read, if `__staging` exists without a main key, the staging is discarded (incomplete write). If both exist, the main key is authoritative and staging is cleaned up.
+
 ### Deterministic ordering (0228)
 
 All JSON exports use stable key ordering. Bundle keys: `exportSchemaVersion`, `exportedAt`, `protocolDocVersion`, `appVersion`, `scoringAlgorithm`, `privacy`, `sessionResult`, `stimulusPackSnapshot`. Timestamps (`exportedAt`) are the only allowed nondeterminism.

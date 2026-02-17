@@ -129,23 +129,31 @@ export function PreviousSessions() {
       ) : (
         <>
           <ul className="space-y-2">
-            {entries.map((entry) => (
-              <li key={entry.id}>
-                <button
-                  onClick={async () => {
-                    const s = await localStorageSessionStore.load(entry.id);
-                    if (s) setSelected(s);
-                  }}
-                  className="w-full rounded-md border border-border px-4 py-3 text-left hover:bg-muted"
-                >
-                  <span className="font-medium text-foreground">{entry.stimulusListId}</span>
-                  <span className="ml-4 text-sm text-muted-foreground">
-                    {entry.totalTrials} trials &middot;{" "}
-                    {new Date(entry.completedAt).toLocaleString()}
-                  </span>
-                </button>
-              </li>
-            ))}
+            {entries.map((entry) => {
+              const isImported = (entry as unknown as Record<string, unknown>)._imported === true;
+              return (
+                <li key={entry.id}>
+                  <button
+                    onClick={async () => {
+                      const s = await localStorageSessionStore.load(entry.id);
+                      if (s) setSelected(s);
+                    }}
+                    className="w-full rounded-md border border-border px-4 py-3 text-left hover:bg-muted"
+                  >
+                    <span className="font-medium text-foreground">{entry.stimulusListId}</span>
+                    {isImported && (
+                      <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">
+                        Imported
+                      </span>
+                    )}
+                    <span className="ml-4 text-sm text-muted-foreground">
+                      {entry.totalTrials} trials &middot;{" "}
+                      {new Date(entry.completedAt).toLocaleString()}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
 
           <div className="mt-8 flex gap-3">

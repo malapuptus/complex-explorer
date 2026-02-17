@@ -30,7 +30,41 @@ Copy this block for each new entry:
 
 ## Runs
 
-### 2026-02-17 17:22 (Lovable sandbox) — Tickets 0228–0232
+### 2026-02-17 17:35 (Lovable sandbox) — Tickets 0233–0237
+
+- **Environment:** Lovable (tests only)
+- **Command:** `npx vitest run src`
+- **Result:** PASS (232/232)
+
+| # | Oracle | Runnable in Lovable | Evidence provided | Notes |
+|---|--------|---------------------|-------------------|-------|
+| 1 | Hygiene | N | — | ResultsExportActions.tsx ~500 lines (see SCOPE_EXCEPTIONS) |
+| 2 | Format | N | — | No shell access |
+| 3 | Lint | N | — | No shell access |
+| 4 | Typecheck | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 5 | Boundaries | N | — | No shell access |
+| 6 | Load smoke | N | — | No shell access |
+| 7 | Build | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 8 | Tests | Y | 232/232 passed | 25 test files |
+
+**Canary artifacts:**
+
+- **Integrity enforcement (0233):** Import preview shows "Integrity: FAIL — ERR_INTEGRITY_MISMATCH" when pkg_v1 hash doesn't match; Import button disabled; test mutates 1 byte and asserts rejection
+- **Import as session (0234):** pkg_v1 import offers "Import as Session" button; session appears in Previous Sessions with "Imported" badge; read-only (no resume)
+- **Anonymize identifiers (0235):** Toggle blanks `session_id` → "anon_session", `startedAt`/`completedAt`/`exportedAt` → ""; preserves sessionFingerprint + hashes + scoring
+- **Atomic saves (0236):** Staging-key → commit-key pattern; atomicSave.test.ts covers: normal write, staging-only crash recovery, staging leftover cleanup, quota error preserves previous state
+- **Accessibility (0237):** Privacy switchboard uses `role="radiogroup"` + `role="radio"` + `aria-checked` + arrow key navigation; quota panel uses `role="alertdialog"` + `aria-labelledby`/`aria-describedby`; import preview uses `role="region"` + `aria-label`
+
+**Policy checklist:**
+
+- [x] `npx vitest run src` passed (232/232)
+- [x] Oracle table included (8 rows)
+- [x] CSV canary: header present
+- [x] Bundle canary: rb_v3 + anonymize + integrity
+- [x] Environment line present: "Lovable (tests only)"
+
+---
+
 
 - **Environment:** Lovable (tests only)
 - **Command:** `npx vitest run src`

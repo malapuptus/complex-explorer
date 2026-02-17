@@ -8,10 +8,11 @@
 
 import { useState, useRef } from "react";
 import type { ReactNode } from "react";
-import type { OrderPolicy, ValidationErrorCode } from "@/domain";
+import type { OrderPolicy, ValidationErrorCode, SessionResult } from "@/domain";
 import { validateStimulusList, STIMULUS_SCHEMA_VERSION, computeWordsSha256 } from "@/domain";
 import type { StimulusList } from "@/domain";
 import { localStorageStimulusStore, localStorageSessionStore } from "@/infra";
+import { verifyPackageIntegrity } from "./ResultsExportActions";
 
 /** Human-readable messages for validation error codes. */
 const ERROR_CODE_MESSAGES: Record<ValidationErrorCode, string> = {
@@ -107,6 +108,10 @@ interface ImportPreview {
   schemaVersion: string | null;
   sizeBytes: number;
   rawJson: string;
+  /** For pkg_v1: integrity check result. */
+  integrityResult?: { valid: boolean; expected: string; actual: string } | null;
+  /** For pkg_v1: the full session result to import. */
+  sessionToImport?: SessionResult | null;
 }
 
 /** Detect type and extract pack data for preview. */
@@ -143,15 +148,18 @@ function analyzeImport(parsed: Record<string, unknown>, rawJson: string): Import
 }
 
 function ImportPreviewPanel({
-  preview, onConfirm, onCancel,
+  preview, onConfirm, onCancel, onImportSession,
 }: {
   preview: ImportPreview;
   onConfirm: () => void;
   onCancel: () => void;
+  onImportSession?: () => void;
 }) {
   const typeLabel = preview.type === "pack" ? "Pack JSON" : preview.type === "bundle" ? "Research Bundle" : "Session Package";
+  const integrityFailed = preview.integrityResult && !preview.integrityResult.valid;
+  const hasSession = !!preview.sessionToImport;
   return (
-    <div className="w-full max-w-md rounded-md border border-border bg-muted/30 p-4 space-y-2">
+    <div className="w-full max-w-md rounded-md border border-border bg-muted/30 p-4 space-y-2" role="region" aria-label="Import preview">
       <h4 className="text-sm font-semibold text-foreground">Import Preview</h4>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
         <dt className="text-muted-foreground">Detected type</dt>
@@ -168,13 +176,37 @@ function ImportPreviewPanel({
         <dd className="font-mono text-foreground">{preview.schemaVersion ?? "n/a"}</dd>
         <dt className="text-muted-foreground">File size</dt>
         <dd className="text-foreground">{formatKB(preview.sizeBytes)}</dd>
+        {preview.integrityResult && (
+          <>
+            <dt className="text-muted-foreground">Integrity</dt>
+            <dd className={integrityFailed ? "text-destructive font-semibold" : "text-primary font-semibold"}>
+              {integrityFailed ? "FAIL — ERR_INTEGRITY_MISMATCH" : "PASS ✓"}
+            </dd>
+          </>
+        )}
       </dl>
-      <div className="flex gap-3 pt-2">
+      {integrityFailed && (
+        <p className="text-xs text-destructive">
+          Package hash mismatch. The file may be corrupted or tampered. Import is blocked.
+        </p>
+      )}
+      <div className="flex flex-wrap gap-3 pt-2">
         <button onClick={onConfirm}
-          className="rounded-md bg-primary px-4 py-1.5 text-sm text-primary-foreground hover:opacity-90"
+          disabled={!!integrityFailed}
+          aria-disabled={!!integrityFailed}
+          className="rounded-md bg-primary px-4 py-1.5 text-sm text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Confirm Import
+          Import Pack
         </button>
+        {hasSession && onImportSession && (
+          <button onClick={onImportSession}
+            disabled={!!integrityFailed}
+            aria-disabled={!!integrityFailed}
+            className="rounded-md border border-primary px-4 py-1.5 text-sm text-primary hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Import as Session
+          </button>
+        )}
         <button onClick={onCancel}
           className="rounded-md border border-border px-4 py-1.5 text-sm text-muted-foreground hover:bg-muted"
         >
@@ -264,7 +296,23 @@ export function ProtocolScreen({
           setImportError("Could not detect a valid pack in this file.");
           return;
         }
-        setImportPreview(preview);
+        // 0233: Integrity check for pkg_v1
+        if (preview.type === "package" && typeof parsed.packageHash === "string") {
+          void verifyPackageIntegrity(parsed).then((result) => {
+            // 0234: Extract session for import
+            let sessionToImport: SessionResult | null = null;
+            if (result.valid) {
+              const bundle = parsed.bundle as Record<string, unknown> | undefined;
+              if (bundle?.sessionResult) {
+                const sr = bundle.sessionResult as Record<string, unknown>;
+                sessionToImport = sr as unknown as SessionResult;
+              }
+            }
+            setImportPreview({ ...preview, integrityResult: result, sessionToImport });
+          });
+        } else {
+          setImportPreview(preview);
+        }
       } catch {
         setImportError("Invalid JSON file.");
       }
@@ -353,12 +401,24 @@ export function ProtocolScreen({
         )}
       </div>
 
-      {/* Import preview (0232) */}
+      {/* Import preview (0232, 0233, 0234) */}
       {importPreview && (
         <ImportPreviewPanel
           preview={importPreview}
           onConfirm={handleConfirmImport}
           onCancel={() => setImportPreview(null)}
+          onImportSession={() => {
+            if (!importPreview.sessionToImport) return;
+            const session = importPreview.sessionToImport;
+            // Save as imported session (with _imported flag)
+            const imported = { ...session, _imported: true } as SessionResult & { _imported: boolean };
+            void localStorageSessionStore.save(imported).then(() => {
+              setImportSuccess(`Session "${session.id}" imported to Previous Sessions.`);
+              setImportPreview(null);
+            }).catch((err) => {
+              setImportError(`Failed to import session: ${String(err)}`);
+            });
+          }}
         />
       )}
 

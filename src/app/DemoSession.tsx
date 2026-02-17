@@ -68,9 +68,9 @@ function QuotaRecoveryDialog({
   };
 
   return (
-    <div className="mx-auto max-w-lg rounded-md border border-destructive bg-destructive/10 p-6 space-y-4">
-      <h3 className="text-lg font-bold text-destructive">Storage Full</h3>
-      <p className="text-sm text-foreground">
+    <div className="mx-auto max-w-lg rounded-md border border-destructive bg-destructive/10 p-6 space-y-4" role="alertdialog" aria-labelledby="quota-title" aria-describedby="quota-desc">
+      <h3 id="quota-title" className="text-lg font-bold text-destructive">Storage Full</h3>
+      <p id="quota-desc" className="text-sm text-foreground">
         {error.operation === "draft" ? "Draft" : "Session"} could not be saved — browser storage quota exceeded.
       </p>
       <p className="text-xs text-muted-foreground">{error.message}</p>
