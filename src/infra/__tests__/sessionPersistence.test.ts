@@ -56,6 +56,24 @@ describe("scoringVersion persistence", () => {
   });
 });
 
+describe("appVersion persistence", () => {
+  it("round-trips appVersion through save/load", async () => {
+    const result = makeFakeResult({ appVersion: "1.2.3" });
+    await localStorageSessionStore.save(result as never);
+    const loaded = await localStorageSessionStore.load("test-1");
+    expect(loaded?.appVersion).toBe("1.2.3");
+  });
+
+  it("migrates legacy session without appVersion to null", async () => {
+    const legacy = makeFakeResult();
+    delete (legacy as Record<string, unknown>).appVersion;
+    const envelope = { schemaVersion: 2, sessions: { "test-1": legacy } };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
+
+    const loaded = await localStorageSessionStore.load("test-1");
+    expect(loaded?.appVersion).toBeNull();
+  });
+});
 describe("draft startedAt persistence", () => {
   it("preserves startedAt through draft save/load", async () => {
     const draft = {

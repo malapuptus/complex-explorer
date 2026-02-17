@@ -82,6 +82,7 @@ describe("Export parity", () => {
       "sessionResult",
       "protocolDocVersion",
       "scoringAlgorithm",
+      "exportSchemaVersion",
       "exportedAt",
     ] as const;
 
@@ -91,6 +92,7 @@ describe("Export parity", () => {
         protocolDocVersion: "PROTOCOL.md@2026-02-13",
         appVersion: "0.0.0",
         scoringAlgorithm: "MAD-modified-z@3.5 + fast<200ms + timeout excluded",
+        exportSchemaVersion: "rb_v1",
         exportedAt: new Date().toISOString(),
       };
 
@@ -106,10 +108,24 @@ describe("Export parity", () => {
         protocolDocVersion: "test",
         appVersion: "1.0.0",
         scoringAlgorithm: "test",
+        exportSchemaVersion: "rb_v1",
         exportedAt: "2026-01-01",
       };
       expect(bundle).toHaveProperty("appVersion");
       expect(bundle.appVersion).toBeTruthy();
+    });
+
+    it("exportSchemaVersion is a non-empty string", () => {
+      const bundle = {
+        sessionResult: {},
+        protocolDocVersion: "test",
+        appVersion: "1.0.0",
+        scoringAlgorithm: "test",
+        exportSchemaVersion: "rb_v1",
+        exportedAt: "2026-01-01",
+      };
+      expect(typeof bundle.exportSchemaVersion).toBe("string");
+      expect(bundle.exportSchemaVersion.length).toBeGreaterThan(0);
     });
   });
 });
