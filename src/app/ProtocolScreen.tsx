@@ -3,6 +3,7 @@
  * Includes an Advanced section for experimental controls.
  * Supports custom pack import/export with collision detection.
  * Supports importing from Research Bundle JSON (auto-detects rb_v3+ payload).
+ * Import preview + confirmation gate added (0232).
  */
 
 import { useState, useRef } from "react";
@@ -94,6 +95,96 @@ function extractPackFromBundle(parsed: Record<string, unknown>): Partial<Stimulu
   };
 }
 
+/** Detected import type for preview. */
+type ImportType = "pack" | "bundle" | "package";
+
+/** Import preview data shown before confirmation. */
+interface ImportPreview {
+  type: ImportType;
+  packData: Partial<StimulusList>;
+  wordCount: number;
+  hash: string | null;
+  schemaVersion: string | null;
+  sizeBytes: number;
+  rawJson: string;
+}
+
+/** Detect type and extract pack data for preview. */
+function analyzeImport(parsed: Record<string, unknown>, rawJson: string): ImportPreview | null {
+  let type: ImportType = "pack";
+  let packData: Partial<StimulusList> | null = null;
+
+  // Session package?
+  if (typeof parsed.packageVersion === "string" && parsed.bundle) {
+    type = "package";
+    const bundle = parsed.bundle as Record<string, unknown>;
+    packData = extractPackFromBundle(bundle);
+  }
+  // Research bundle?
+  else if (typeof parsed.exportSchemaVersion === "string") {
+    type = "bundle";
+    packData = extractPackFromBundle(parsed);
+  }
+  // Direct pack JSON
+  else {
+    packData = parsed as Partial<StimulusList>;
+  }
+
+  if (!packData) return null;
+
+  return {
+    type,
+    packData,
+    wordCount: Array.isArray(packData.words) ? packData.words.length : 0,
+    hash: (packData.stimulusListHash as string) ?? null,
+    schemaVersion: (packData.stimulusSchemaVersion as string) ?? null,
+    sizeBytes: rawJson.length,
+  } as ImportPreview;
+}
+
+function ImportPreviewPanel({
+  preview, onConfirm, onCancel,
+}: {
+  preview: ImportPreview;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const typeLabel = preview.type === "pack" ? "Pack JSON" : preview.type === "bundle" ? "Research Bundle" : "Session Package";
+  return (
+    <div className="w-full max-w-md rounded-md border border-border bg-muted/30 p-4 space-y-2">
+      <h4 className="text-sm font-semibold text-foreground">Import Preview</h4>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+        <dt className="text-muted-foreground">Detected type</dt>
+        <dd className="text-foreground">{typeLabel}</dd>
+        <dt className="text-muted-foreground">Pack ID</dt>
+        <dd className="font-mono text-foreground">{(preview.packData.id as string) ?? "unknown"}</dd>
+        <dt className="text-muted-foreground">Version</dt>
+        <dd className="font-mono text-foreground">{(preview.packData.version as string) ?? "unknown"}</dd>
+        <dt className="text-muted-foreground">Word count</dt>
+        <dd className="text-foreground">{preview.wordCount}</dd>
+        <dt className="text-muted-foreground">Hash</dt>
+        <dd className="font-mono text-foreground break-all">{preview.hash ?? "n/a"}</dd>
+        <dt className="text-muted-foreground">Schema</dt>
+        <dd className="font-mono text-foreground">{preview.schemaVersion ?? "n/a"}</dd>
+        <dt className="text-muted-foreground">File size</dt>
+        <dd className="text-foreground">{formatKB(preview.sizeBytes)}</dd>
+      </dl>
+      <div className="flex gap-3 pt-2">
+        <button onClick={onConfirm}
+          className="rounded-md bg-primary px-4 py-1.5 text-sm text-primary-foreground hover:opacity-90"
+        >
+          Confirm Import
+        </button>
+        <button onClick={onCancel}
+          className="rounded-md border border-border px-4 py-1.5 text-sm text-muted-foreground hover:bg-muted"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ProtocolScreen({
   wordCount, practiceCount, source, estimatedMinutes,
   isLongPack, onReady, onPackImported, selectedPack, children,
@@ -106,6 +197,7 @@ export function ProtocolScreen({
   const [timeoutMs, setTimeoutMs] = useState(8000);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
   const [showManager, setShowManager] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -120,11 +212,7 @@ export function ProtocolScreen({
     });
   };
 
-  const importPack = (parsed: Record<string, unknown>) => {
-    // Auto-detect: is this a Research Bundle?
-    const bundlePack = extractPackFromBundle(parsed);
-    const packData = bundlePack ?? parsed;
-
+  const doImport = (packData: Partial<StimulusList>) => {
     const errors = validateStimulusList(packData as Partial<StimulusList>);
     if (errors.length > 0) {
       const messages = errors.map((err) => ERROR_CODE_MESSAGES[err.code] ?? err.message);
@@ -151,8 +239,10 @@ export function ProtocolScreen({
         return;
       }
       localStorageStimulusStore.save(enriched);
-      const fromBundle = bundlePack ? " (extracted from Research Bundle)" : "";
-      setImportSuccess(`Imported "${pack.id}" (${pack.words.length} words)${fromBundle}`);
+      const fromType = importPreview?.type === "bundle" ? " (extracted from Research Bundle)"
+        : importPreview?.type === "package" ? " (extracted from Session Package)" : "";
+      setImportSuccess(`Imported "${pack.id}" (${pack.words.length} words)${fromType}`);
+      setImportPreview(null);
       onPackImported?.();
     });
   };
@@ -162,18 +252,30 @@ export function ProtocolScreen({
     if (!file) return;
     setImportError(null);
     setImportSuccess(null);
+    setImportPreview(null);
 
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const parsed = JSON.parse(reader.result as string);
-        importPack(parsed);
+        const rawJson = reader.result as string;
+        const parsed = JSON.parse(rawJson);
+        const preview = analyzeImport(parsed, rawJson);
+        if (!preview) {
+          setImportError("Could not detect a valid pack in this file.");
+          return;
+        }
+        setImportPreview(preview);
       } catch {
         setImportError("Invalid JSON file.");
       }
     };
     reader.readAsText(file);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleConfirmImport = () => {
+    if (!importPreview) return;
+    doImport(importPreview.packData);
   };
 
   const handleExportPack = () => {
@@ -250,6 +352,16 @@ export function ProtocolScreen({
           </button>
         )}
       </div>
+
+      {/* Import preview (0232) */}
+      {importPreview && (
+        <ImportPreviewPanel
+          preview={importPreview}
+          onConfirm={handleConfirmImport}
+          onCancel={() => setImportPreview(null)}
+        />
+      )}
+
       {importError && <p className="text-xs text-destructive">{importError}</p>}
       {importSuccess && <p className="text-xs text-primary">{importSuccess}</p>}
 

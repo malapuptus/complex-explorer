@@ -2,9 +2,11 @@
  * ResultsExportActions — export/restore/reproduce buttons for ResultsView.
  * Extracted from ResultsView (Ticket 0213). Privacy manifest added (0223).
  * Redacted bundle (0224), session package (0227) added.
+ * Privacy switchboard (0229), deterministic ordering (0228),
+ * package integrity (0231) added.
  */
 
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import type { Trial, TrialFlag, OrderPolicy, SessionResult, StimulusPackSnapshot, StimulusList } from "@/domain";
 import { sessionTrialsToCsv, getStimulusList } from "@/domain";
 import { localStorageStimulusStore } from "@/infra";
@@ -19,7 +21,7 @@ export interface PrivacyManifest {
 }
 
 /** Self-contained research bundle for offline reproducibility. */
-interface ResearchBundle {
+export interface ResearchBundle {
   sessionResult: Record<string, unknown>;
   protocolDocVersion: string;
   appVersion: string | null;
@@ -38,6 +40,45 @@ export const APP_VERSION: string | null =
   typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : null;
 
 const SIZE_WARN_THRESHOLD = 256 * 1024; // 250 KB
+
+/** Deterministic key order for bundles. */
+const BUNDLE_KEY_ORDER = [
+  "exportSchemaVersion", "exportedAt", "protocolDocVersion", "appVersion",
+  "scoringAlgorithm", "privacy", "sessionResult", "stimulusPackSnapshot",
+] as const;
+
+/** Deterministic key order for packages. */
+const PACKAGE_KEY_ORDER = [
+  "packageVersion", "packageHash", "hashAlgorithm", "exportedAt",
+  "bundle", "csv", "csvRedacted",
+] as const;
+
+/** Stringify with stable key ordering. */
+export function stableStringify(obj: unknown, keyOrder?: readonly string[]): string {
+  return JSON.stringify(obj, keyOrder ? createKeyReplacer(keyOrder) : undefined, 2);
+}
+
+function createKeyReplacer(topLevelOrder: readonly string[]) {
+  let isRoot = true;
+  return function replacer(this: unknown, _key: string, value: unknown): unknown {
+    if (isRoot && typeof value === "object" && value !== null && !Array.isArray(value)) {
+      isRoot = false;
+      const ordered: Record<string, unknown> = {};
+      for (const k of topLevelOrder) {
+        if (k in (value as Record<string, unknown>)) {
+          ordered[k] = (value as Record<string, unknown>)[k];
+        }
+      }
+      for (const k of Object.keys(value as Record<string, unknown>)) {
+        if (!(k in ordered)) {
+          ordered[k] = (value as Record<string, unknown>)[k];
+        }
+      }
+      return ordered;
+    }
+    return value;
+  };
+}
 
 function downloadFile(content: string, mime: string, filename: string) {
   const blob = new Blob([content], { type: mime });
@@ -72,6 +113,12 @@ function PrivacyNote({ mode }: { mode: "full" | "minimal" | "redacted" }) {
     ? "Omits stimulus words, includes responses"
     : "Omits responses, omits stimulus words";
   return <span className="block text-xs text-muted-foreground">{text}</span>;
+}
+
+/** Compute SHA-256 hex digest of a string (browser SubtleCrypto). */
+export async function sha256Hex(input: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 interface Props {
@@ -129,11 +176,92 @@ function redactTrials(trials: Trial[]): Trial[] {
   }));
 }
 
+/** Build a bundle for the given mode. Exported for testing. */
+export function buildBundleObject(
+  mode: BundleMode,
+  trials: Trial[],
+  trialFlags: TrialFlag[],
+  meanReactionTimeMs: number,
+  medianReactionTimeMs: number,
+  sessionResult: SessionResult | undefined,
+  csvMeta: Props["csvMeta"],
+  persistedSnapshot: StimulusPackSnapshot | null,
+  exportedAt: string,
+): ResearchBundle {
+  const isRedacted = mode === "redacted";
+  const sessionTrials = isRedacted
+    ? redactTrials(sessionResult?.trials ?? trials)
+    : (sessionResult?.trials ?? trials);
+
+  const bundleSession = sessionResult
+    ? {
+        id: sessionResult.id, config: sessionResult.config,
+        trials: sessionTrials, scoring: sessionResult.scoring,
+        sessionFingerprint: sessionResult.sessionFingerprint,
+        provenanceSnapshot: sessionResult.provenanceSnapshot,
+        stimulusOrder: sessionResult.stimulusOrder,
+        seedUsed: sessionResult.seedUsed,
+        scoringVersion: sessionResult.scoringVersion,
+        startedAt: sessionResult.startedAt,
+        completedAt: sessionResult.completedAt,
+      }
+    : {
+        id: csvMeta.sessionId,
+        config: {
+          stimulusListId: csvMeta.packId, stimulusListVersion: csvMeta.packVersion,
+          orderPolicy: csvMeta.orderPolicy ?? "fixed", seed: csvMeta.seed,
+          ...(csvMeta.trialTimeoutMs !== undefined && { trialTimeoutMs: csvMeta.trialTimeoutMs }),
+          ...(csvMeta.breakEveryN !== undefined && { breakEveryN: csvMeta.breakEveryN }),
+        },
+        trials: isRedacted ? redactTrials(trials) : trials,
+        scoring: { trialFlags, summary: { meanReactionTimeMs, medianReactionTimeMs } },
+        sessionFingerprint: csvMeta.sessionFingerprint ?? null,
+      };
+
+  const baseSnapshot = persistedSnapshot ?? {
+    stimulusListHash: csvMeta.stimulusListHash ?? null,
+    stimulusSchemaVersion: null,
+    provenance: sessionResult?.provenanceSnapshot ?? null,
+  };
+
+  const includesWords = mode === "full";
+  let snapshot: ResearchBundle["stimulusPackSnapshot"];
+  if (includesWords) {
+    const words = resolvePackWords(csvMeta, sessionResult);
+    snapshot = { ...baseSnapshot, ...(words ? { words } : {}) };
+  } else {
+    snapshot = {
+      stimulusListHash: baseSnapshot.stimulusListHash,
+      stimulusSchemaVersion: baseSnapshot.stimulusSchemaVersion,
+      provenance: baseSnapshot.provenance,
+    };
+  }
+
+  const privacy: PrivacyManifest = {
+    mode,
+    includesStimulusWords: includesWords,
+    includesResponses: !isRedacted,
+  };
+
+  return {
+    exportSchemaVersion: EXPORT_SCHEMA_VERSION,
+    exportedAt,
+    protocolDocVersion: PROTOCOL_DOC_VERSION,
+    appVersion: APP_VERSION,
+    scoringAlgorithm: SCORING_ALGORITHM,
+    privacy,
+    sessionResult: bundleSession,
+    stimulusPackSnapshot: snapshot,
+  };
+}
+
 export function ExportActions({
   trials, trialFlags, meanReactionTimeMs, medianReactionTimeMs,
   sessionResult, csvMeta, persistedSnapshot, packIsInstalled,
   onReproduce, onReset,
 }: Props) {
+  const [privacyMode, setPrivacyMode] = useState<BundleMode>("full");
+
   const csvContent = useMemo(() =>
     sessionTrialsToCsv(trials, trialFlags, csvMeta.sessionId, csvMeta.packId,
       csvMeta.packVersion, csvMeta.seed, csvMeta.sessionFingerprint, SCORING_VERSION),
@@ -147,86 +275,31 @@ export function ExportActions({
     [trials, trialFlags, csvMeta],
   );
 
-  /** Build bundle JSON for a given mode. Exported for testing. */
-  const buildBundle = useMemo(() => {
-    return (mode: BundleMode): ResearchBundle => {
-      const isRedacted = mode === "redacted";
-      const sessionTrials = isRedacted ? redactTrials(sessionResult?.trials ?? trials) : (sessionResult?.trials ?? trials);
+  /** Build bundle for selected privacy mode. */
+  const bundle = useMemo(() =>
+    buildBundleObject(privacyMode, trials, trialFlags, meanReactionTimeMs,
+      medianReactionTimeMs, sessionResult, csvMeta, persistedSnapshot,
+      new Date().toISOString()),
+    [privacyMode, trials, trialFlags, meanReactionTimeMs, medianReactionTimeMs, sessionResult, csvMeta, persistedSnapshot],
+  );
 
-      const bundleSession = sessionResult
-        ? {
-            id: sessionResult.id, config: sessionResult.config,
-            trials: sessionTrials, scoring: sessionResult.scoring,
-            sessionFingerprint: sessionResult.sessionFingerprint,
-            provenanceSnapshot: sessionResult.provenanceSnapshot,
-            stimulusOrder: sessionResult.stimulusOrder,
-            seedUsed: sessionResult.seedUsed,
-            scoringVersion: sessionResult.scoringVersion,
-            startedAt: sessionResult.startedAt,
-            completedAt: sessionResult.completedAt,
-          }
-        : {
-            id: csvMeta.sessionId,
-            config: {
-              stimulusListId: csvMeta.packId, stimulusListVersion: csvMeta.packVersion,
-              orderPolicy: csvMeta.orderPolicy ?? "fixed", seed: csvMeta.seed,
-              ...(csvMeta.trialTimeoutMs !== undefined && { trialTimeoutMs: csvMeta.trialTimeoutMs }),
-              ...(csvMeta.breakEveryN !== undefined && { breakEveryN: csvMeta.breakEveryN }),
-            },
-            trials: isRedacted ? redactTrials(trials) : trials,
-            scoring: { trialFlags, summary: { meanReactionTimeMs, medianReactionTimeMs } },
-            sessionFingerprint: csvMeta.sessionFingerprint ?? null,
-          };
+  const bundleJson = useMemo(() => stableStringify(bundle, BUNDLE_KEY_ORDER), [bundle]);
 
-      const baseSnapshot = persistedSnapshot ?? {
-        stimulusListHash: csvMeta.stimulusListHash ?? null,
-        stimulusSchemaVersion: null,
-        provenance: sessionResult?.provenanceSnapshot ?? null,
-      };
-
-      const includesWords = mode === "full";
-      let snapshot: ResearchBundle["stimulusPackSnapshot"];
-      if (includesWords) {
-        const words = resolvePackWords(csvMeta, sessionResult);
-        snapshot = { ...baseSnapshot, ...(words ? { words } : {}) };
-      } else {
-        snapshot = {
-          stimulusListHash: baseSnapshot.stimulusListHash,
-          stimulusSchemaVersion: baseSnapshot.stimulusSchemaVersion,
-          provenance: baseSnapshot.provenance,
-        };
-      }
-
-      const privacy: PrivacyManifest = {
-        mode,
-        includesStimulusWords: includesWords,
-        includesResponses: !isRedacted,
-      };
-
-      return {
-        sessionResult: bundleSession, protocolDocVersion: PROTOCOL_DOC_VERSION,
-        appVersion: APP_VERSION, scoringAlgorithm: SCORING_ALGORITHM,
-        exportSchemaVersion: EXPORT_SCHEMA_VERSION, exportedAt: new Date().toISOString(),
-        stimulusPackSnapshot: snapshot, privacy,
-      };
-    };
-  }, [trials, trialFlags, meanReactionTimeMs, medianReactionTimeMs, sessionResult, csvMeta, persistedSnapshot]);
-
-  const bundleJsonFull = useMemo(() => JSON.stringify(buildBundle("full"), null, 2), [buildBundle]);
-  const bundleJsonMinimal = useMemo(() => JSON.stringify(buildBundle("minimal"), null, 2), [buildBundle]);
-  const bundleJsonRedacted = useMemo(() => JSON.stringify(buildBundle("redacted"), null, 2), [buildBundle]);
-
-  /** Session Package (pkg_v1): single envelope with bundle + optional CSV. */
+  /** Session Package: envelope with bundle + CSV matching privacy mode. */
   const packageJson = useMemo(() => {
-    const pkg = {
+    const csvForMode = privacyMode === "redacted" ? csvRedacted : csvContent;
+    const pkg: Record<string, unknown> = {
       packageVersion: "pkg_v1",
-      bundle: buildBundle("full"),
-      csv: csvContent,
-      csvRedacted,
+      packageHash: "",
+      hashAlgorithm: "sha-256",
       exportedAt: new Date().toISOString(),
+      bundle,
+      csv: csvForMode,
+      csvRedacted,
     };
-    return JSON.stringify(pkg, null, 2);
-  }, [buildBundle, csvContent, csvRedacted]);
+    // packageHash is computed async, leave placeholder for size estimate
+    return stableStringify(pkg, PACKAGE_KEY_ORDER);
+  }, [bundle, csvContent, csvRedacted, privacyMode]);
 
   const snapshotJson = useMemo(() =>
     persistedSnapshot ? JSON.stringify(persistedSnapshot, null, 2) : null,
@@ -258,25 +331,63 @@ export function ExportActions({
     alert(`Pack "${restoredPack.id}@${restoredPack.version}" restored (${restoredPack.words.length} words).`);
   };
 
-  const makeBundleFn = (mode: BundleMode) => () => {
-    const json = mode === "full" ? bundleJsonFull : mode === "minimal" ? bundleJsonMinimal : bundleJsonRedacted;
+  const handleBundle = () => {
     const fp = csvMeta.sessionFingerprint?.slice(0, 8) ?? "";
     const seedPart = csvMeta.seed != null ? `seed${csvMeta.seed}` : "noseed";
     const datePart = new Date().toISOString().slice(0, 10);
-    const suffix = mode === "full" ? "" : `-${mode}`;
+    const suffix = privacyMode === "full" ? "" : `-${privacyMode}`;
     const filename = ["bundle", datePart, csvMeta.packId, seedPart, ...(fp ? [fp] : [])].join("-") + suffix + ".json";
-    downloadFile(json, "application/json", filename);
+    downloadFile(bundleJson, "application/json", filename);
   };
 
-  const handlePackage = () => {
+  const handlePackage = async () => {
+    const csvForMode = privacyMode === "redacted" ? csvRedacted : csvContent;
+    const pkg: Record<string, unknown> = {
+      packageVersion: "pkg_v1",
+      packageHash: "",
+      hashAlgorithm: "sha-256",
+      exportedAt: new Date().toISOString(),
+      bundle,
+      csv: csvForMode,
+      csvRedacted,
+    };
+    // Compute hash of everything except packageHash itself
+    const forHash = { ...pkg, packageHash: undefined };
+    delete forHash.packageHash;
+    const canonical = stableStringify(forHash, PACKAGE_KEY_ORDER);
+    pkg.packageHash = await sha256Hex(canonical);
+
+    const json = stableStringify(pkg, PACKAGE_KEY_ORDER);
     const fp = csvMeta.sessionFingerprint?.slice(0, 8) ?? "";
     const datePart = new Date().toISOString().slice(0, 10);
     const filename = ["session-package", datePart, csvMeta.packId, ...(fp ? [fp] : [])].join("-") + ".json";
-    downloadFile(packageJson, "application/json", filename);
+    downloadFile(json, "application/json", filename);
   };
 
   return (
     <div className="mt-6 space-y-3">
+      {/* Privacy mode selector (0229) */}
+      <div className="flex items-center gap-3">
+        <label className="text-sm text-muted-foreground">Privacy mode:</label>
+        <div className="inline-flex rounded-md border border-border">
+          {(["full", "minimal", "redacted"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setPrivacyMode(m)}
+              className={`px-3 py-1.5 text-xs capitalize ${
+                privacyMode === m
+                  ? "bg-primary text-primary-foreground"
+                  : "text-foreground hover:bg-muted"
+              } ${m === "full" ? "rounded-l-md" : m === "redacted" ? "rounded-r-md" : ""}`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      </div>
+      <PrivacyNote mode={privacyMode} />
+
+      {/* CSV exports */}
       <div className="flex flex-wrap gap-3">
         <button
           onClick={() => downloadFile(csvContent, "text/csv", `session-${csvMeta.sessionId}.csv`)}
@@ -292,39 +403,24 @@ export function ExportActions({
         </button>
       </div>
 
+      {/* Bundle + Package */}
       <div className="flex flex-wrap gap-3">
         <div>
-          <button onClick={makeBundleFn("full")}
+          <button onClick={handleBundle}
             className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
           >
-            Bundle (Full) <SizeLabel bytes={bundleJsonFull.length} />
+            Export Bundle ({privacyMode}) <SizeLabel bytes={bundleJson.length} />
           </button>
-          <PrivacyNote mode="full" />
         </div>
-        <div>
-          <button onClick={makeBundleFn("minimal")}
-            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
-          >
-            Bundle (Minimal) <SizeLabel bytes={bundleJsonMinimal.length} />
-          </button>
-          <PrivacyNote mode="minimal" />
-        </div>
-        <div>
-          <button onClick={makeBundleFn("redacted")}
-            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
-          >
-            Bundle (Redacted) <SizeLabel bytes={bundleJsonRedacted.length} />
-          </button>
-          <PrivacyNote mode="redacted" />
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-3">
         <button onClick={handlePackage}
           className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
         >
           Export Session Package <SizeLabel bytes={packageJson.length} />
         </button>
+      </div>
+
+      {/* Snapshot + Restore */}
+      <div className="flex flex-wrap gap-3">
         {snapshotJson && (
           <button
             onClick={() => downloadFile(snapshotJson, "application/json", `pack-snapshot-${csvMeta.packId}.json`)}
@@ -347,6 +443,7 @@ export function ExportActions({
         )}
       </div>
 
+      {/* Reproduce + Reset */}
       <div className="flex flex-wrap gap-3">
         {onReproduce && (
           <button
@@ -366,4 +463,16 @@ export function ExportActions({
       </div>
     </div>
   );
+}
+
+/** Verify a session package's integrity by recomputing the hash. */
+export async function verifyPackageIntegrity(
+  pkg: Record<string, unknown>,
+): Promise<{ valid: boolean; expected: string; actual: string }> {
+  const expected = pkg.packageHash as string;
+  const forHash = { ...pkg, packageHash: undefined };
+  delete forHash.packageHash;
+  const canonical = stableStringify(forHash, PACKAGE_KEY_ORDER);
+  const actual = await sha256Hex(canonical);
+  return { valid: actual === expected, expected, actual };
 }

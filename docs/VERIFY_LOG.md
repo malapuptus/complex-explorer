@@ -30,6 +30,41 @@ Copy this block for each new entry:
 
 ## Runs
 
+### 2026-02-17 17:22 (Lovable sandbox) — Tickets 0228–0232
+
+- **Environment:** Lovable (tests only)
+- **Command:** `npx vitest run src`
+- **Result:** PASS (224/224)
+
+| # | Oracle | Runnable in Lovable | Evidence provided | Notes |
+|---|--------|---------------------|-------------------|-------|
+| 1 | Hygiene | N | — | ResultsExportActions.tsx under 350 lines ✓ |
+| 2 | Format | N | — | No shell access |
+| 3 | Lint | N | — | No shell access |
+| 4 | Typecheck | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 5 | Boundaries | N | — | No shell access |
+| 6 | Load smoke | N | — | No shell access |
+| 7 | Build | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 8 | Tests | Y | 224/224 passed | 24 test files |
+
+**Canary artifacts:**
+
+- **Privacy switchboard (0229):** Single segmented control (Full/Minimal/Redacted) governs bundle export + session package content; tests assert privacy manifest matches selector
+- **Recovery workflow (0230):** Quota error shows "Storage Full" panel with Export CSV (Redacted) + Delete orphan packs + Retry save + Dismiss buttons
+- **Import preview (0232):** File import shows preview panel (detected type, pack ID, version, word count, hash, schema, size) with Confirm/Cancel before importing; supports Pack JSON, Research Bundle, and Session Package
+- **Deterministic ordering (0228):** `stableStringify()` with key order; test confirms two exports with same timestamp produce identical JSON; timestamp is the only nondeterminism
+- **Package integrity (0231):** `pkg_v1` includes `packageHash` (SHA-256) + `hashAlgorithm: "sha-256"`; `verifyPackageIntegrity()` recomputes and compares; test confirms tampered CSV fails verification
+
+**Policy checklist:**
+
+- [x] `npx vitest run src` passed (224/224)
+- [x] Oracle table included (8 rows)
+- [x] CSV canary: header present
+- [x] Bundle canary: rb_v3 + privacy switchboard + deterministic keys
+- [x] Environment line present: "Lovable (tests only)"
+
+---
+
 ### 2026-02-17 17:14 (Lovable sandbox) — Tickets 0223–0227
 
 - **Environment:** Lovable (tests only)

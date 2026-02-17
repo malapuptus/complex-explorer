@@ -169,12 +169,28 @@ A single JSON envelope containing all export artifacts for a session.
 ```json
 {
   "packageVersion": "pkg_v1",
-  "bundle": { "rb_v3 Research Bundle object" },
-  "csv": "full CSV string",
-  "csvRedacted": "redacted CSV string",
-  "exportedAt": "ISO-8601 timestamp"
+  "packageHash": "SHA-256 hex digest of canonical package (excluding packageHash itself)",
+  "hashAlgorithm": "sha-256",
+  "exportedAt": "ISO-8601 timestamp",
+  "bundle": { "rb_v3 Research Bundle object (privacy mode matches selector)" },
+  "csv": "full or redacted CSV string (matches privacy mode)",
+  "csvRedacted": "redacted CSV string"
 }
 ```
+
+### Integrity verification
+
+The `packageHash` is computed over a canonical JSON of the package with `packageHash` removed and keys ordered: `packageVersion`, `hashAlgorithm`, `exportedAt`, `bundle`, `csv`, `csvRedacted`. Consumers can recompute and compare to detect tampering.
+
+### Privacy mode integration (0229)
+
+The privacy mode selector (Full / Minimal / Redacted) governs:
+- Which bundle mode is used inside the package
+- Whether `csv` contains full or redacted CSV (redacted mode uses redacted CSV)
+
+### Deterministic ordering (0228)
+
+All JSON exports use stable key ordering. Bundle keys: `exportSchemaVersion`, `exportedAt`, `protocolDocVersion`, `appVersion`, `scoringAlgorithm`, `privacy`, `sessionResult`, `stimulusPackSnapshot`. Timestamps (`exportedAt`) are the only allowed nondeterminism.
 
 ### Changes from rb_v1
 
