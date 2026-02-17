@@ -1,5 +1,29 @@
 # Verify Run Log
 
+## 2026-02-17 — Tickets 0259–0263
+
+**Oracle:** `npx vitest run src` → **395/395 PASS** (36 test files)
+
+**Files changed:**
+- NEW `src/domain/exportFilenames.ts` — pure filename helpers (bundle/package/CSV/pack)
+- NEW `src/domain/snapshotNormalize.ts` — 0261 snapshot completeness invariant
+- NEW `src/infra/storageReport.ts` — 0262 storage report builder
+- EDIT `src/app/ResultsExportActions.tsx` — use `bundleFilename`, `packageFilename`, `csvFilename`
+- EDIT `src/app/ImportSection.tsx` — use `packFilename`
+- EDIT `src/app/importPreviewModel.ts` — 0260 `ImportCompat`, `getCompatWarnings`
+- EDIT `src/app/ImportPreviewPanel.tsx` — render compat warnings block
+- EDIT `src/domain/sessionStore.ts` — `deleteOlderThan`, `deleteImported` interface
+- EDIT `src/infra/localStorageSessionStore.ts` — implement cleanup methods
+- EDIT `src/infra/index.ts` — export `buildStorageReport`
+- EDIT `src/app/PreviousSessions.tsx` — storage report + cleanup buttons
+- NEW `src/domain/__tests__/exportFilenames.test.ts` — 27 tests
+- NEW `src/domain/__tests__/snapshotNormalize.test.ts` — 9 tests
+- NEW `src/infra/__tests__/storageReport.test.ts` — 8 tests
+- NEW `src/app/__tests__/importCompatWarnings.test.ts` — 9 tests
+
+**Risk card:** Proved — filenames deterministic+safe; snapshot invariant locked; compat warnings advisory; cleanup actions guarded by confirm dialogs. Not proved — browser OS filename handling (safe char set enforced by tests).
+
+
 > Paste real `node tools/verify.mjs` outputs here as proof the pipeline passes. One entry per run.
 
 ---

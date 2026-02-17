@@ -1,18 +1,20 @@
 /**
  * PreviousSessions — lists saved sessions with delete/export controls.
  * Shows provenance and reproducibility metadata when viewing a session.
+ * Ticket 0262: Storage report. Ticket 0263: Cleanup actions.
  */
 
 import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { SessionListEntry, SessionResult } from "@/domain";
 import { sessionResultsToCsv } from "@/domain";
-import { localStorageSessionStore } from "@/infra";
+import { localStorageSessionStore, buildStorageReport } from "@/infra";
 import { ResultsView } from "./ResultsView";
 
 export function PreviousSessions() {
   const [entries, setEntries] = useState<SessionListEntry[]>([]);
   const [selected, setSelected] = useState<SessionResult | null>(null);
+  const [cleanupMsg, setCleanupMsg] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const refresh = useCallback(() => {
@@ -24,8 +26,10 @@ export function PreviousSessions() {
   }, [refresh]);
 
   const handleDeleteAll = async () => {
+    if (!window.confirm(`Delete all ${entries.length} sessions? This cannot be undone.`)) return;
     await localStorageSessionStore.deleteAll();
     setSelected(null);
+    setCleanupMsg(null);
     refresh();
   };
 
@@ -55,6 +59,50 @@ export function PreviousSessions() {
     a.download = `complex-mapper-export-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  /** 0262: Export Storage Report as JSON. */
+  const handleExportStorageReport = () => {
+    const report = buildStorageReport();
+    const json = JSON.stringify(report, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cm_storage_report_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  /** 0263: Delete sessions older than 30 days. */
+  const handleDeleteOld = async () => {
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const eligible = entries.filter((e) => new Date(e.completedAt) < cutoff).length;
+    if (eligible === 0) {
+      setCleanupMsg("No sessions older than 30 days.");
+      return;
+    }
+    if (!window.confirm(`Delete ${eligible} session(s) completed before ${cutoff.toLocaleDateString()}? This cannot be undone.`)) return;
+    const deleted = await localStorageSessionStore.deleteOlderThan(cutoff);
+    setCleanupMsg(`Deleted ${deleted} session(s) older than 30 days.`);
+    setSelected(null);
+    refresh();
+  };
+
+  /** 0263: Delete all imported sessions. */
+  const handleDeleteImported = async () => {
+    const eligible = entries.filter((e) => {
+      return (e as unknown as Record<string, unknown>)._imported === true;
+    }).length;
+    if (eligible === 0) {
+      setCleanupMsg("No imported sessions found.");
+      return;
+    }
+    if (!window.confirm(`Delete ${eligible} imported session(s)? This cannot be undone.`)) return;
+    const deleted = await localStorageSessionStore.deleteImported();
+    setCleanupMsg(`Deleted ${deleted} imported session(s).`);
+    setSelected(null);
+    refresh();
   };
 
   if (selected) {
@@ -91,8 +139,7 @@ export function PreviousSessions() {
           meanReactionTimeMs={selected.scoring.summary.meanReactionTimeMs}
           medianReactionTimeMs={selected.scoring.summary.medianReactionTimeMs}
           onReset={() => setSelected(null)}
-          onReproduce={(config) => {
-            // Navigate to /demo — the DemoSession will handle pack resolution
+          onReproduce={(_config) => {
             navigate("/demo");
           }}
           sessionResult={selected}
@@ -167,7 +214,13 @@ export function PreviousSessions() {
             })}
           </ul>
 
-          <div className="mt-8 flex gap-3">
+          {/* Cleanup message */}
+          {cleanupMsg && (
+            <p className="mt-4 text-xs text-muted-foreground">{cleanupMsg}</p>
+          )}
+
+          {/* Export actions */}
+          <div className="mt-8 flex flex-wrap gap-3">
             <button
               onClick={handleExport}
               className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
@@ -179,6 +232,29 @@ export function PreviousSessions() {
               className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
             >
               Export CSV
+            </button>
+            {/* 0262: Storage report */}
+            <button
+              onClick={handleExportStorageReport}
+              className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+            >
+              Export Storage Report
+            </button>
+          </div>
+
+          {/* 0263: Cleanup actions */}
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              onClick={handleDeleteOld}
+              className="rounded-md border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-muted"
+            >
+              Delete sessions &gt;30 days old
+            </button>
+            <button
+              onClick={handleDeleteImported}
+              className="rounded-md border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-muted"
+            >
+              Delete imported sessions
             </button>
             <button
               onClick={handleDeleteAll}

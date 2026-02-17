@@ -2,12 +2,13 @@
  * ImportPreviewPanel — render-only component for import previews.
  * Pure logic lives in importPreviewModel.ts (Ticket 0250).
  * Tickets: 0244 (diagnostics), 0245 (Extract Pack), 0248 (Available actions),
- *          0251 (clipboard fallback), 0253 (SSoT gating via getAvailableActions).
+ *          0251 (clipboard fallback), 0253 (SSoT gating via getAvailableActions),
+ *          0260 (compatibility warnings).
  */
 
 import { useState } from "react";
 import type { ImportPreview } from "./importPreviewModel";
-import { formatKB, getAvailableActions } from "./importPreviewModel";
+import { formatKB, getAvailableActions, getCompatWarnings } from "./importPreviewModel";
 
 // Re-export types so existing imports from ImportPreviewPanel still work.
 export type { ImportType, ImportPreview } from "./importPreviewModel";
@@ -43,6 +44,9 @@ export function ImportPreviewPanel({
 
   // 0253: derive actions from the single source of truth
   const availableActions = getAvailableActions(preview, integrityFailed);
+
+  // 0260: compatibility warnings
+  const compatWarnings = getCompatWarnings(preview.compat);
 
   // 0245: show "Extract Pack" only for package + words present + integrity OK
   const showExtractPack =
@@ -116,6 +120,24 @@ export function ImportPreviewPanel({
         <dt className="text-muted-foreground">File size</dt>
         <dd className="text-foreground">{formatKB(preview.sizeBytes)}</dd>
 
+        {/* 0260: Compatibility block (bundle/package only) */}
+        {preview.compat && (
+          <>
+            {preview.compat.exportSchemaVersion && (
+              <>
+                <dt className="text-muted-foreground">Bundle schema</dt>
+                <dd className="font-mono text-foreground">{preview.compat.exportSchemaVersion}</dd>
+              </>
+            )}
+            {preview.compat.privacyMode && (
+              <>
+                <dt className="text-muted-foreground">Privacy mode</dt>
+                <dd className="text-foreground capitalize">{preview.compat.privacyMode}</dd>
+              </>
+            )}
+          </>
+        )}
+
         {/* 0244: Integrity row */}
         {preview.integrityResult && (
           <>
@@ -171,6 +193,24 @@ export function ImportPreviewPanel({
           </ul>
         </dd>
       </dl>
+
+      {/* 0260: Compatibility warnings — advisory, non-blocking */}
+      {compatWarnings.length > 0 && (
+        <div
+          className="rounded-md border border-border bg-muted/20 px-3 py-2 space-y-0.5"
+          role="note"
+          aria-label="Compatibility warnings"
+        >
+          <p className="text-xs font-semibold text-muted-foreground">Compatibility notices</p>
+          <ul className="space-y-0.5">
+            {compatWarnings.map((w) => (
+              <li key={w.field} className="text-xs text-muted-foreground">
+                ⚠ {w.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {integrityFailed && (
         <p className="text-xs text-destructive">

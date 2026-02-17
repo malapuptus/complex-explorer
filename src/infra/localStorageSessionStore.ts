@@ -329,4 +329,33 @@ export const localStorageSessionStore: SessionStore = {
     const envelope = readEnvelope();
     return id in envelope.sessions;
   },
+
+  /** Delete sessions completed before the cutoff date (0263). */
+  async deleteOlderThan(cutoffDate: Date): Promise<number> {
+    const envelope = readEnvelope();
+    const cutoff = cutoffDate.toISOString();
+    let deleted = 0;
+    for (const [id, s] of Object.entries(envelope.sessions)) {
+      if (s.completedAt < cutoff) {
+        delete envelope.sessions[id];
+        deleted++;
+      }
+    }
+    if (deleted > 0) writeEnvelope(envelope);
+    return deleted;
+  },
+
+  /** Delete sessions with importedFrom != null (0263). */
+  async deleteImported(): Promise<number> {
+    const envelope = readEnvelope();
+    let deleted = 0;
+    for (const [id, s] of Object.entries(envelope.sessions)) {
+      if (s.importedFrom != null) {
+        delete envelope.sessions[id];
+        deleted++;
+      }
+    }
+    if (deleted > 0) writeEnvelope(envelope);
+    return deleted;
+  },
 };

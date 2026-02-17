@@ -10,6 +10,7 @@ import { useState, useMemo } from "react";
 import type { Trial, TrialFlag, OrderPolicy, SessionResult, StimulusPackSnapshot, StimulusList } from "@/domain";
 import { sessionTrialsToCsv, getStimulusList } from "@/domain";
 import { localStorageStimulusStore } from "@/infra";
+import { bundleFilename, packageFilename, csvFilename, packFilename } from "@/domain/exportFilenames";
 
 declare const __APP_VERSION__: string;
 
@@ -358,11 +359,12 @@ export function ExportActions({
   };
 
   const handleBundle = () => {
-    const fp = csvMeta.sessionFingerprint?.slice(0, 8) ?? "";
-    const seedPart = csvMeta.seed != null ? `seed${csvMeta.seed}` : "noseed";
-    const datePart = new Date().toISOString().slice(0, 10);
-    const suffix = privacyMode === "full" ? "" : `-${privacyMode}`;
-    const filename = ["bundle", datePart, csvMeta.packId, seedPart, ...(fp ? [fp] : [])].join("-") + suffix + ".json";
+    const now = new Date();
+    const filename = bundleFilename({
+      mode: privacyMode,
+      hashPrefix: csvMeta.sessionFingerprint,
+      now,
+    });
     downloadFile(bundleJson, "application/json", filename);
   };
 
@@ -381,12 +383,12 @@ export function ExportActions({
     const forHash = { ...pkg, packageHash: undefined };
     delete forHash.packageHash;
     const canonical = stableStringify(forHash, PACKAGE_KEY_ORDER);
-    pkg.packageHash = await sha256Hex(canonical);
+    const hash = await sha256Hex(canonical);
+    pkg.packageHash = hash;
 
     const json = stableStringify(pkg, PACKAGE_KEY_ORDER);
-    const fp = csvMeta.sessionFingerprint?.slice(0, 8) ?? "";
-    const datePart = new Date().toISOString().slice(0, 10);
-    const filename = ["session-package", datePart, csvMeta.packId, ...(fp ? [fp] : [])].join("-") + ".json";
+    const now = new Date();
+    const filename = packageFilename({ mode: privacyMode, packageHash: hash, now });
     downloadFile(json, "application/json", filename);
   };
 
@@ -443,13 +445,13 @@ export function ExportActions({
       {/* CSV exports */}
       <div className="flex flex-wrap gap-3">
         <button
-          onClick={() => downloadFile(csvContent, "text/csv", `session-${csvMeta.sessionId}.csv`)}
+          onClick={() => downloadFile(csvContent, "text/csv", csvFilename({ redacted: false }))}
           className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
         >
           Export CSV <SizeLabel bytes={csvContent.length} />
         </button>
         <button
-          onClick={() => downloadFile(csvRedacted, "text/csv", `session-${csvMeta.sessionId}-redacted.csv`)}
+          onClick={() => downloadFile(csvRedacted, "text/csv", csvFilename({ redacted: true }))}
           className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
         >
           Export CSV (Redacted) <SizeLabel bytes={csvRedacted.length} />
@@ -476,7 +478,7 @@ export function ExportActions({
       <div className="flex flex-wrap gap-3">
         {snapshotJson && (
           <button
-            onClick={() => downloadFile(snapshotJson, "application/json", `pack-snapshot-${csvMeta.packId}.json`)}
+            onClick={() => downloadFile(snapshotJson, "application/json", `cm_pack_snapshot_${csvMeta.packId}_${new Date().toISOString().slice(0,10).replace(/-/g,"")}.json`)}
             className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
           >
             Export Pack Snapshot <SizeLabel bytes={snapshotJson.length} />
