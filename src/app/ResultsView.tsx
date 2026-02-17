@@ -1,11 +1,13 @@
 import { useMemo, useCallback, useState, useEffect } from "react";
 import type { Trial, TrialFlag, OrderPolicy, SessionResult, StimulusPackSnapshot } from "@/domain";
-import { generateReflectionPrompts, getStimulusList, buildSessionInsights } from "@/domain";
+import { generateReflectionPrompts, getStimulusList, buildSessionInsights, getResponseText, getTimedOut } from "@/domain";
 import { localStorageStimulusStore, localStorageSessionStore, uiPrefs } from "@/infra";
 import { SessionSummaryCard } from "./SessionSummaryCard";
 import { ExportActions, SCORING_VERSION, APP_VERSION } from "./ResultsExportActions";
 import { ResultsDashboardPanel } from "./ResultsDashboardPanel";
 import { SessionsDrawer } from "./SessionsDrawer";
+import { ResultsTableControls, RtBar, rowMatchesFilter } from "./ResultsTableControls";
+import type { FilterChip } from "./ResultsTableControls";
 
 interface Props {
   trials: Trial[];
@@ -145,6 +147,19 @@ export function ResultsView({
   const showCompare = baseline !== null && baseline.id !== sessionResult?.id
     && baselineInsights !== null && insights !== null;
 
+  // 0274: Comparability check (same pack + same order)
+  const isComparable = useMemo(() => {
+    if (!baseline || !sessionResult || !baselineInsights || !insights) return false;
+    const samePackId = sessionResult.config.stimulusListId === baseline.config.stimulusListId;
+    const samePackVersion = sessionResult.config.stimulusListVersion === baseline.config.stimulusListVersion;
+    const sameOrder = JSON.stringify(sessionResult.stimulusOrder) === JSON.stringify(baseline.stimulusOrder);
+    return samePackId && samePackVersion && sameOrder;
+  }, [baseline, sessionResult, baselineInsights, insights]);
+
+  // 0273: Table filter/search state
+  const [activeFilter, setActiveFilter] = useState<FilterChip>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       {/* 0269: Header row with Sessions drawer access */}
@@ -188,6 +203,7 @@ export function ResultsView({
           <ResultsDashboardPanel
             insights={insights}
             sessionContext={sessionResult?.sessionContext ?? null}
+            baselineInsights={baselineInsights}
           />
         </>
       )}
@@ -297,44 +313,107 @@ export function ResultsView({
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-md border border-border">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-muted text-muted-foreground">
-            <tr>
-              <th className="px-3 py-2">#</th>
-              <th className="px-3 py-2">Stimulus</th>
-              <th className="px-3 py-2">Response</th>
-              <th className="px-3 py-2 text-right">1st Key</th>
-              <th className="px-3 py-2 text-right">Submit</th>
-              <th className="px-3 py-2 text-right">BS</th>
-              <th className="px-3 py-2">Flags</th>
-            </tr>
-          </thead>
-          <tbody>
-            {trials.map((trial, i) => {
-              const flags = trialFlags[i]?.flags ?? [];
-              const a = trial.association;
-              return (
-                <tr key={i} className="border-t border-border">
-                  <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
-                  <td className="px-3 py-2 font-medium text-foreground">{trial.stimulus.word}</td>
-                  <td className="px-3 py-2 text-foreground">
-                    {a.response || <span className="italic text-muted-foreground">(empty)</span>}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono text-foreground">{a.tFirstKeyMs !== null ? a.tFirstKeyMs : "—"}</td>
-                  <td className="px-3 py-2 text-right font-mono text-foreground">{a.reactionTimeMs}</td>
-                  <td className="px-3 py-2 text-right font-mono text-foreground">{a.backspaceCount}</td>
-                  <td className="px-3 py-2">
-                    {flags.length > 0
-                      ? <span className="text-xs text-destructive">{flags.join(", ")}</span>
-                      : <span className="text-xs text-muted-foreground">—</span>}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {/* 0273: Table controls */}
+      {(() => {
+        const minRt = insights?.minRtMs ?? 0;
+        const maxRt = insights?.maxRtMs ?? 1;
+
+        // Build filtered+searched list
+        const filteredRows = trials.map((trial, i) => {
+          const flags = trialFlags[i]?.flags ?? [];
+          const response = getResponseText(trial);
+          const timedOut = getTimedOut(trial, flags as string[]);
+          const matches = rowMatchesFilter(
+            trial.stimulus.word,
+            response,
+            flags,
+            timedOut,
+            activeFilter,
+            searchQuery,
+          );
+          return { trial, i, flags, response, timedOut, matches };
+        });
+        const visibleRows = filteredRows.filter((r) => r.matches);
+
+        return (
+          <>
+            <ResultsTableControls
+              totalCount={trials.length}
+              visibleCount={visibleRows.length}
+              activeFilter={activeFilter}
+              searchQuery={searchQuery}
+              onFilterChange={setActiveFilter}
+              onSearchChange={setSearchQuery}
+            />
+
+            <div className="overflow-x-auto rounded-md border border-border">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-muted text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2">#</th>
+                    <th className="px-3 py-2">Stimulus</th>
+                    <th className="px-3 py-2">Response</th>
+                    <th className="px-3 py-2 text-right">RT bar</th>
+                    <th className="px-3 py-2 text-right">1st Key</th>
+                    <th className="px-3 py-2 text-right">Submit</th>
+                    <th className="px-3 py-2 text-right">BS</th>
+                    {/* 0274: ΔRT column when comparable */}
+                    {isComparable && <th className="px-3 py-2 text-right">ΔRT</th>}
+                    <th className="px-3 py-2">Flags</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleRows.map(({ trial, i, flags, response, timedOut }) => {
+                    const a = trial.association;
+                    // 0274: per-trial ΔRT when comparable
+                    const baselineRef = isComparable && baselineInsights
+                      ? baselineInsights.trialRefBySessionTrialIndex[i] ?? null
+                      : null;
+                    const deltaRt = baselineRef !== null
+                      ? a.reactionTimeMs - baselineRef.reactionTimeMs
+                      : null;
+
+                    return (
+                      <tr key={i} className={`border-t border-border ${flags.length > 0 ? "bg-destructive/5" : ""}`}>
+                        <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
+                        <td className="px-3 py-2 font-medium text-foreground">{trial.stimulus.word}</td>
+                        <td className="px-3 py-2 text-foreground">
+                          {response || <span className="italic text-muted-foreground">(empty)</span>}
+                        </td>
+                        <td className="w-24 px-3 py-2">
+                          <RtBar rt={a.reactionTimeMs} minRt={minRt} maxRt={maxRt} />
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono text-foreground">
+                          {a.tFirstKeyMs !== null ? a.tFirstKeyMs : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono text-foreground">{a.reactionTimeMs}</td>
+                        <td className="px-3 py-2 text-right font-mono text-foreground">{a.backspaceCount}</td>
+                        {isComparable && (
+                          <td className={`px-3 py-2 text-right font-mono text-xs ${deltaRt === null ? "text-muted-foreground" : deltaRt > 0 ? "text-destructive" : deltaRt < 0 ? "text-green-600" : "text-foreground"}`}>
+                            {deltaRt !== null ? (deltaRt > 0 ? `+${deltaRt}` : `${deltaRt}`) : "—"}
+                          </td>
+                        )}
+                        <td className="px-3 py-2">
+                          {flags.length > 0
+                            ? <span className="text-xs text-destructive">{flags.join(", ")}</span>
+                            : <span className="text-xs text-muted-foreground">—</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 0274: Non-comparable note */}
+            {showCompare && !isComparable && (
+              <p className="mt-1 text-xs text-muted-foreground italic">
+                Baseline compare requires same pack + same order.
+              </p>
+            )}
+          </>
+        );
+      })()}
 
       {reflectionPrompts.length > 0 && (
         <div className="mt-8">

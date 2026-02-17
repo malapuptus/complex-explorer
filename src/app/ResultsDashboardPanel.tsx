@@ -1,18 +1,20 @@
 /**
  * ResultsDashboardPanel — 3-card summary + SVG charts + anomalies list.
- * Supports drilldown (0266) and quality card (0268).
- * Ticket 0265.
+ * Supports drilldown (0266), quality card (0268), pattern charts (0272), baseline overlays (0274).
+ * Tickets 0265, 0266, 0268, 0272, 0274.
  */
 
 import { useState, useMemo } from "react";
-import type { SessionInsights, SessionContext } from "@/domain";
+import type { SessionInsights, SessionContext, SessionInsights as SI } from "@/domain";
 import { computeQualityIndex, getMicroGoal } from "@/domain";
-import { RtTimeline, RtHistogram } from "./ResultsCharts";
+import { RtTimeline, RtHistogram, FlagBreakdownChart, ResponseClusters } from "./ResultsCharts";
 import { TrialDetailPanel } from "./TrialDetailPanel";
 
 interface Props {
   insights: SessionInsights;
   sessionContext?: SessionContext | null;
+  /** 0274: Baseline insights for overlay markers */
+  baselineInsights?: SI | null;
 }
 
 function StatRow({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
@@ -35,7 +37,7 @@ function DashCard({ title, children }: { title: string; children: React.ReactNod
   );
 }
 
-export function ResultsDashboardPanel({ insights, sessionContext }: Props) {
+export function ResultsDashboardPanel({ insights, sessionContext, baselineInsights }: Props) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
   const deviceLabel = useMemo(() => {
@@ -55,7 +57,7 @@ export function ResultsDashboardPanel({ insights, sessionContext }: Props) {
 
   return (
     <div className="mb-6 space-y-4">
-      {/* 3 + 1 cards */}
+      {/* 4 cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <DashCard title="Response Quality">
           <StatRow label="Scored" value={insights.scoredCount} />
@@ -99,17 +101,38 @@ export function ResultsDashboardPanel({ insights, sessionContext }: Props) {
         </DashCard>
       </div>
 
-      {/* Charts */}
+      {/* RT Charts with optional 0274 baseline overlays */}
       <div className="space-y-2">
         <p className="text-xs font-medium text-muted-foreground">RT Timeline</p>
         <RtTimeline
           points={insights.timeline}
           onPointClick={(idx) => setSelectedIdx(idx)}
+          baselineMedian={baselineInsights?.medianRtMs}
+          baselineP90={baselineInsights?.p90RtMs}
         />
       </div>
       <div className="space-y-2">
         <p className="text-xs font-medium text-muted-foreground">RT Distribution</p>
-        <RtHistogram histogram={insights.histogram} />
+        <RtHistogram
+          histogram={insights.histogram}
+          baselineMedian={baselineInsights?.medianRtMs}
+          baselineP90={baselineInsights?.p90RtMs}
+        />
+      </div>
+
+      {/* 0272: Session Patterns */}
+      <div data-testid="session-patterns-heading" className="space-y-3">
+        <p className="text-xs font-semibold text-muted-foreground">Session Patterns</p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <p className="mb-1.5 text-[11px] text-muted-foreground">Flag Breakdown</p>
+            <FlagBreakdownChart counts={insights.flagCounts} />
+          </div>
+          <div>
+            <p className="mb-1.5 text-[11px] text-muted-foreground">Response Clusters</p>
+            <ResponseClusters clusters={insights.responseClusters} />
+          </div>
+        </div>
       </div>
 
       {/* Anomalies */}

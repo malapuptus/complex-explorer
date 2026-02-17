@@ -438,3 +438,64 @@ describe("getMicroGoal", () => {
     expect(goal).toContain("baseline repeat");
   });
 });
+
+// ── 0271 regression ────────────────────────────────────────────────────
+
+describe("0271 regression: non-empty responses not counted as empty", () => {
+  it("10 scored trials with non-empty responses → emptyResponseCount === 0 and nonEmptyResponseRate === 1", () => {
+    const trials = Array.from({ length: 10 }, (_, i) =>
+      makeTrial(`w${i}`, i, 400 + i * 10, { response: `resp${i}` }),
+    );
+    const session = makeSession(trials);
+    const ins = buildSessionInsights(session);
+    expect(ins.emptyResponseCount).toBe(0);
+    expect(ins.nonEmptyResponseRate).toBe(1.0);
+  });
+});
+
+// ── 0272 Tests ────────────────────────────────────────────────────────
+
+describe("flagCounts and responseClusters (0272)", () => {
+  it("flagCounts accumulates all flag kinds", () => {
+    const trials = [
+      makeTrial("a", 0, 300),
+      makeTrial("b", 1, 800),
+      makeTrial("c", 2, 100),
+    ];
+    const session = makeSession(trials, [
+      { trialIndex: 0, flags: ["timing_outlier_slow"] },
+      { trialIndex: 1, flags: ["timing_outlier_slow", "high_editing"] },
+      { trialIndex: 2, flags: ["timing_outlier_fast"] },
+    ]);
+    const ins = buildSessionInsights(session);
+    expect(ins.flagCounts["timing_outlier_slow"]).toBe(2);
+    expect(ins.flagCounts["high_editing"]).toBe(1);
+    expect(ins.flagCounts["timing_outlier_fast"]).toBe(1);
+  });
+
+  it("responseClusters only includes responses with count >= 2", () => {
+    const trials = [
+      makeTrial("a", 0, 300, { response: "ss" }),
+      makeTrial("b", 1, 300, { response: "ss" }),
+      makeTrial("c", 2, 300, { response: "ss" }),
+      makeTrial("d", 3, 300, { response: "unique" }),
+    ];
+    const ins = buildSessionInsights(makeSession(trials));
+    expect(ins.responseClusters.length).toBe(1);
+    expect(ins.responseClusters[0].response).toBe("ss");
+    expect(ins.responseClusters[0].count).toBe(3);
+  });
+
+  it("responseClusters sorted by count desc", () => {
+    const trials = [
+      makeTrial("a", 0, 300, { response: "ok" }),
+      makeTrial("b", 1, 300, { response: "ok" }),
+      makeTrial("c", 2, 300, { response: "ss" }),
+      makeTrial("d", 3, 300, { response: "ss" }),
+      makeTrial("e", 4, 300, { response: "ss" }),
+    ];
+    const ins = buildSessionInsights(makeSession(trials));
+    expect(ins.responseClusters[0].response).toBe("ss");
+    expect(ins.responseClusters[1].response).toBe("ok");
+  });
+});

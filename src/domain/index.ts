@@ -46,3 +46,13 @@ export type { SessionInsights, TrialRef, TimelinePoint, QualityIndex } from "./s
 export { buildSessionInsights, computeQualityIndex, getMicroGoal } from "./sessionInsights";
 
 export { simulateSession } from "./simulateSession";
+
+export {
+  getResponseText,
+  getResponseLen,
+  getTimedOut,
+  getBackspaces,
+  getEdits,
+  getCompositions,
+  getFirstKeyMs,
+} from "./trialFields";

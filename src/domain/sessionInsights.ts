@@ -1,10 +1,19 @@
 /**
  * sessionInsights — pure analysis layer for a completed SessionResult.
  * No I/O, no React, no side-effects. Deterministic.
- * Ticket 0264.
+ * Ticket 0264. Updated 0271 (trialFields), 0272 (flagCounts, responseClusters).
  */
 
 import type { SessionResult, FlagKind } from "./types";
+import {
+  getResponseText,
+  getResponseLen,
+  getTimedOut,
+  getBackspaces,
+  getEdits,
+  getCompositions,
+  getFirstKeyMs,
+} from "./trialFields";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -67,6 +76,15 @@ export interface SessionInsights {
   // Charts
   timeline: TimelinePoint[];
   histogram: { binEdges: number[]; counts: number[] };
+
+  // 0272: Aggregate patterns
+  flagCounts: Partial<Record<FlagKind, number>>;
+  responseClusters: Array<{
+    response: string;
+    count: number;
+    words: string[];
+    sessionTrialIndices: number[];
+  }>;
 
   // Drilldown lookup
   trialRefs: TrialRef[];
@@ -164,18 +182,18 @@ export function buildSessionInsights(session: SessionResult): SessionInsights {
   let totalEdits = 0;
   let totalCompositions = 0;
 
+  // 0272: flag counts accumulator
+  const flagCountsMap = new Map<FlagKind, number>();
+
   for (let pos = 0; pos < scoredPairs.length; pos++) {
     const { trialIndex, subsetIndex } = scoredPairs[pos];
     const trial = trials[trialIndex];
-    const assoc = trial.association;
     const flags = (scoredSubsetFlags.get(subsetIndex) ?? []) as FlagKind[];
 
-    // timedOut: Trial field takes priority, then flags
-    const timedOut =
-      trial.timedOut === true ||
-      flags.some(isTimeoutFlag);
-
-    const responseLen = assoc.response.length;
+    // 0271: Use trialFields helpers — single source of truth
+    const timedOut = getTimedOut(trial, flags);
+    const response = getResponseText(trial);
+    const responseLen = getResponseLen(trial);
     const isEmptyNonTimeout = !timedOut && responseLen === 0;
 
     const ref: TrialRef = {
@@ -183,15 +201,15 @@ export function buildSessionInsights(session: SessionResult): SessionInsights {
       orderIndex: trial.stimulus.index,
       position: pos,
       word: trial.stimulus.word,
-      reactionTimeMs: assoc.reactionTimeMs,
+      reactionTimeMs: trial.association.reactionTimeMs,
       flags,
       timedOut,
-      response: assoc.response,
+      response,
       responseLen,
-      tFirstKeyMs: assoc.tFirstKeyMs,
-      backspaces: assoc.backspaceCount,
-      edits: assoc.editCount,
-      compositions: assoc.compositionCount,
+      tFirstKeyMs: getFirstKeyMs(trial),
+      backspaces: getBackspaces(trial),
+      edits: getEdits(trial),
+      compositions: getCompositions(trial),
     };
 
     trialRefs.push(ref);
@@ -200,12 +218,12 @@ export function buildSessionInsights(session: SessionResult): SessionInsights {
     timeline.push({
       sessionTrialIndex: trialIndex,
       x: pos,
-      y: assoc.reactionTimeMs,
+      y: trial.association.reactionTimeMs,
       timedOut,
       flags,
     });
 
-    if (!timedOut) rtsNonTimeout.push(assoc.reactionTimeMs);
+    if (!timedOut) rtsNonTimeout.push(trial.association.reactionTimeMs);
 
     // Quality counters
     if (timedOut) timeoutCount++;
@@ -215,10 +233,17 @@ export function buildSessionInsights(session: SessionResult): SessionInsights {
     if (flags.some((f) => !isTimeoutFlag(f) && !isEmptyFlag(f))) flaggedOtherCount++;
 
     // Input counters
-    totalBackspaces += assoc.backspaceCount;
-    totalEdits += assoc.editCount;
-    totalCompositions += assoc.compositionCount;
+    totalBackspaces += getBackspaces(trial);
+    totalEdits += getEdits(trial);
+    totalCompositions += getCompositions(trial);
+
+    // 0272: accumulate flag counts
+    for (const f of flags) {
+      flagCountsMap.set(f, (flagCountsMap.get(f) ?? 0) + 1);
+    }
   }
+
+  const flagCounts = Object.fromEntries(flagCountsMap) as Partial<Record<FlagKind, number>>;
 
   // 4. Speed stats
   const sorted = sortedAsc(rtsNonTimeout);
@@ -246,6 +271,28 @@ export function buildSessionInsights(session: SessionResult): SessionInsights {
   const nonEmptyActive = trialRefs.filter((r) => !r.timedOut && r.responseLen > 0).length;
   const nonEmptyResponseRate = scoredCount === 0 ? 0 : nonEmptyActive / scoredCount;
 
+  // 7. 0272: Response clusters (count >= 2), sorted by count desc
+  const responseMap = new Map<string, { words: string[]; indices: number[] }>();
+  for (const ref of trialRefs) {
+    const key = ref.response;
+    const entry = responseMap.get(key) ?? { words: [], indices: [] };
+    entry.words.push(ref.word);
+    entry.indices.push(ref.sessionTrialIndex);
+    responseMap.set(key, entry);
+  }
+  const responseClusters = [...responseMap.entries()]
+    .filter(([, v]) => v.words.length >= 2)
+    .sort((a, b) => {
+      const diff = b[1].words.length - a[1].words.length;
+      return diff !== 0 ? diff : a[0].localeCompare(b[0]);
+    })
+    .map(([response, v]) => ({
+      response,
+      count: v.words.length,
+      words: v.words,
+      sessionTrialIndices: v.indices,
+    }));
+
   return {
     trialCount: trials.length,
     scoredCount,
@@ -269,6 +316,8 @@ export function buildSessionInsights(session: SessionResult): SessionInsights {
     topFastTrials,
     timeline,
     histogram,
+    flagCounts,
+    responseClusters,
     trialRefs,
     trialRefBySessionTrialIndex,
   };
