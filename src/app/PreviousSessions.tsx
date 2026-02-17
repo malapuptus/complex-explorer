@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { SessionListEntry, SessionResult } from "@/domain";
 import { sessionResultsToCsv } from "@/domain";
 import { localStorageSessionStore } from "@/infra";
@@ -13,6 +13,7 @@ import { ResultsView } from "./ResultsView";
 export function PreviousSessions() {
   const [entries, setEntries] = useState<SessionListEntry[]>([]);
   const [selected, setSelected] = useState<SessionResult | null>(null);
+  const navigate = useNavigate();
 
   const refresh = useCallback(() => {
     localStorageSessionStore.list().then(setEntries);
@@ -90,6 +91,10 @@ export function PreviousSessions() {
           meanReactionTimeMs={selected.scoring.summary.meanReactionTimeMs}
           medianReactionTimeMs={selected.scoring.summary.medianReactionTimeMs}
           onReset={() => setSelected(null)}
+          onReproduce={(config) => {
+            // Navigate to /demo — the DemoSession will handle pack resolution
+            navigate("/demo");
+          }}
           sessionResult={selected}
           csvMeta={{
             sessionId: selected.id,

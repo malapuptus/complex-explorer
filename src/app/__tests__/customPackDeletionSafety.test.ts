@@ -118,14 +118,9 @@ describe("Custom pack deletion safety", () => {
   });
 
   it("exported bundle includes snapshot after pack deletion", async () => {
-    // Save session with snapshot
     const session = makeSessionWithCustomPack();
     await localStorageSessionStore.save(session);
 
-    // Delete the pack (not the session)
-    // Pack doesn't even need to exist for this — session is self-contained
-
-    // Export all sessions
     const exported = await localStorageSessionStore.exportAll();
     const parsed = JSON.parse(exported);
     const s = parsed.sessions["session-custom-1"];
@@ -134,5 +129,56 @@ describe("Custom pack deletion safety", () => {
     expect(s.stimulusPackSnapshot.stimulusListHash).toBe("deadbeef1234");
     expect(s.stimulusPackSnapshot.stimulusSchemaVersion).toBe("sp_v1");
     expect(s.stimulusPackSnapshot.provenance.listId).toBe("custom-test-pack");
+  });
+
+  it("re-import from snapshot restores pack from stimulusOrder", async () => {
+    // Save session with snapshot + stimulusOrder
+    const session = makeSessionWithCustomPack();
+    await localStorageSessionStore.save(session);
+
+    // Delete custom pack
+    localStorageStimulusStore.delete("custom-test-pack", "1.0.0");
+    expect(localStorageStimulusStore.exists("custom-test-pack", "1.0.0")).toBe(false);
+
+    // Re-import from session snapshot using stimulusOrder as words
+    const loaded = await localStorageSessionStore.load("session-custom-1");
+    expect(loaded).toBeDefined();
+    const snapshot = loaded!.stimulusPackSnapshot!;
+    const prov = snapshot.provenance!;
+
+    const restoredPack = {
+      id: prov.listId,
+      version: prov.listVersion,
+      language: prov.language,
+      source: prov.source,
+      provenance: {
+        sourceName: prov.sourceName,
+        sourceYear: prov.sourceYear,
+        sourceCitation: prov.sourceCitation,
+        licenseNote: prov.licenseNote,
+      },
+      words: loaded!.stimulusOrder as string[],
+      stimulusSchemaVersion: snapshot.stimulusSchemaVersion ?? "sp_v1",
+    };
+    localStorageStimulusStore.save(restoredPack);
+
+    // Verify restored pack
+    expect(localStorageStimulusStore.exists("custom-test-pack", "1.0.0")).toBe(true);
+    const restored = localStorageStimulusStore.load("custom-test-pack", "1.0.0");
+    expect(restored).toBeDefined();
+    expect(restored!.words).toEqual(["alpha"]);
+  });
+
+  it("snapshot without stimulusOrder cannot restore full pack", async () => {
+    // A session with snapshot but no stimulusOrder
+    const session = makeSessionWithCustomPack();
+    const noOrderSession = { ...session, stimulusOrder: [] as string[] };
+    await localStorageSessionStore.save(noOrderSession);
+
+    const loaded = await localStorageSessionStore.load("session-custom-1");
+    // stimulusOrder is empty — can't restore meaningful word list
+    expect(loaded!.stimulusOrder).toHaveLength(0);
+    // Snapshot is still present for hash verification
+    expect(loaded!.stimulusPackSnapshot!.stimulusListHash).toBe("deadbeef1234");
   });
 });

@@ -6,9 +6,25 @@
 
 import { useState, useRef } from "react";
 import type { ReactNode } from "react";
-import type { OrderPolicy } from "@/domain";
+import type { OrderPolicy, ValidationErrorCode } from "@/domain";
 import { validateStimulusList, STIMULUS_SCHEMA_VERSION, computeWordsSha256 } from "@/domain";
 import type { StimulusList } from "@/domain";
+
+/** Human-readable messages for validation error codes. */
+const ERROR_CODE_MESSAGES: Record<ValidationErrorCode, string> = {
+  MISSING_ID: "Pack ID is required.",
+  MISSING_VERSION: "Version is required.",
+  MISSING_LANGUAGE: "Language is required.",
+  MISSING_SOURCE: "Source is required.",
+  MISSING_PROVENANCE: "Provenance metadata is required.",
+  MISSING_PROVENANCE_SOURCE_NAME: "Provenance source name is required.",
+  MISSING_PROVENANCE_SOURCE_YEAR: "Provenance source year is required.",
+  MISSING_PROVENANCE_SOURCE_CITATION: "Provenance citation is required.",
+  MISSING_PROVENANCE_LICENSE_NOTE: "Provenance license note is required.",
+  EMPTY_WORD_LIST: "Word list must not be empty.",
+  BLANK_WORDS: "Word list contains blank entries.",
+  DUPLICATE_WORDS: "Word list contains duplicates (case-insensitive).",
+};
 import { localStorageStimulusStore } from "@/infra";
 import { CustomPackManager } from "./CustomPackManager";
 
@@ -80,7 +96,8 @@ export function ProtocolScreen({
         const parsed = JSON.parse(reader.result as string);
         const errors = validateStimulusList(parsed);
         if (errors.length > 0) {
-          setImportError(errors.map((err) => `${err.field}: ${err.message}`).join("; "));
+          const messages = errors.map((err) => ERROR_CODE_MESSAGES[err.code] ?? err.message);
+          setImportError(messages.join("; "));
           return;
         }
         // Collision check: reject if same (id, version) exists

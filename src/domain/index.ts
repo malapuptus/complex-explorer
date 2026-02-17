@@ -27,7 +27,7 @@ export { generateReflectionPrompts } from "./reflection";
 
 export { seededShuffle, randomSeed } from "./shuffle";
 
-export type { StimulusList, StimulusListProvenance, StimulusListValidationError } from "./stimuli";
+export type { StimulusList, StimulusListProvenance, StimulusListValidationError, ValidationErrorCode } from "./stimuli";
 
 export {
   validateStimulusList,

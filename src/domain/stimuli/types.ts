@@ -37,9 +37,25 @@ export interface StimulusList {
   readonly stimulusListHash?: string;
 }
 
+/** Structured error codes for deterministic validation UX. */
+export type ValidationErrorCode =
+  | "MISSING_ID"
+  | "MISSING_VERSION"
+  | "MISSING_LANGUAGE"
+  | "MISSING_SOURCE"
+  | "MISSING_PROVENANCE"
+  | "MISSING_PROVENANCE_SOURCE_NAME"
+  | "MISSING_PROVENANCE_SOURCE_YEAR"
+  | "MISSING_PROVENANCE_SOURCE_CITATION"
+  | "MISSING_PROVENANCE_LICENSE_NOTE"
+  | "EMPTY_WORD_LIST"
+  | "BLANK_WORDS"
+  | "DUPLICATE_WORDS";
+
 export interface StimulusListValidationError {
   readonly field: string;
   readonly message: string;
+  readonly code: ValidationErrorCode;
 }
 
 /**
@@ -49,45 +65,49 @@ export function validateStimulusList(list: Partial<StimulusList>): StimulusListV
   const errors: StimulusListValidationError[] = [];
 
   if (!list.id || list.id.trim() === "") {
-    errors.push({ field: "id", message: "id is required" });
+    errors.push({ field: "id", message: "id is required", code: "MISSING_ID" });
   }
   if (!list.version || list.version.trim() === "") {
-    errors.push({ field: "version", message: "version is required" });
+    errors.push({ field: "version", message: "version is required", code: "MISSING_VERSION" });
   }
   if (!list.language || list.language.trim() === "") {
-    errors.push({ field: "language", message: "language is required" });
+    errors.push({ field: "language", message: "language is required", code: "MISSING_LANGUAGE" });
   }
   if (!list.source || list.source.trim() === "") {
-    errors.push({ field: "source", message: "source is required" });
+    errors.push({ field: "source", message: "source is required", code: "MISSING_SOURCE" });
   }
 
   // Provenance validation
   if (!list.provenance) {
-    errors.push({ field: "provenance", message: "provenance is required" });
+    errors.push({ field: "provenance", message: "provenance is required", code: "MISSING_PROVENANCE" });
   } else {
     const p = list.provenance;
     if (!p.sourceName || p.sourceName.trim() === "") {
       errors.push({
         field: "provenance.sourceName",
         message: "provenance.sourceName is required",
+        code: "MISSING_PROVENANCE_SOURCE_NAME",
       });
     }
     if (!p.sourceYear || p.sourceYear.trim() === "") {
       errors.push({
         field: "provenance.sourceYear",
         message: "provenance.sourceYear is required",
+        code: "MISSING_PROVENANCE_SOURCE_YEAR",
       });
     }
     if (!p.sourceCitation || p.sourceCitation.trim() === "") {
       errors.push({
         field: "provenance.sourceCitation",
         message: "provenance.sourceCitation is required",
+        code: "MISSING_PROVENANCE_SOURCE_CITATION",
       });
     }
     if (!p.licenseNote || p.licenseNote.trim() === "") {
       errors.push({
         field: "provenance.licenseNote",
         message: "provenance.licenseNote is required",
+        code: "MISSING_PROVENANCE_LICENSE_NOTE",
       });
     }
   }
@@ -96,6 +116,7 @@ export function validateStimulusList(list: Partial<StimulusList>): StimulusListV
     errors.push({
       field: "words",
       message: "words must be a non-empty array",
+      code: "EMPTY_WORD_LIST",
     });
   } else {
     const blanks = list.words.filter((w) => typeof w !== "string" || w.trim() === "");
@@ -103,6 +124,7 @@ export function validateStimulusList(list: Partial<StimulusList>): StimulusListV
       errors.push({
         field: "words",
         message: `${blanks.length} blank or non-string word(s) found`,
+        code: "BLANK_WORDS",
       });
     }
 
@@ -120,6 +142,7 @@ export function validateStimulusList(list: Partial<StimulusList>): StimulusListV
       errors.push({
         field: "words",
         message: `${duplicates.length} duplicate word(s): ${duplicates.slice(0, 5).join(", ")}`,
+        code: "DUPLICATE_WORDS",
       });
     }
   }

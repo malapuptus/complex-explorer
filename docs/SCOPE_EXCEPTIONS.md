@@ -17,4 +17,4 @@ This is the canonical record of out-of-scope edits made during ticket execution.
 The following hygiene exceptions were previously tracked here. They have been resolved or are no longer applicable:
 
 - **`src/app/DemoSession.tsx`** — Was 365 lines (over 350 limit); resolved by Ticket 0198 (extracted `usePackSelection.ts` hook). Now under 350 lines.
-- **`src/app/ResultsView.tsx`** — Was within limits; previously allowlisted at 400 as a buffer. No longer in the allowlist.
+- **`src/app/ResultsView.tsx`** — 382 lines (over 350 limit) as of Ticket 0212; contains reproducibility panel, export buttons, pack restore, reproduce button, and reflection prompts. Follow-up ticket recommended to extract export/restore logic into a separate component.

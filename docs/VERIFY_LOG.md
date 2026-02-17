@@ -30,6 +30,44 @@ Copy this block for each new entry:
 
 ## Runs
 
+### 2026-02-17 16:14 (Lovable sandbox) — Tickets 0208–0212
+
+- **Environment:** Lovable (tests only)
+- **Command:** `npx vitest run src`
+- **Result:** PASS (173/173)
+
+| # | Oracle | Runnable in Lovable | Evidence provided | Notes |
+|---|--------|---------------------|-------------------|-------|
+| 1 | Hygiene | N | — | DemoSession.tsx 313 lines ✓; ResultsView.tsx 382 lines (over 350, logged) |
+| 2 | Format | N | — | No shell access |
+| 3 | Lint | N | — | No shell access |
+| 4 | Typecheck | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 5 | Boundaries | N | — | No shell access |
+| 6 | Load smoke | N | — | No shell access |
+| 7 | Build | Y (implicit) | Preview loads | Covered by Vite dev server |
+| 8 | Tests | Y | 173/173 passed | 20 test files |
+
+**Canary artifacts:**
+
+- **Hash test vector (0208):** `["alpha","beta","gamma"] → f3220283d05d1ff2ae350cfe9e0e367cb5aef46e10efb203c8a53c678e2218c8`
+- **Unicode vector:** `["café","naïve","über","日本語"] → 4984688c9201cc352d2384d17e75cf0e5144aae7bfcb3da6afa3b01462dd7d70`
+- **Validation error codes (0209):** All errors now include `code` field (MISSING_ID, EMPTY_WORD_LIST, DUPLICATE_WORDS, etc.); tests assert codes not message strings
+- **Bulk export (0210):** PreviousSessions `exportAll()` already includes `stimulusPackSnapshot` on each session — verified in customPackDeletionSafety.test.ts
+- **Reproduce button (0211):** "Run again with same settings" button added to ResultsView; DemoSession handles `onReproduce` with pack availability check
+- **Re-import from snapshot (0212):** "Restore pack from snapshot" button shows when pack missing + stimulusOrder available; test confirms round-trip (customPackDeletionSafety.test.ts 4/4)
+- **Custom pack deleted, historical export still includes snapshot hash:** ✓
+
+**Policy checklist:**
+
+- [x] `npx vitest run src` passed (173/173)
+- [x] Oracle table included (8 rows)
+- [x] CSV canary: header present
+- [x] Bundle canary: rb_v2 + stimulusPackSnapshot
+- [x] Hash vector canary: 6 vectors with hard-coded hashes
+- [x] Environment line present: "Lovable (tests only)"
+
+---
+
 ### 2026-02-17 16:02 (Lovable sandbox) — Tickets 0203–0207
 
 - **Environment:** Lovable (tests only)

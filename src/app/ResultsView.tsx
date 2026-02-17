@@ -1,6 +1,7 @@
 import { useMemo, useCallback, useState } from "react";
-import type { Trial, TrialFlag, OrderPolicy, SessionScoring, SessionResult, StimulusPackSnapshot } from "@/domain";
-import { generateReflectionPrompts, sessionTrialsToCsv } from "@/domain";
+import type { Trial, TrialFlag, OrderPolicy, SessionScoring, SessionResult, StimulusPackSnapshot, StimulusList } from "@/domain";
+import { generateReflectionPrompts, sessionTrialsToCsv, getStimulusList } from "@/domain";
+import { localStorageStimulusStore } from "@/infra";
 import { SessionSummaryCard } from "./SessionSummaryCard";
 
 declare const __APP_VERSION__: string;
@@ -30,6 +31,15 @@ interface Props {
   meanReactionTimeMs: number;
   medianReactionTimeMs: number;
   onReset: () => void;
+  /** Callback to reproduce session with same config. */
+  onReproduce?: (config: {
+    packId: string;
+    packVersion: string;
+    seed: number | null;
+    orderPolicy: OrderPolicy;
+    trialTimeoutMs?: number;
+    breakEveryN?: number;
+  }) => void;
   sessionResult?: SessionResult;
   csvMeta?: {
     sessionId: string;
@@ -70,7 +80,7 @@ function CopyButton({ text }: { text: string }) {
 
 export function ResultsView({
   trials, trialFlags, meanReactionTimeMs, medianReactionTimeMs,
-  onReset, sessionResult, csvMeta,
+  onReset, onReproduce, sessionResult, csvMeta,
 }: Props) {
   const reflectionPrompts = useMemo(
     () => generateReflectionPrompts(trials, trialFlags),
@@ -90,6 +100,12 @@ export function ResultsView({
     return null;
   }, [sessionResult, csvMeta]);
 
+  // Check if the session's pack is currently installed
+  const packIsInstalled = useMemo(() => {
+    if (!csvMeta) return false;
+    if (getStimulusList(csvMeta.packId, csvMeta.packVersion)) return true;
+    return localStorageStimulusStore.exists(csvMeta.packId, csvMeta.packVersion);
+  }, [csvMeta]);
   const reproBundle = useMemo(() => {
     if (!csvMeta) return null;
     const lines = [
@@ -291,7 +307,61 @@ export function ResultsView({
                 Export Pack Snapshot
               </button>
             )}
+            {/* Ticket 0212: Restore pack from snapshot — only possible with full word list */}
+            {persistedSnapshot && !packIsInstalled && sessionResult?.stimulusOrder && (
+              <button
+                onClick={() => {
+                  if (!persistedSnapshot.provenance || !sessionResult?.stimulusOrder) return;
+                  const prov = persistedSnapshot.provenance;
+                  const restoredPack: StimulusList = {
+                    id: prov.listId,
+                    version: prov.listVersion,
+                    language: prov.language,
+                    source: prov.source,
+                    provenance: {
+                      sourceName: prov.sourceName,
+                      sourceYear: prov.sourceYear,
+                      sourceCitation: prov.sourceCitation,
+                      licenseNote: prov.licenseNote,
+                    },
+                    words: sessionResult.stimulusOrder as string[],
+                    stimulusSchemaVersion: persistedSnapshot.stimulusSchemaVersion ?? "sp_v1",
+                    stimulusListHash: persistedSnapshot.stimulusListHash ?? undefined,
+                  };
+                  if (localStorageStimulusStore.exists(restoredPack.id, restoredPack.version)) {
+                    return; // Already restored
+                  }
+                  localStorageStimulusStore.save(restoredPack);
+                  alert(`Pack "${restoredPack.id}@${restoredPack.version}" restored from session snapshot (${restoredPack.words.length} words). Note: only scored words are included; practice words are not in the snapshot.`);
+                }}
+                className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+              >
+                Restore pack from snapshot
+              </button>
+            )}
+            {persistedSnapshot && !packIsInstalled && !sessionResult?.stimulusOrder && (
+              <p className="text-xs text-muted-foreground italic">
+                Pack not installed. Snapshot contains only hash + provenance — insufficient to restore the full word list.
+              </p>
+            )}
           </>
+        )}
+        {csvMeta && onReproduce && (
+          <button
+            onClick={() => {
+              onReproduce({
+                packId: csvMeta.packId,
+                packVersion: csvMeta.packVersion,
+                seed: csvMeta.seed,
+                orderPolicy: csvMeta.orderPolicy ?? "fixed",
+                trialTimeoutMs: csvMeta.trialTimeoutMs,
+                breakEveryN: csvMeta.breakEveryN,
+              });
+            }}
+            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+          >
+            Run again with same settings
+          </button>
         )}
         <button onClick={onReset} className="rounded-md bg-primary px-6 py-2 text-primary-foreground hover:opacity-90">
           Start Over
