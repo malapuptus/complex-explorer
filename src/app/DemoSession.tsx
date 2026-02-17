@@ -6,8 +6,8 @@
 declare const __APP_VERSION__: string;
 
 import { getStimulusList, computeSessionFingerprint } from "@/domain";
-import type { SessionResult, ProvenanceSnapshot, DraftSession } from "@/domain";
-import { localStorageSessionStore } from "@/infra";
+import type { SessionResult, ProvenanceSnapshot, DraftSession, StimulusList } from "@/domain";
+import { localStorageSessionStore, localStorageStimulusStore } from "@/infra";
 import { useSession } from "./useSession";
 import type { SessionSnapshot, StartOverrides } from "./useSession";
 import { ResultsView } from "./ResultsView";
@@ -25,7 +25,9 @@ import {
 import { useEffect, useRef, useState, useCallback } from "react";
 
 export function DemoSession() {
-  const packOptions = useRef(buildPackOptions()).current;
+  const [packOptions, setPackOptions] = useState(() =>
+    buildPackOptions(localStorageStimulusStore.list()),
+  );
   const [selectedPackKey, setSelectedPackKey] = useState(
     `${packOptions[0].id}@${packOptions[0].version}`,
   );
@@ -40,8 +42,21 @@ export function DemoSession() {
   const tabIdRef = useRef(generateTabId());
   const startedAtRef = useRef<string | null>(null);
 
+  const refreshPacks = useCallback(() => {
+    setPackOptions(buildPackOptions(localStorageStimulusStore.list()));
+  }, []);
+
   const selectedOption = packOptions.find((p) => `${p.id}@${p.version}` === selectedPackKey)!;
-  const list = getStimulusList(selectedOption.id, selectedOption.version)!;
+
+  /** Look up a pack from built-in registry or custom store. */
+  const resolveList = useCallback(
+    (id: string, version: string): StimulusList | undefined => {
+      return getStimulusList(id, version) ?? localStorageStimulusStore.load(id, version);
+    },
+    [],
+  );
+
+  const list = resolveList(selectedOption.id, selectedOption.version)!;
   const isLongPack = list.words.length > 10;
 
   const session = useSession(list.words as string[], {
@@ -170,7 +185,7 @@ export function DemoSession() {
       setDraftLocked(true);
       return;
     }
-    const draftList = getStimulusList(
+    const draftList = resolveList(
       pendingDraft.stimulusListId,
       pendingDraft.stimulusListVersion,
     );
@@ -202,7 +217,7 @@ export function DemoSession() {
     });
     session.restore(snapshot);
     setPendingDraft(null);
-  }, [pendingDraft, session]);
+  }, [pendingDraft, session, resolveList]);
 
   const handleDiscard = useCallback(() => {
     localStorageSessionStore.deleteDraft();
@@ -275,6 +290,8 @@ export function DemoSession() {
         estimatedMinutes={selectedOption.estimate}
         isLongPack={isLongPack}
         onReady={handleStart}
+        onPackImported={refreshPacks}
+        selectedPack={list}
       >
         {draftLocked && (
           <p className="text-center text-sm text-destructive">

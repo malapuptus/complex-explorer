@@ -1,6 +1,7 @@
 import { useMemo, useCallback, useState } from "react";
 import type { Trial, TrialFlag, OrderPolicy, SessionScoring, SessionResult } from "@/domain";
 import { generateReflectionPrompts, sessionTrialsToCsv } from "@/domain";
+import { SessionSummaryCard } from "./SessionSummaryCard";
 
 declare const __APP_VERSION__: string;
 
@@ -156,6 +157,19 @@ export function ResultsView({
               </>
             )}
           </dl>
+        </div>
+      )}
+
+      {csvMeta && (
+        <div className="mb-6">
+          <SessionSummaryCard
+            trials={trials}
+            trialFlags={trialFlags}
+            meanReactionTimeMs={meanReactionTimeMs}
+            medianReactionTimeMs={medianReactionTimeMs}
+            sessionResult={sessionResult}
+            csvMeta={csvMeta}
+          />
         </div>
       )}
 

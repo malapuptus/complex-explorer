@@ -41,6 +41,15 @@
 | 3.3 | Click **Continue** | Next trial begins; break does not count as a trial |
 | 3.4 | Complete all 100 trials through multiple breaks | Results show exactly 100 scored trials (breaks excluded) |
 
+## 3b. Break Canary — breakEveryN=2
+
+| Step | Action | Expected Outcome |
+|------|--------|------------------|
+| 3b.1 | Start demo-10 with breakEveryN=2 (via advanced settings) | Session starts normally |
+| 3b.2 | Complete 2 scored trials | Break screen appears **once** — no duplicate trigger |
+| 3b.3 | Click Continue, complete 2 more trials | Second break appears at trial 4 |
+| 3b.4 | Complete session | All breaks triggered exactly once per threshold |
+
 ## 4. Warm-Up Exclusion
 
 | Step | Action | Expected Outcome |
@@ -77,12 +86,22 @@
 | Step | Action | Expected Outcome |
 |------|--------|------------------|
 | 7.1 | Complete a session and click **Export CSV** on results | CSV file downloads with correct filename |
-| 7.2 | Open CSV; verify columns | Must include: `session_id`, `pack_id`, `pack_version`, `seed`, `order_index`, `word`, `warmup`, `response`, `t_first_input_ms`, `t_submit_ms`, `backspaces`, `edits`, `compositions`, `timed_out`, `flags` |
+| 7.2 | Open CSV; verify columns | Must include: `csv_schema_version`, `session_id`, `session_fingerprint`, `scoring_version`, `pack_id`, `pack_version`, `seed`, `order_index`, `word`, `warmup`, `response`, `t_first_input_ms`, `t_submit_ms`, `backspaces`, `edits`, `compositions`, `timed_out`, `flags` |
 | 7.3 | Navigate to **Previous Sessions** | Completed session appears in the list |
 | 7.4 | Click **Export CSV** (all sessions) | CSV contains rows from all stored sessions |
 | 7.5 | Verify no diagnostic language in exports | No clinical terms, no interpretation text |
 | 7.6 | On results screen, verify reproducibility bundle shows fingerprint, pack, seed, order policy | All values match the export JSON; Copy button copies the bundle text |
-| 7.7 | Click **Export Research Bundle** on results screen | JSON file downloads; contains `sessionResult`, `protocolDocVersion`, `scoringAlgorithm`, `exportedAt`; fingerprint and repro fields match the UI |
+| 7.7 | Click **Export Research Bundle** on results screen | JSON file downloads; contains `sessionResult`, `protocolDocVersion`, `appVersion`, `scoringAlgorithm`, `exportSchemaVersion`, `exportedAt`; fingerprint and repro fields match the UI |
+
+## 7b. Verify-log canary requirements
+
+After each ticket batch, paste into `docs/VERIFY_LOG.md`:
+
+| Canary | What to paste |
+|--------|---------------|
+| CSV header + row | Full CSV header line + one data row showing `csv_schema_version`, `scoring_version`, `session_fingerprint` populated |
+| Research Bundle snippet | JSON snippet showing `sessionResult`, `protocolDocVersion`, `appVersion`, `scoringAlgorithm`, `exportSchemaVersion`, `exportedAt` |
+| Break canary | breakLogic.test.ts output or manual observation with breakEveryN=2 |
 
 ## 8. Delete My Data
 
@@ -102,6 +121,26 @@
 | 9.2 | Start a session; on a trial, type using IME composition | Composition underline appears in the input field |
 | 9.3 | Commit the composed text and submit | Trial records normally |
 | 9.4 | View results or export CSV for that trial | `compositions` count ≥ 1; `t_first_input_ms` reflects the first keydown (not composition commit) |
+
+## 10. Custom Pack Import
+
+| Step | Action | Expected Outcome |
+|------|--------|------------------|
+| 10.1 | On the protocol screen, click **Import Pack (JSON)** | File picker opens |
+| 10.2 | Select a valid JSON file containing a StimulusList | Success message appears with pack name and word count |
+| 10.3 | Verify the imported pack appears in the pack selector dropdown | Pack shows with `(custom)` tag |
+| 10.4 | Select the custom pack and start a session | Session uses the imported words |
+| 10.5 | Import a JSON file with missing required fields (e.g., no `id`) | Error message shows validation failures |
+| 10.6 | Import a JSON file with duplicate words | Error message mentions duplicate count |
+| 10.7 | Import a non-JSON file | Error message: "Invalid JSON file" |
+
+## 11. Pack Export
+
+| Step | Action | Expected Outcome |
+|------|--------|------------------|
+| 11.1 | On the protocol screen, click **Export Pack JSON** | JSON file downloads for the currently selected pack |
+| 11.2 | Open the JSON; verify it contains `id`, `version`, `language`, `source`, `provenance`, `words` | All provenance fields present |
+| 11.3 | Re-import the exported JSON | Import succeeds; pack appears in selector |
 
 ---
 
@@ -144,6 +183,7 @@
 | Timeout flag | Exactly 1 trial flagged `timeout` (trial 6) |
 | Backspace count | Trial 7 shows `BS ≥ 3` |
 | Reproducibility Bundle | Fingerprint (64-char hex), seed (numeric), pack `kent-rosanoff-1910@1.0.0`, order `seeded`, scoring version visible |
+| Session Summary Card | Shows pack, seed, order, trial/flagged/timeout counts, median RT, scoring version, export schema, app version |
 | Mean/Median RT | Values displayed; timeout trial excluded from aggregates |
 
 ### Expected Outcomes — CSV Export
@@ -154,7 +194,7 @@
 | Row count | 103 data rows (3 practice + 100 scored) |
 | Timeout trial row | `timed_out` = `true`, `response` = `""`, `flags` contains `timeout` |
 | Backspace trial row | `backspaces` ≥ 3 |
-| Headers include | `session_id`, `session_fingerprint`, `scoring_version`, `pack_id`, `seed`, `timed_out`, `flags` |
+| Headers include | `csv_schema_version`, `session_id`, `session_fingerprint`, `scoring_version`, `pack_id`, `seed`, `timed_out`, `flags` |
 | Fingerprint column | Same value on every row; matches Reproducibility Bundle display |
 
 ### Expected Outcomes — Research Bundle
@@ -164,6 +204,8 @@
 | Click **Export Research Bundle** | JSON file downloads; filename contains date, pack id, seed, fingerprint prefix |
 | `sessionResult.trials` | 100 entries (scored only) |
 | `scoringAlgorithm` | `MAD-modified-z@3.5 + fast<200ms + timeout excluded` |
+| `exportSchemaVersion` | `rb_v1` |
+| `appVersion` | Non-null string |
 | `sessionResult.sessionFingerprint` | Matches CSV and UI |
 
 ---

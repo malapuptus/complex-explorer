@@ -10,7 +10,11 @@ This is the canonical record of out-of-scope edits made during ticket execution.
 | 0146   | `src/domain/fingerprint.ts` (new), `src/app/DemoSession.tsx`         | New fingerprint module needed a dedicated file; `DemoSession` required edits to compute and thread the fingerprint on completion.                                                         | Include host/orchestration components and allow new domain files when the ticket introduces a new domain concept.                                                                           |
 | 0149   | `src/app/DemoSession.tsx`                                            | Reproducibility bundle in `ResultsView` required passing `orderPolicy`, `trialTimeoutMs`, and `breakEveryN` via `csvMeta`, which meant editing the parent component.                      | Include host/integration components in allowed edits when expanding a child component's props interface.                                                                                    |
 | 0172   | `vite.config.ts`                                                     | Needed a compile-time `__APP_VERSION__` define so Research Bundle `appVersion` is populated without runtime I/O or bundling `package.json`. This file was outside the allowed-edits list. | Include `vite.config.ts` (or a dedicated build/version module) in allowed edits whenever introducing build-time constants, version stamping, or bundle metadata.                            |
+| 0194   | `src/app/DemoSession.tsx`, `src/app/DemoSessionHelpers.ts`, `src/infra/index.ts` | Custom pack import requires the session host to resolve packs from the custom store, helpers to build pack options from custom entries, and the infra barrel to export the new store. | Include host/orchestration components, barrel files, and helper modules in allowed edits when adding a new data source or storage adapter. |
 
+## Known Hygiene Exceptions
+
+- **`src/app/DemoSession.tsx`** — 365 lines (limit 350). Needs decomposition (follow-up ticket). Added by Ticket 0194 custom pack integration.
 ## Resolved Hygiene Exceptions
 
 The following hygiene exceptions were previously tracked here. They have been resolved or are no longer applicable:

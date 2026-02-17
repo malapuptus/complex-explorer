@@ -1,11 +1,15 @@
 /**
  * ProtocolScreen — standardized pre-session instructions.
  * Includes an Advanced section for experimental controls.
+ * Supports custom pack import/export.
  */
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { ReactNode } from "react";
 import type { OrderPolicy } from "@/domain";
+import { validateStimulusList } from "@/domain";
+import type { StimulusList } from "@/domain";
+import { localStorageStimulusStore } from "@/infra";
 
 /** Config produced by the Advanced settings panel. */
 export interface AdvancedConfig {
@@ -23,6 +27,10 @@ interface ProtocolScreenProps {
   /** If true, break/timeout controls are shown (hidden for tiny packs). */
   isLongPack: boolean;
   onReady: (config: AdvancedConfig) => void;
+  /** Called when a custom pack is imported to refresh pack list. */
+  onPackImported?: () => void;
+  /** The currently selected pack (for export). */
+  selectedPack?: StimulusList | null;
   children?: ReactNode;
 }
 
@@ -43,6 +51,8 @@ export function ProtocolScreen({
   estimatedMinutes,
   isLongPack,
   onReady,
+  onPackImported,
+  selectedPack,
   children,
 }: ProtocolScreenProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -51,6 +61,9 @@ export function ProtocolScreen({
   const [breakEvery, setBreakEvery] = useState(DEFAULT_BREAK_EVERY);
   const [timeoutEnabled, setTimeoutEnabled] = useState(false);
   const [timeoutMs, setTimeoutMs] = useState(8000);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importSuccess, setImportSuccess] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleReady = () => {
     const parsedSeed =
@@ -63,6 +76,45 @@ export function ProtocolScreen({
       breakEveryN: isLongPack ? breakEvery : 0,
       trialTimeoutMs: timeoutEnabled ? timeoutMs : undefined,
     });
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportError(null);
+    setImportSuccess(null);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string);
+        const errors = validateStimulusList(parsed);
+        if (errors.length > 0) {
+          setImportError(errors.map((e) => `${e.field}: ${e.message}`).join("; "));
+          return;
+        }
+        localStorageStimulusStore.save(parsed as StimulusList);
+        setImportSuccess(`Imported "${parsed.id}" (${parsed.words.length} words)`);
+        onPackImported?.();
+      } catch {
+        setImportError("Invalid JSON file.");
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so same file can be re-imported
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleExportPack = () => {
+    if (!selectedPack) return;
+    const json = JSON.stringify(selectedPack, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pack-${selectedPack.id}-${selectedPack.version}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -98,6 +150,30 @@ export function ProtocolScreen({
 
       {children}
 
+      {/* Pack tools: import + export */}
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <label className="cursor-pointer rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted">
+          Import Pack (JSON)
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleImport}
+            className="hidden"
+          />
+        </label>
+        {selectedPack && (
+          <button
+            onClick={handleExportPack}
+            className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
+          >
+            Export Pack JSON
+          </button>
+        )}
+      </div>
+      {importError && <p className="text-xs text-destructive">{importError}</p>}
+      {importSuccess && <p className="text-xs text-primary">{importSuccess}</p>}
+
       {/* Advanced settings toggle */}
       <button
         type="button"
@@ -108,91 +184,19 @@ export function ProtocolScreen({
       </button>
 
       {showAdvanced && (
-        <div className="w-full max-w-md space-y-4 rounded-md border border-border bg-muted/30 p-4">
-          {/* Order policy */}
-          <div className="flex items-center gap-3">
-            <label className="w-28 shrink-0 text-sm text-muted-foreground">Word order:</label>
-            <select
-              value={orderPolicy}
-              onChange={(e) => setOrderPolicy(e.target.value as OrderPolicy)}
-              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
-            >
-              <option value="fixed">Fixed</option>
-              <option value="seeded">Randomized</option>
-            </select>
-          </div>
-
-          {/* Seed input (only when seeded) */}
-          {orderPolicy === "seeded" && (
-            <div className="flex items-center gap-3">
-              <label className="w-28 shrink-0 text-sm text-muted-foreground">Seed:</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={seedInput}
-                onChange={(e) => setSeedInput(e.target.value)}
-                placeholder="Auto-generate"
-                className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground/60"
-              />
-            </div>
-          )}
-
-          {/* Break interval (long packs only) */}
-          {isLongPack && (
-            <div className="flex items-center gap-3">
-              <label className="w-28 shrink-0 text-sm text-muted-foreground">Break every:</label>
-              <input
-                type="number"
-                min={5}
-                max={100}
-                value={breakEvery}
-                onChange={(e) =>
-                  setBreakEvery(Math.max(5, Math.min(100, Number(e.target.value) || 5)))
-                }
-                className="w-20 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
-              />
-              <span className="text-sm text-muted-foreground">trials</span>
-            </div>
-          )}
-
-          {/* Timeout */}
-          {isLongPack && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <label className="w-28 shrink-0 text-sm text-muted-foreground">
-                  Trial timeout:
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setTimeoutEnabled((v) => !v)}
-                  className={`rounded-md border px-3 py-1.5 text-sm ${
-                    timeoutEnabled
-                      ? "border-primary bg-primary/10 text-foreground"
-                      : "border-input bg-background text-muted-foreground"
-                  }`}
-                >
-                  {timeoutEnabled ? "On" : "Off"}
-                </button>
-              </div>
-              {timeoutEnabled && (
-                <div className="flex items-center gap-3 pl-[7.75rem]">
-                  <input
-                    type="number"
-                    min={3000}
-                    max={30000}
-                    step={1000}
-                    value={timeoutMs}
-                    onChange={(e) =>
-                      setTimeoutMs(Math.max(3000, Math.min(30000, Number(e.target.value) || 3000)))
-                    }
-                    className="w-24 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
-                  />
-                  <span className="text-sm text-muted-foreground">ms</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <AdvancedPanel
+          orderPolicy={orderPolicy}
+          setOrderPolicy={setOrderPolicy}
+          seedInput={seedInput}
+          setSeedInput={setSeedInput}
+          isLongPack={isLongPack}
+          breakEvery={breakEvery}
+          setBreakEvery={setBreakEvery}
+          timeoutEnabled={timeoutEnabled}
+          setTimeoutEnabled={setTimeoutEnabled}
+          timeoutMs={timeoutMs}
+          setTimeoutMs={setTimeoutMs}
+        />
       )}
 
       <button
@@ -201,6 +205,115 @@ export function ProtocolScreen({
       >
         I'm ready
       </button>
+    </div>
+  );
+}
+
+/** Extracted advanced settings panel. */
+function AdvancedPanel({
+  orderPolicy,
+  setOrderPolicy,
+  seedInput,
+  setSeedInput,
+  isLongPack,
+  breakEvery,
+  setBreakEvery,
+  timeoutEnabled,
+  setTimeoutEnabled,
+  timeoutMs,
+  setTimeoutMs,
+}: {
+  orderPolicy: OrderPolicy;
+  setOrderPolicy: (v: OrderPolicy) => void;
+  seedInput: string;
+  setSeedInput: (v: string) => void;
+  isLongPack: boolean;
+  breakEvery: number;
+  setBreakEvery: (v: number) => void;
+  timeoutEnabled: boolean;
+  setTimeoutEnabled: (v: boolean) => void;
+  timeoutMs: number;
+  setTimeoutMs: (v: number) => void;
+}) {
+  return (
+    <div className="w-full max-w-md space-y-4 rounded-md border border-border bg-muted/30 p-4">
+      <div className="flex items-center gap-3">
+        <label className="w-28 shrink-0 text-sm text-muted-foreground">Word order:</label>
+        <select
+          value={orderPolicy}
+          onChange={(e) => setOrderPolicy(e.target.value as OrderPolicy)}
+          className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
+        >
+          <option value="fixed">Fixed</option>
+          <option value="seeded">Randomized</option>
+        </select>
+      </div>
+
+      {orderPolicy === "seeded" && (
+        <div className="flex items-center gap-3">
+          <label className="w-28 shrink-0 text-sm text-muted-foreground">Seed:</label>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={seedInput}
+            onChange={(e) => setSeedInput(e.target.value)}
+            placeholder="Auto-generate"
+            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground/60"
+          />
+        </div>
+      )}
+
+      {isLongPack && (
+        <div className="flex items-center gap-3">
+          <label className="w-28 shrink-0 text-sm text-muted-foreground">Break every:</label>
+          <input
+            type="number"
+            min={5}
+            max={100}
+            value={breakEvery}
+            onChange={(e) =>
+              setBreakEvery(Math.max(5, Math.min(100, Number(e.target.value) || 5)))
+            }
+            className="w-20 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
+          />
+          <span className="text-sm text-muted-foreground">trials</span>
+        </div>
+      )}
+
+      {isLongPack && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <label className="w-28 shrink-0 text-sm text-muted-foreground">Trial timeout:</label>
+            <button
+              type="button"
+              onClick={() => setTimeoutEnabled(!timeoutEnabled)}
+              className={`rounded-md border px-3 py-1.5 text-sm ${
+                timeoutEnabled
+                  ? "border-primary bg-primary/10 text-foreground"
+                  : "border-input bg-background text-muted-foreground"
+              }`}
+            >
+              {timeoutEnabled ? "On" : "Off"}
+            </button>
+          </div>
+          {timeoutEnabled && (
+            <div className="flex items-center gap-3 pl-[7.75rem]">
+              <input
+                type="number"
+                min={3000}
+                max={30000}
+                step={1000}
+                value={timeoutMs}
+                onChange={(e) =>
+                  setTimeoutMs(Math.max(3000, Math.min(30000, Number(e.target.value) || 3000)))
+                }
+                className="w-24 rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
+              />
+              <span className="text-sm text-muted-foreground">ms</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
