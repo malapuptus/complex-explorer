@@ -56,6 +56,22 @@ export interface SessionConfig {
   readonly breakEveryN?: number;
 }
 
+/**
+ * Coarse, privacy-preserving environment hints captured at session time.
+ * No raw userAgent, no screen resolution, no IP-ish identifiers.
+ */
+export interface SessionContext {
+  deviceClass: "desktop" | "mobile" | "tablet" | "unknown";
+  osFamily: "macos" | "windows" | "linux" | "ios" | "android" | "unknown";
+  browserFamily: "chrome" | "safari" | "firefox" | "edge" | "unknown";
+  locale?: string | null;
+  timeZone?: string | null;
+  inputHints?: {
+    usedIME: boolean;
+    totalCompositionCount: number;
+  } | null;
+}
+
 /** A completed session with all trials. */
 export interface SessionResult {
   readonly id: string;
@@ -88,6 +104,11 @@ export interface SessionResult {
     /** Original session ID from the package before any collision rewrite (0252). */
     readonly originalSessionId?: string;
   } | null;
+  /**
+   * Coarse, privacy-preserving environment hints (0259).
+   * Null for legacy sessions or when unavailable.
+   */
+  readonly sessionContext?: SessionContext | null;
 }
 
 /** Frozen snapshot of stimulus pack metadata for reproducibility. */

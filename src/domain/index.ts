@@ -4,6 +4,7 @@ export type {
   Trial,
   SessionConfig,
   SessionResult,
+  SessionContext,
   SessionScoring,
   TrialFlag,
   FlagKind,
@@ -12,6 +13,7 @@ export type {
   ProvenanceSnapshot,
   StimulusPackSnapshot,
 } from "./types";
+
 
 export type { SessionStore, SessionListEntry, DraftSession, DraftLock } from "./sessionStore";
 export { DRAFT_LOCK_TTL_MS } from "./sessionStore";
@@ -37,3 +39,5 @@ export {
   STIMULUS_SCHEMA_VERSION,
   computeWordsSha256,
 } from "./stimuli";
+
+export { buildSessionContext, detectDeviceClass, detectOsFamily, detectBrowserFamily, sumCompositionCount } from "./sessionContext";

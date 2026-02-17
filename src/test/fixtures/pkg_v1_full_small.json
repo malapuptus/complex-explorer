@@ -1,0 +1,131 @@
+{
+  "packageVersion": "pkg_v1",
+  "packageHash": "__PLACEHOLDER__",
+  "hashAlgorithm": "sha-256",
+  "exportedAt": "2026-02-17T12:00:00.000Z",
+  "bundle": {
+    "exportSchemaVersion": "rb_v3",
+    "exportedAt": "2026-02-17T12:00:00.000Z",
+    "protocolDocVersion": "PROTOCOL.md@2026-02-13",
+    "appVersion": "1.0.0",
+    "scoringAlgorithm": "MAD-modified-z@3.5 + fast<200ms + timeout excluded",
+    "privacy": {
+      "mode": "full",
+      "includesStimulusWords": true,
+      "includesResponses": true,
+      "identifiersAnonymized": false
+    },
+    "sessionResult": {
+      "id": "fixture-session-001",
+      "config": {
+        "stimulusListId": "demo-10",
+        "stimulusListVersion": "1.0.0",
+        "maxResponseTimeMs": 0,
+        "orderPolicy": "fixed",
+        "seed": null
+      },
+      "trials": [
+        {
+          "stimulus": { "word": "tree", "index": 0 },
+          "association": {
+            "response": "leaf",
+            "reactionTimeMs": 420,
+            "tFirstKeyMs": 180,
+            "backspaceCount": 0,
+            "editCount": 1,
+            "compositionCount": 0
+          },
+          "isPractice": false
+        },
+        {
+          "stimulus": { "word": "house", "index": 1 },
+          "association": {
+            "response": "home",
+            "reactionTimeMs": 380,
+            "tFirstKeyMs": 150,
+            "backspaceCount": 1,
+            "editCount": 2,
+            "compositionCount": 0
+          },
+          "isPractice": false
+        },
+        {
+          "stimulus": { "word": "water", "index": 2 },
+          "association": {
+            "response": "ocean",
+            "reactionTimeMs": 510,
+            "tFirstKeyMs": 200,
+            "backspaceCount": 0,
+            "editCount": 1,
+            "compositionCount": 1
+          },
+          "isPractice": false
+        }
+      ],
+      "startedAt": "2026-02-17T11:55:00.000Z",
+      "completedAt": "2026-02-17T11:58:00.000Z",
+      "scoring": {
+        "trialFlags": [
+          { "trialIndex": 0, "flags": [] },
+          { "trialIndex": 1, "flags": [] },
+          { "trialIndex": 2, "flags": [] }
+        ],
+        "summary": {
+          "totalTrials": 3,
+          "meanReactionTimeMs": 436,
+          "medianReactionTimeMs": 420,
+          "stdDevReactionTimeMs": 54,
+          "emptyResponseCount": 0,
+          "repeatedResponseCount": 0,
+          "timingOutlierCount": 0,
+          "highEditingCount": 0,
+          "timeoutCount": 0
+        }
+      },
+      "seedUsed": null,
+      "stimulusOrder": ["tree", "house", "water"],
+      "provenanceSnapshot": {
+        "listId": "demo-10",
+        "listVersion": "1.0.0",
+        "language": "en",
+        "source": "Project demo list (not clinically validated)",
+        "sourceName": "Complex Mapper Project",
+        "sourceYear": "2025",
+        "sourceCitation": "Internal demo list — not derived from any clinical instrument.",
+        "licenseNote": "Project-internal; no license restrictions.",
+        "wordCount": 3
+      },
+      "sessionFingerprint": "aabbccdd1122",
+      "scoringVersion": "scoring_v2_mad_3.5",
+      "appVersion": "1.0.0",
+      "stimulusPackSnapshot": null,
+      "importedFrom": null,
+      "sessionContext": {
+        "deviceClass": "desktop",
+        "osFamily": "macos",
+        "browserFamily": "chrome",
+        "locale": "en-US",
+        "timeZone": "America/New_York",
+        "inputHints": { "usedIME": true, "totalCompositionCount": 1 }
+      }
+    },
+    "stimulusPackSnapshot": {
+      "stimulusListHash": "abc123hash",
+      "stimulusSchemaVersion": "sp_v1",
+      "provenance": {
+        "listId": "demo-10",
+        "listVersion": "1.0.0",
+        "language": "en",
+        "source": "Project demo list (not clinically validated)",
+        "sourceName": "Complex Mapper Project",
+        "sourceYear": "2025",
+        "sourceCitation": "Internal demo list — not derived from any clinical instrument.",
+        "licenseNote": "Project-internal; no license restrictions.",
+        "wordCount": 3
+      },
+      "words": ["tree", "house", "water"]
+    }
+  },
+  "csv": "csv_v1,fixture-session-001,...",
+  "csvRedacted": "csv_v1,fixture-session-001,..."
+}
