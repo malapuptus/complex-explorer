@@ -5,13 +5,13 @@ import { JungMotif } from "@/components/brand/JungMotif";
 
 const Index = () => {
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center gap-8 px-4 overflow-hidden">
-      {/* Jung motif watermark — home only, behind everything */}
+    <div className="relative flex min-h-screen flex-col items-center justify-center gap-6 px-4 overflow-hidden">
+      {/* Jung motif watermark — home only, behind everything. T0236: size↓, opacity via CSS var */}
       <div
         className="pointer-events-none absolute inset-0 flex items-center justify-center"
         aria-hidden="true"
       >
-        <JungMotif size={600} />
+        <JungMotif size={520} />
       </div>
 
       {/* Sessions button top-right */}
@@ -19,28 +19,28 @@ const Index = () => {
         <SessionsDrawer />
       </div>
 
-      {/* Hero lockup */}
-      <div className="relative z-10 flex flex-col items-center gap-3">
+      {/* Hero lockup — T0234: BrandLogo owns its own width, no overflow clip */}
+      <div className="relative z-10 flex flex-col items-center gap-2">
         <BrandLogo height={52} />
-        <p className="text-sm tracking-widest text-muted-foreground uppercase font-medium">
+        <p className="text-xs tracking-[0.2em] text-muted-foreground uppercase font-medium mt-1">
           Word association analysis
         </p>
       </div>
 
       {/* Olive divider */}
-      <div className="relative z-10 h-px w-40 bg-border/60" />
+      <div className="relative z-10 h-px w-32 bg-border/50" />
 
-      {/* CTA buttons */}
-      <div className="relative z-10 flex flex-wrap justify-center gap-4">
+      {/* T0237: CTA row — tighter, more deliberate spacing, secondary reads clearly clickable */}
+      <div className="relative z-10 flex flex-wrap justify-center gap-3">
         <Link
           to="/demo"
-          className="rounded-md bg-primary px-8 py-3 text-base font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
+          className="rounded-md bg-primary px-7 py-2.5 text-base font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
         >
           Start Demo
         </Link>
         <Link
           to="/sessions"
-          className="rounded-md border border-border bg-card px-8 py-3 text-base font-medium text-foreground shadow-sm hover:bg-accent/15 transition-colors"
+          className="rounded-md border border-border bg-card px-7 py-2.5 text-base font-medium text-foreground shadow-sm hover:bg-muted/60 hover:border-foreground/30 transition-colors"
         >
           Previous Sessions
         </Link>

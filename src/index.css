@@ -23,27 +23,29 @@
 
 @layer base {
   :root {
-    /* ── Surfaces ── */
+  /* ── Surfaces ── */
     --background: 41 40% 88%;          /* Cream */
     --foreground: 26 55% 18%;          /* Ink — deeper for contrast */
 
-    --card: 40 35% 93%;                /* Light cream surface */
+    /* T0235: card is meaningfully lighter/whiter than the gradient bg
+       so content blocks clearly "float above" the atmosphere */
+    --card: 40 42% 96%;                /* Near-white cream surface */
     --card-foreground: 26 55% 18%;
 
-    --popover: 40 35% 95%;
+    --popover: 40 40% 97%;
     --popover-foreground: 26 55% 18%;
 
     /* ── Primary action — Deep Lapis ── */
     --primary: 221 52% 36%;            /* Deep Lapis */
     --primary-foreground: 221 52% 96%; /* near-white */
 
-    /* ── Secondary — Bark ── */
-    --secondary: 28 20% 86%;           /* Pale sand, neutral */
-    --secondary-foreground: 26 55% 22%;
+    /* ── Secondary — Bark ── T0237: stronger border+ink so it reads clickable */
+    --secondary: 28 18% 80%;           /* Pale sand, clearly distinct */
+    --secondary-foreground: 26 55% 18%; /* Ink — same weight as body copy */
 
     /* ── Muted ── */
-    --muted: 45 25% 82%;               /* Olive wash */
-    --muted-foreground: 28 25% 42%;    /* Bark-ish, readable */
+    --muted: 45 22% 85%;               /* Olive wash, lighter */
+    --muted-foreground: 28 28% 38%;    /* Bark, readable */
 
     /* ── Accent — Sand ── */
     --accent: 32 39% 59%;              /* Sand */
@@ -54,8 +56,8 @@
     --destructive-foreground: 0 0% 98%;
 
     /* ── Chrome ── */
-    --border: 45 28% 72%;              /* Olive, softer */
-    --input: 40 30% 88%;               /* Same as card bg */
+    --border: 45 28% 66%;              /* Olive, clearly visible */
+    --input: 40 38% 95%;               /* Near-white so inputs pop */
     --ring: 221 52% 50%;               /* Lapis focus ring */
 
     --radius: 0.375rem;
@@ -67,15 +69,15 @@
     --sidebar-primary-foreground: 221 52% 96%;
     --sidebar-accent: 45 25% 77%;
     --sidebar-accent-foreground: 26 55% 18%;
-    --sidebar-border: 45 28% 68%;
+    --sidebar-border: 45 28% 62%;
     --sidebar-ring: 221 52% 50%;
 
-    /* ── Background gradient stops ── */
-    --bg-warm: hsl(41, 48%, 86%);      /* Cream warm */
-    --bg-cool: hsl(210, 18%, 90%);     /* Cool mist */
+    /* ── Background gradient stops (T0236: warm→cool, subtle) ── */
+    --bg-warm: hsl(41, 45%, 87%);      /* Cream warm */
+    --bg-cool: hsl(210, 16%, 91%);     /* Cool mist — only slightly cooler */
 
-    /* ── Jung motif ── */
-    --motif-opacity: 0.045;
+    /* ── Jung motif (T0236: dialled back to barely-there) ── */
+    --motif-opacity: 0.035;
   }
 
   .dark {
@@ -147,13 +149,15 @@
   }
 
   /* Subtle grain overlay via pseudo-element on the root */
+  /* T0236: grain is the primary texture — reduced to 0.022 so it reads as
+     paper-tooth rather than film-grain. Motif stays on Home only. */
   body::before {
     content: "";
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: 0;
-    opacity: 0.032;
+    opacity: 0.022;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
     background-repeat: repeat;
     background-size: 200px 200px;
@@ -170,11 +174,11 @@
     background: hsl(var(--card));
   }
 
-  /* UI typography scale */
-  h1 { @apply text-2xl font-semibold tracking-tight; }
-  h2 { @apply text-xl font-semibold tracking-tight; }
-  h3 { @apply text-base font-semibold; }
-  h4 { @apply text-sm font-semibold; }
+  /* T0237 — UI typography scale: instrument-grade sans, clear hierarchy */
+  h1 { @apply text-2xl font-semibold tracking-tight leading-tight; }
+  h2 { @apply text-xl font-semibold tracking-tight leading-snug; }
+  h3 { @apply text-base font-semibold leading-snug; }
+  h4 { @apply text-sm font-semibold tracking-wide uppercase; }
 
   /* Wordmark serif stays isolated to the brand component */
   .font-wordmark {

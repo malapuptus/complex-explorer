@@ -76,30 +76,36 @@ export function ProtocolScreen({
   const storageWarn = storageTotalBytes > STORAGE_WARN_BYTES;
 
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8 px-4">
-      <h1 className="text-3xl font-bold text-foreground">Word Association Task</h1>
+    /* T0235: content sits on a card surface so it clearly floats above the gradient bg */
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8 px-4 py-10">
+      {/* Card panel — provides the foreground surface for the instruction block */}
+      <div className="w-full max-w-lg rounded-xl border border-border/70 bg-card shadow-md ring-1 ring-border/20 px-8 py-8 space-y-6">
+        <h1 className="text-center text-2xl font-semibold tracking-tight text-foreground">
+          Word Association Task
+        </h1>
 
-      <div className="max-w-lg space-y-4">
-        <p className="text-center text-muted-foreground">
-          You'll start with <strong className="text-foreground">{practiceCount}</strong> warm-up
-          words, then see <strong className="text-foreground">{wordCount}</strong> scored words. For
-          each word, type the first association that comes to mind.
-        </p>
-        <p className="text-center text-sm text-muted-foreground">
-          Estimated time: <strong className="text-foreground">{estimatedMinutes}</strong>
-        </p>
-        <ul className="space-y-2 rounded-md border border-border bg-muted/40 p-4">
-          {INSTRUCTIONS.map((text, i) => (
-            <li key={i} className="flex gap-2 text-sm text-foreground">
-              <span className="shrink-0 text-muted-foreground">{i + 1}.</span>
-              {text}
-            </li>
-          ))}
-        </ul>
-        <p className="text-center text-xs text-muted-foreground italic">
-          This is not a diagnostic tool. Results are for personal reflection only.
-        </p>
-        <p className="text-center text-xs text-muted-foreground">Source: {source}</p>
+        <div className="space-y-4">
+          <p className="text-center text-muted-foreground">
+            You'll start with <strong className="text-foreground">{practiceCount}</strong> warm-up
+            words, then see <strong className="text-foreground">{wordCount}</strong> scored words. For
+            each word, type the first association that comes to mind.
+          </p>
+          <p className="text-center text-sm text-muted-foreground">
+            Estimated time: <strong className="text-foreground">{estimatedMinutes}</strong>
+          </p>
+          <ul className="space-y-2 rounded-md border border-border/60 bg-muted/30 p-4">
+            {INSTRUCTIONS.map((text, i) => (
+              <li key={i} className="flex gap-2 text-sm text-foreground">
+                <span className="shrink-0 text-muted-foreground">{i + 1}.</span>
+                {text}
+              </li>
+            ))}
+          </ul>
+          <p className="text-center text-xs text-muted-foreground italic">
+            This is not a diagnostic tool. Results are for personal reflection only.
+          </p>
+          <p className="text-center text-xs text-muted-foreground">Source: {source}</p>
+        </div>
       </div>
 
       {children}
