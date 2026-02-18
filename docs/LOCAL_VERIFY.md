@@ -21,6 +21,8 @@ That's it. The script fails fast on the first broken oracle.
 
 ## What each oracle checks
 
+### Full mode (default) — 10 oracles
+
 | # | Oracle | What it validates | Common failure causes |
 |---|--------|-------------------|-----------------------|
 | 1 | Repo hygiene | File ≤350 lines, function ≤60 lines, no `console.log` in src | Large files, debug logging left in |
@@ -30,7 +32,27 @@ That's it. The script fails fast on the first broken oracle.
 | 5 | Boundaries | Domain cannot import infra or app | Wrong import direction |
 | 6 | Load smoke | Vite SSR import of domain + infra modules (skips `*.browser.ts(x)`) | Node-only APIs in browser code; forgot `.browser.ts` suffix on browser-only adapters |
 | 7 | Build | `vite build` production bundle | Same as load-smoke, plus chunk/asset errors |
-| 8 | Tests | `vitest run` | Broken logic, stale snapshots |
+| 8 | Discovery coverage | ≥1 .ts/.tsx file per layer (app/domain/infra) | Missing or empty source layer |
+| 9 | Docs freshness | Key docs exist with ≥3 non-empty lines | Stale or missing docs/CURRENT.md, DECISIONS.md, CORE_MODULES.md |
+| 10 | Tests | `vitest run` | Broken logic, stale snapshots |
+
+### Fast mode (`--fast`) — 4 oracles
+
+```sh
+node tools/verify.mjs --fast   # or: bash tools/verify --fast
+```
+
+| # | Oracle | Notes |
+|---|--------|-------|
+| 1 | Repo hygiene | Same as full |
+| 2 | Typecheck | Same as full |
+| 3 | Discovery coverage | Same as full |
+| 4 | Unit tests | Same as full |
+
+Fast mode emits `VERIFY_FAST PASS` or `VERIFY_FAST FAIL`.
+Full mode emits `VERIFY_FULL PASS` or `VERIFY_FULL FAIL`.
+
+Receipts must state which mode ran: `ORACLES_RUN: verify(full)` or `ORACLES_RUN: verify(fast)`.
 
 ## Troubleshooting
 

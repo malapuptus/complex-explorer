@@ -1,0 +1,36 @@
+{
+  "_comment": "AI Coding OS v3.3 — policy configuration for docs freshness and discovery oracles.",
+  "corePaths": [
+    "src/domain/index.ts",
+    "src/domain/types.ts",
+    "src/domain/scoring.ts",
+    "src/domain/sessionInsights.ts",
+    "src/infra/localStorageSessionStore.ts",
+    "src/infra/index.ts",
+    "src/app/DemoSession.tsx",
+    "src/app/ResultsView.tsx",
+    "src/app/ResultsExportActions.tsx",
+    "tools/check-hygiene.ts",
+    "tools/hygiene-baseline.json",
+    "tools/verify.mjs"
+  ],
+  "coreInvariantPaths": [
+    "src/domain/types.ts",
+    "src/domain/scoring.ts",
+    "src/domain/csvExport.ts",
+    "src/domain/fingerprint.ts"
+  ],
+  "escalationAreas": [
+    "src/domain/stimuli/integrity.ts",
+    "src/domain/stimuli/registry.ts",
+    "src/infra/localStorageSessionStore.ts",
+    "tools/hygiene-baseline.json"
+  ],
+  "docsToKeepFresh": [
+    "docs/CURRENT.md",
+    "docs/DECISIONS.md",
+    "docs/CORE_MODULES.md"
+  ],
+  "discoveryLayerDirs": ["app", "domain", "infra"],
+  "minFilesPerLayer": 1
+}
