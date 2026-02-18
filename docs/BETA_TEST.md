@@ -33,8 +33,8 @@
 
 Go to **Issues → New issue** to pick a form, or use these direct links:
 
-- **Bug** → [Bug report](https://github.com/malapuptus/complex-explorer/issues/new?template=bug_report.yml)
-- **Ideas** → [Feature request](https://github.com/malapuptus/complex-explorer/issues/new?template=feature_request.yml)
+- **Bug** → [Bug report](https://github.com/malapuptus/complex-explorer/issues)
+- **Ideas** → [Feature request](https://github.com/malapuptus/complex-explorer/issues)
 
 Include:
 
