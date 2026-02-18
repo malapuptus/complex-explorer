@@ -46,3 +46,31 @@ Overview (charts) is default tab. Details (table + filters) accessible in one cl
 
 Manual tags (B, DR, M, Med, Fl, So, S) stored with source:"manual" in trial annotations.
 Never collide with auto-computed indicators. Appear in exports alongside auto indicators.
+
+## ADR-011 — Verify is the truth layer (8-oracle gate + Lovable proxy) | 2026-02-18 | Accepted
+
+Single source of truth for “PASS/FAIL” is the verify pipeline:
+
+- Preferred: tools/verify (bash entry) → tools/verify.mjs (canonical gate)
+- Lovable sandbox: tools/verify-proxy.mjs may SKIP unavailable oracles, but must be explicit about SKIPs
+
+Rationale:
+
+- Prevent fabricated “PASS” claims and enforce whole-system coherence continuously.
+- Keep a stable developer loop: failures are concrete and reproducible.
+
+## ADR-012 — Adopt AI Coding OS v3.3 + continuity baton docs | 2026-02-18 | Accepted
+
+Process is treated as load-bearing:
+
+- Canonical OS prompts live in docs/AI_CODING_OS_v3.3.md
+- Continuity baton docs exist and are maintained:
+  - docs/CURRENT.md (≤30 lines status/next)
+  - docs/DECISIONS.md (this file; append-only)
+  - docs/CORE_MODULES.md (load-bearing modules)
+  - docs/PROJECT_SUMMARY.md (project overview)
+
+Rationale:
+
+- Prevent long-run drift across many small AI-assisted tickets.
+- Keep the repo itself as the durable “truth snapshot,” not chat memory.
