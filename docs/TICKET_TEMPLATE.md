@@ -1,59 +1,66 @@
-# Ticket Template
+Ticket XXXX — <Short title (imperative, specific)>
 
-## Ticket XXXX — <Short title>
+Goal (1 sentence):
+<Exactly one sentence describing the user-visible outcome.>
 
-**CAPABILITY:** `EXECUTABLE` | `EDITOR_ONLY`  _(delete one)_
+Scope / Context (optional, 1–3 bullets):
 
-**BATCH:** `T####-T####` | _<short note on what this batch covers>_
+- <What this affects / where it lives>
+- <Why now / dependency>
 
-**Goal (1 sentence):**
-<What this ticket achieves.>
+Allowed edits:
+May edit:
 
-**Allowed edits (explicit file list):**
+- <file path>
+- <file path>
 
-- `src/...`
-- `src/...`
+May add:
 
-**Must NOT:**
+- <new file path>
 
-- <Constraint 1>
-- <Constraint 2>
+Must NOT:
 
-**Acceptance criteria:**
+- <hard prohibitions: deps, schema, migrations, refactors, UI changes, etc.>
+- <“No new npm deps” / “No store migrations” / “No schema bump” as applicable>
 
-1. <Criterion 1>
-2. <Criterion 2>
+Acceptance criteria:
 
-**Required oracles:**
+- [ ] <User-observable behavior or deterministic output>
+- [ ] <Edge case behavior>
+- [ ] <No regressions / preserves X behavior>
+- [ ] <Tests updated/added as described>
 
-- `bash tools/verify` (preferred) OR `node tools/verify.mjs` (cross-platform fallback)
-- If using fast/full modes, receipt must state which ran.
+Implementation notes (optional, 3–8 bullets):
 
-**Verify receipt (paste output):**
+- <Key decisions / algorithms / invariants>
+- <Any tricky indexing rules>
+- <Any compatibility notes>
 
-```
-VERIFY_HYGIENE: PASS/FAIL/SKIP
-VERIFY_FORMAT:  PASS/FAIL/SKIP
-VERIFY_LINT:    PASS/FAIL/SKIP
-VERIFY_TYPE:    PASS/FAIL/SKIP
-VERIFY_BOUNDS:  PASS/FAIL/SKIP
-VERIFY_SMOKE:   PASS/FAIL/SKIP
-VERIFY_BUILD:   PASS/FAIL/SKIP
-VERIFY_TESTS:   PASS/FAIL/SKIP (N tests)
-```
+Evidence (required):
+Paste:
 
-**Pre-merge checklist:**
+- <exact console output snippet OR>
+- <exact UI text/selector screenshot note OR>
+- <exact lines changed (file:line range) for docs>
 
-- [ ] All acceptance criteria met
-- [ ] All required oracles pass
-- [ ] **Receipt/provenance included:** VERIFY_* PASS/FAIL line (or verify-last line if implemented).
-- [ ] **No out-of-scope edits were made.** If any were necessary, a Scope Exception entry was added to `docs/SCOPE_EXCEPTIONS.md` before merging.
-- [ ] **If the ticket introduces a new infra module or pack source,** include the orchestration host + barrel exports in Allowed edits.
-- [ ] **Attach raw verify output** (or state verify unavailable) **and include one canary artifact** (CSV header+row or JSON snippet).
+Required oracles:
 
----
+- <test command(s)> (e.g., pnpm test / node tools/verify.mjs / unit test file names)
+- <lint/typecheck if relevant>
 
-> **If you need to touch any other file, STOP and ask for a new ticket.**
-> Output the exact phrase: **`NEEDS FOLLOW-UP TICKET`** with the file(s) and a minimal ticket proposal.
-> Then log the exception in `docs/SCOPE_EXCEPTIONS.md` before continuing.
+Risk Card:
+Proved:
 
+- <What this ticket de-risks / makes true>
+
+Not proved:
+
+- <What remains uncertain even after completion>
+
+Residual:
+
+- <Remaining known risk / debt left intentionally>
+
+Detect failure:
+
+- <How we’d notice it’s broken: failing test, wrong UI state, mismatch export, etc.>
