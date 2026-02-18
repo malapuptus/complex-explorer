@@ -2,95 +2,106 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+/*
+  CE Brand Palette (from CE_Wordmark_Lockup_v4_centered.svg)
+  ──────────────────────────────────────────────────────────
+  Ink    #58381F  → hsl(26 48% 23%)   primary text / primary button
+  Bark   #8F6743  → hsl(28 36% 41%)   secondary / links
+  Sand   #BF986C  → hsl(32 39% 59%)   accent / highlights
+  Olive  #C7BA94  → hsl(45 31% 68%)   borders / muted surfaces
+  Cream  #E9DBBE  → hsl(41 50% 83%)   background
+  Sage   #AFB7AC  → hsl(105 7% 70%)   muted UI / disabled
+
+  Definition of the design system. All colors MUST be HSL.
 */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* ── Surfaces ── */
+    --background: 41 50% 83%;        /* Cream */
+    --foreground: 26 48% 23%;        /* Ink */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 41 38% 88%;              /* Cream lighter */
+    --card-foreground: 26 48% 23%;   /* Ink */
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 41 38% 91%;
+    --popover-foreground: 26 48% 23%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* ── Brand action ── */
+    --primary: 26 48% 23%;           /* Ink */
+    --primary-foreground: 41 50% 91%;/* light Cream */
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 28 36% 41%;         /* Bark */
+    --secondary-foreground: 41 50% 91%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* ── Muted / neutral ── */
+    --muted: 45 25% 78%;             /* Olive-ish wash */
+    --muted-foreground: 28 30% 38%;  /* dark Bark */
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* ── Accent ── */
+    --accent: 32 39% 59%;            /* Sand */
+    --accent-foreground: 26 48% 18%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* ── Semantic ── */
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 41 50% 91%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* ── Chrome ── */
+    --border: 45 31% 68%;            /* Olive */
+    --input: 45 31% 68%;             /* Olive */
+    --ring: 32 39% 59%;              /* Sand focus ring */
 
-    --radius: 0.5rem;
+    --radius: 0.375rem;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* ── Sidebar ── */
+    --sidebar-background: 41 40% 79%;
+    --sidebar-foreground: 26 48% 23%;
+    --sidebar-primary: 26 48% 23%;
+    --sidebar-primary-foreground: 41 50% 91%;
+    --sidebar-accent: 45 25% 74%;
+    --sidebar-accent-foreground: 26 48% 23%;
+    --sidebar-border: 45 31% 65%;
+    --sidebar-ring: 32 39% 59%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Dark mode: invert surface/text, keep brand hues */
+    --background: 26 35% 14%;
+    --foreground: 41 50% 87%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 26 35% 18%;
+    --card-foreground: 41 50% 87%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 26 35% 16%;
+    --popover-foreground: 41 50% 87%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 32 39% 59%;           /* Sand as primary in dark */
+    --primary-foreground: 26 48% 12%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 45 25% 40%;
+    --secondary-foreground: 41 50% 87%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 26 25% 22%;
+    --muted-foreground: 45 20% 62%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 28 36% 50%;
+    --accent-foreground: 41 50% 87%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 62% 38%;
+    --destructive-foreground: 41 50% 91%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 26 25% 26%;
+    --input: 26 25% 26%;
+    --ring: 32 39% 55%;
+
+    --sidebar-background: 26 35% 11%;
+    --sidebar-foreground: 41 50% 85%;
+    --sidebar-primary: 32 39% 59%;
+    --sidebar-primary-foreground: 26 48% 12%;
+    --sidebar-accent: 26 25% 20%;
+    --sidebar-accent-foreground: 41 50% 85%;
+    --sidebar-border: 26 25% 22%;
+    --sidebar-ring: 32 39% 55%;
   }
 }
 
@@ -101,5 +112,7 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
