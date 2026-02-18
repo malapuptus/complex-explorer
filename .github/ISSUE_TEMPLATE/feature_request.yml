@@ -1,0 +1,55 @@
+name: Feature request
+description: Suggest an improvement or new capability.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks — the best requests include the problem, who it helps, and what "done" looks like.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What's painful or missing right now?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What do you want to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: success
+    attributes:
+      label: Success criteria
+      description: How will we know it worked?
+      placeholder: |
+        - If I do X, I should see Y
+        - The flow should take <N> steps
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other ways to solve it (optional).
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority (your opinion)
+      options:
+        - High
+        - Medium
+        - Low
+    validations:
+      required: false

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Beta test guide
+    url: https://github.com/malapuptus/complex-explorer/blob/main/docs/BETA_TEST.md
+    about: Start here if you're testing the app and want to submit feedback.
