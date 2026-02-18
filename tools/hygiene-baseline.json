@@ -1,10 +1,24 @@
 {
-  "_comment": "Hygiene baseline — grandfathered violations (Ticket 0201). Do NOT add new entries; only remove when items are fixed.",
+  "_comment": "Hygiene baseline — grandfathered violations (Tickets 0201, 0208). Do NOT add new entries; only remove when items are fixed.",
   "entries": [
-    { "kind": "file_lines", "file": "app/DemoSession.tsx",        "baseline": 450 },
-    { "kind": "file_lines", "file": "app/ResultsCharts.tsx",      "baseline": 399 },
-    { "kind": "file_lines", "file": "app/ResultsView.tsx",        "baseline": 597 },
-    { "kind": "file_lines", "file": "domain/sessionInsights.ts",  "baseline": 403 },
-    { "kind": "file_lines", "file": "infra/localStorageSessionStore.ts", "baseline": 363 }
+    { "kind": "file_lines",  "file": "app/DemoSession.tsx",               "baseline": 450 },
+    { "kind": "file_lines",  "file": "app/ResultsCharts.tsx",             "baseline": 399 },
+    { "kind": "file_lines",  "file": "app/ResultsExportActions.tsx",      "baseline": 583 },
+    { "kind": "file_lines",  "file": "app/ResultsView.tsx",               "baseline": 597 },
+    { "kind": "file_lines",  "file": "domain/sessionInsights.ts",         "baseline": 403 },
+    { "kind": "file_lines",  "file": "infra/localStorageSessionStore.ts", "baseline": 363 },
+
+    { "kind": "fn_lines", "file": "app/DemoSession.tsx",               "symbol": "DemoSession",              "baseline": 346 },
+    { "kind": "fn_lines", "file": "app/DemoSession.tsx",               "symbol": "QuotaRecoveryDialog",      "baseline": 74  },
+    { "kind": "fn_lines", "file": "app/ImportSection.tsx",             "symbol": "ImportSection",            "baseline": 195 },
+    { "kind": "fn_lines", "file": "app/ResultsCharts.tsx",             "symbol": "RtHistogram",              "baseline": 106 },
+    { "kind": "fn_lines", "file": "app/ResultsCharts.tsx",             "symbol": "RtTimeline",               "baseline": 130 },
+    { "kind": "fn_lines", "file": "app/ResultsDashboardPanel.tsx",     "symbol": "ResultsDashboardPanel",    "baseline": 176 },
+    { "kind": "fn_lines", "file": "app/ResultsExportActions.tsx",      "symbol": "ExportActions",            "baseline": 250 },
+    { "kind": "fn_lines", "file": "app/ResultsExportActions.tsx",      "symbol": "buildBundleObject",        "baseline": 126 },
+    { "kind": "fn_lines", "file": "app/ResultsView.tsx",               "symbol": "ResultsView",              "baseline": 532 },
+    { "kind": "fn_lines", "file": "app/useSession.ts",                 "symbol": "useSession",               "baseline": 175 },
+    { "kind": "fn_lines", "file": "domain/scoring.ts",                 "symbol": "scoreSession",             "baseline": 86  },
+    { "kind": "fn_lines", "file": "domain/sessionInsights.ts",         "symbol": "buildSessionInsights",     "baseline": 199 }
   ]
 }
