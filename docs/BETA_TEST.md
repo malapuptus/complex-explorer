@@ -19,6 +19,7 @@
 - [ ] Confirm the UI never "dead-ends" (you can always keep going or exit cleanly)
 - [ ] Try one navigation detour (switch views, return, confirm state is consistent)
 - [ ] If export exists: export and re-import once
+- [ ] If you do have the time, please go through a full list of 100 words
 
 ## What to test (pick any)
 
