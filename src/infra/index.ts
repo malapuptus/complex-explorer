@@ -5,4 +5,8 @@ export { buildStorageReport } from "./storageReport";
 export type { StorageReport } from "./storageReport";
 export { uiPrefs } from "./localStorageUiPrefs";
 export { trialAnnotations } from "./localStorageTrialAnnotations";
-export type { TrialAnnotation, SelfTagCode } from "./localStorageTrialAnnotations";
+export type {
+  TrialAnnotation,
+  SelfTagCode,
+  ManualIndicatorCode,
+} from "./localStorageTrialAnnotations";

@@ -45,6 +45,7 @@ export { buildSessionContext, detectDeviceClass, detectOsFamily, detectBrowserFa
 export type { SessionInsights, TrialRef, TimelinePoint, QualityIndex } from "./sessionInsights";
 export { buildSessionInsights, computeQualityIndex, getMicroGoal } from "./sessionInsights";
 
+
 export { simulateSession } from "./simulateSession";
 
 export {
@@ -59,3 +60,14 @@ export {
 
 export type { CiCode } from "./ciCodes";
 export { computeCiCodesForTrial, aggregateCiCounts, CI_CODE_ORDER, CI_CODE_LABELS } from "./ciCodes";
+
+// 0282: Unified indicators
+export type { IndicatorCode, IndicatorCategory, IndicatorDescriptor } from "./indicators";
+export {
+  INDICATOR_DESCRIPTORS,
+  INDICATOR_ORDER,
+  mergeTrialIndicators,
+  aggregateIndicatorCounts,
+  indicatorLabel,
+  indicatorExplanation,
+} from "./indicators";

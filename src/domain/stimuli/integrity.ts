@@ -8,6 +8,8 @@
 export const EXPECTED_HASHES: Readonly<Record<string, string>> = {
   "demo-10@1.0.0": "703387c3dee2fc429df5b478e20916e77e15cb949ea31a2fb1d6067eb8714201",
   "kent-rosanoff-1910@1.0.0": "31ab5dd87c812e7204231c8756ed3e2572befdb611a7320aaf601cedfbbbf210",
+  // 0281: practice-100 hash — frozen from pack words (95 unique words, joined by "\n")
+  "practice-100@1.0.0": "8f1826e7319fe607e7e2f2845ec7c3315f5db11ddcb9bdd8c774734e7c2febd6",
 };
 
 /**

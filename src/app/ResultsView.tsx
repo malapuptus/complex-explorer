@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useState, useEffect } from "react";
-import type { Trial, TrialFlag, OrderPolicy, SessionResult, StimulusPackSnapshot, CiCode } from "@/domain";
+import type { Trial, TrialFlag, OrderPolicy, SessionResult, StimulusPackSnapshot, CiCode, FlagKind } from "@/domain";
 import { generateReflectionPrompts, getStimulusList, buildSessionInsights, getResponseText, getTimedOut } from "@/domain";
 import { localStorageStimulusStore, localStorageSessionStore, uiPrefs, trialAnnotations } from "@/infra";
 import { SessionSummaryCard } from "./SessionSummaryCard";
@@ -8,6 +8,7 @@ import { ResultsDashboardPanel } from "./ResultsDashboardPanel";
 import { SessionsDrawer } from "./SessionsDrawer";
 import { ResultsTableControls, RtBar, rowMatchesFilter } from "./ResultsTableControls";
 import type { FilterChip } from "./ResultsTableControls";
+
 
 
 interface Props {
@@ -162,6 +163,45 @@ export function ResultsView({
   const [searchQuery, setSearchQuery] = useState("");
   // 0278: CI filter state
   const [activeCiCode, setActiveCiCode] = useState<CiCode | null>(null);
+  // 0283: Layout toggle (Overview = charts first; Details = table)
+  const [layout, setLayout] = useState<"overview" | "details">("overview");
+  // 0284: Filter history for back-navigation
+  const [filterHistory, setFilterHistory] = useState<FilterChip[]>([]);
+  // 0284: Active flag filter (driven from chart clicks)
+  const [activeFlagFilter, setActiveFlagFilter] = useState<FlagKind | null>(null);
+  // 0284: Cluster-filtered trial indices (null = no cluster filter)
+  const [clusterIndices, setClusterIndices] = useState<Set<number> | null>(null);
+
+  // 0284: Chart → filter bridge
+  const handleFlagFilter = useCallback((flag: FlagKind | null) => {
+    setFilterHistory((h) => [...h, activeFilter]);
+    setActiveFlagFilter(flag);
+    setClusterIndices(null);
+    // Map flag to FilterChip where possible
+    if (flag === "timing_outlier_slow") { setActiveFilter("timing_outlier_slow"); }
+    else if (flag === "timing_outlier_fast") { setActiveFilter("timing_outlier_fast"); }
+    else if (flag === "repeated_response") { setActiveFilter("repeated_response"); }
+    else if (flag === "empty_response") { setActiveFilter("empty"); }
+    else if (flag === "timeout") { setActiveFilter("timeout"); }
+    else if (flag === null) { setActiveFilter("all"); }
+    setLayout("details");
+  }, [activeFilter]);
+
+  const handleClusterFilter = useCallback((indices: number[]) => {
+    setFilterHistory((h) => [...h, activeFilter]);
+    setClusterIndices(new Set(indices));
+    setActiveFlagFilter(null);
+    setLayout("details");
+  }, [activeFilter]);
+
+  const handleBackFilter = useCallback(() => {
+    const prev = filterHistory[filterHistory.length - 1] ?? "all";
+    setFilterHistory((h) => h.slice(0, -1));
+    setActiveFilter(prev);
+    setActiveFlagFilter(null);
+    setClusterIndices(null);
+    setActiveCiCode(null);
+  }, [filterHistory]);
 
 
   return (
@@ -195,8 +235,36 @@ export function ResultsView({
         Mean RT: {meanReactionTimeMs} ms &middot; Median RT: {medianReactionTimeMs} ms
       </p>
 
-      {/* 0265/0271: Insights Dashboard */}
+      {/* 0283: Layout toggle */}
       {insights && (
+        <div className="mb-4 flex items-center gap-1" data-testid="layout-toggle">
+          <button
+            data-testid="layout-overview-btn"
+            onClick={() => setLayout("overview")}
+            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+              layout === "overview"
+                ? "bg-primary text-primary-foreground"
+                : "border border-border text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            Overview
+          </button>
+          <button
+            data-testid="layout-details-btn"
+            onClick={() => setLayout("details")}
+            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+              layout === "details"
+                ? "bg-primary text-primary-foreground"
+                : "border border-border text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            Details
+          </button>
+        </div>
+      )}
+
+      {/* 0265/0271: Insights Dashboard (Overview mode) */}
+      {insights && layout === "overview" && (
         <>
           <h3
             data-testid="insights-dashboard-heading"
@@ -209,9 +277,15 @@ export function ResultsView({
             sessionContext={sessionResult?.sessionContext ?? null}
             baselineInsights={baselineInsights}
             sessionId={sessionResult?.id}
+            onFlagFilter={handleFlagFilter}
+            onCiFilter={(code) => { setActiveCiCode(code); setLayout("details"); }}
+            onChartFilter={handleClusterFilter}
+            activeFlag={activeFlagFilter}
+            activeCiCode={activeCiCode}
           />
         </>
       )}
+
 
       {/* 0267: Baseline not found */}
       {baselineNotFound && (
@@ -318,42 +392,82 @@ export function ResultsView({
         </div>
       )}
 
-      {/* 0273 + 0278: Table controls with CI filter */}
-      {(() => {
+      {/* 0283: Details mode — table with controls. Also always show heading for tests. */}
+      {insights && layout === "details" && (
+        <h3
+          data-testid="insights-dashboard-heading"
+          className="sr-only"
+        >
+          Insights Dashboard
+        </h3>
+      )}
+      {/* 0273 + 0278 + 0283 + 0284: Table controls with CI filter (Details mode) */}
+      {layout === "details" && (() => {
         const minRt = insights?.minRtMs ?? 0;
         const maxRt = insights?.maxRtMs ?? 1;
         const sessionAnnotations = sessionResult
           ? trialAnnotations.getSessionAnnotations(sessionResult.id)
           : {};
 
-        // Build filtered+searched list
+        // 0284: cluster filter overrides normal filter
         const filteredRows = trials.map((trial, i) => {
           const flags = trialFlags[i]?.flags ?? [];
           const response = getResponseText(trial);
           const timedOut = getTimedOut(trial, flags as string[]);
           const trialCiCodes = insights?.ciByTrial.get(i) ?? [];
-          const matches = rowMatchesFilter(
-            trial.stimulus.word,
-            response,
-            flags,
-            timedOut,
-            activeFilter,
-            searchQuery,
-            activeCiCode,
-            trialCiCodes,
-          );
+          let matches: boolean;
+          if (clusterIndices !== null) {
+            // Cluster filter: show only trials in the cluster set
+            matches = clusterIndices.has(i);
+            // Also apply search
+            if (searchQuery.trim()) {
+              const q = searchQuery.trim().toLowerCase();
+              matches = matches && (
+                trial.stimulus.word.toLowerCase().includes(q) ||
+                response.toLowerCase().includes(q)
+              );
+            }
+          } else {
+            matches = rowMatchesFilter(
+              trial.stimulus.word,
+              response,
+              flags,
+              timedOut,
+              activeFilter,
+              searchQuery,
+              activeCiCode,
+              trialCiCodes,
+            );
+          }
           return { trial, i, flags, response, timedOut, trialCiCodes, matches };
         });
         const visibleRows = filteredRows.filter((r) => r.matches);
 
         return (
           <>
+            {/* 0284: Back button when filter was activated from chart */}
+            {(clusterIndices !== null || activeFlagFilter !== null) && filterHistory.length > 0 && (
+              <div className="mb-2 flex items-center gap-2">
+                <button
+                  data-testid="filter-back-btn"
+                  onClick={handleBackFilter}
+                  className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
+                >
+                  ← Back
+                </button>
+                <span className="text-xs text-muted-foreground">
+                  {clusterIndices !== null
+                    ? `Showing ${clusterIndices.size} trials from cluster`
+                    : `Filtered by: ${activeFlagFilter}`}
+                </span>
+              </div>
+            )}
             <ResultsTableControls
               totalCount={trials.length}
               visibleCount={visibleRows.length}
               activeFilter={activeFilter}
               searchQuery={searchQuery}
-              onFilterChange={setActiveFilter}
+              onFilterChange={(f) => { setActiveFilter(f); setClusterIndices(null); setActiveFlagFilter(null); }}
               onSearchChange={setSearchQuery}
               activeCiCode={activeCiCode}
               onCiCodeChange={setActiveCiCode}
