@@ -2,12 +2,14 @@
  * sessionInsights — pure analysis layer for a completed SessionResult.
  * No I/O, no React, no side-effects. Deterministic.
  * Ticket 0264. Updated 0271 (trialFields), 0272 (flagCounts, responseClusters).
- * Updated 0277 (ciByTrial, ciCounts).
+ * Updated 0277 (ciByTrial, ciCounts). Updated 0282 (indicatorsByTrial, indicatorCounts).
  */
 
 import type { SessionResult, FlagKind } from "./types";
 import type { CiCode } from "./ciCodes";
 import { computeCiCodesForTrial, aggregateCiCounts } from "./ciCodes";
+import type { IndicatorCode } from "./indicators";
+import { mergeTrialIndicators, aggregateIndicatorCounts } from "./indicators";
 
 import {
   getResponseText,
@@ -93,6 +95,10 @@ export interface SessionInsights {
   // 0277: CI codes
   ciByTrial: Map<number, CiCode[]>;
   ciCounts: Partial<Record<CiCode, number>>;
+
+  // 0282: Unified indicators (merge of ciCodes + flags per trial)
+  indicatorsByTrial: Map<number, IndicatorCode[]>;
+  indicatorCounts: Partial<Record<IndicatorCode, number>>;
 
   // Drilldown lookup
   trialRefs: TrialRef[];
@@ -313,6 +319,15 @@ export function buildSessionInsights(session: SessionResult): SessionInsights {
   }
   const ciCounts = aggregateCiCounts(allTrialCiCodes);
 
+  // 9. 0282: Unified indicators — merge CI codes + flags per trial
+  const indicatorsByTrial = new Map<number, IndicatorCode[]>();
+  for (const ref of trialRefs) {
+    const ci = ciByTrial.get(ref.sessionTrialIndex) ?? [];
+    const merged = mergeTrialIndicators(ci, ref.flags);
+    indicatorsByTrial.set(ref.sessionTrialIndex, merged);
+  }
+  const indicatorCounts = aggregateIndicatorCounts(indicatorsByTrial);
+
   return {
     trialCount: trials.length,
     scoredCount,
@@ -340,6 +355,8 @@ export function buildSessionInsights(session: SessionResult): SessionInsights {
     responseClusters,
     ciByTrial,
     ciCounts,
+    indicatorsByTrial,
+    indicatorCounts,
     trialRefs,
     trialRefBySessionTrialIndex,
   };

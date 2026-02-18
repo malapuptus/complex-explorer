@@ -262,7 +262,7 @@ export function RtHistogram({ histogram, baselineMedian, baselineP90 }: RtHistog
   );
 }
 
-// ── FlagBreakdownChart (0272) ─────────────────────────────────────────
+// ── FlagBreakdownChart (0272 + 0284) ──────────────────────────────────
 
 const FLAG_LABELS: Partial<Record<FlagKind, string>> = {
   timing_outlier_slow: "Slow",
@@ -273,11 +273,24 @@ const FLAG_LABELS: Partial<Record<FlagKind, string>> = {
   timeout: "Timeout",
 };
 
+const FLAG_EXPLANATIONS: Partial<Record<FlagKind, string>> = {
+  timing_outlier_slow: "Reaction time was unusually slow (MAD-based outlier).",
+  timing_outlier_fast: "Reaction time was under 200 ms (unusually fast).",
+  empty_response: "No text was entered before submission.",
+  repeated_response: "This exact response appeared in a previous trial.",
+  high_editing: "An unusually high number of edits occurred.",
+  timeout: "The trial ended because the time limit was reached.",
+};
+
 interface FlagBreakdownChartProps {
   counts: Partial<Record<FlagKind, number>>;
+  /** 0284: callback when a bar is clicked */
+  onFlagClick?: (flag: FlagKind) => void;
+  /** 0284: currently active flag filter */
+  activeFlag?: FlagKind | null;
 }
 
-export function FlagBreakdownChart({ counts }: FlagBreakdownChartProps) {
+export function FlagBreakdownChart({ counts, onFlagClick, activeFlag }: FlagBreakdownChartProps) {
   const entries = (Object.entries(counts) as [FlagKind, number][])
     .filter(([, c]) => c > 0)
     .sort(([, a], [, b]) => b - a);
@@ -297,25 +310,40 @@ export function FlagBreakdownChart({ counts }: FlagBreakdownChartProps) {
 
   return (
     <div data-testid="flag-breakdown-chart" className="space-y-1.5">
-      {entries.map(([flag, count]) => (
-        <div key={flag} className="flex items-center gap-2">
-          <span className="w-20 shrink-0 text-right text-[11px] text-muted-foreground">
-            {FLAG_LABELS[flag] ?? flag}
-          </span>
-          <div className="flex-1 overflow-hidden rounded-full bg-muted" style={{ height: 10 }}>
-            <div
-              className="h-full rounded-full bg-destructive"
-              style={{ width: `${(count / maxCount) * 100}%`, opacity: 0.7 }}
-            />
+      {entries.map(([flag, count]) => {
+        const isActive = activeFlag === flag;
+        return (
+          <div
+            key={flag}
+            className={`flex items-center gap-2 ${onFlagClick ? "cursor-pointer rounded px-1 hover:bg-muted/50" : ""} ${isActive ? "bg-muted/60" : ""}`}
+            onClick={() => onFlagClick?.(flag)}
+            data-flag={flag}
+            title={FLAG_EXPLANATIONS[flag]}
+          >
+            <span className="w-20 shrink-0 text-right text-[11px] text-muted-foreground">
+              {FLAG_LABELS[flag] ?? flag}
+            </span>
+            <div className="flex-1 overflow-hidden rounded-full bg-muted" style={{ height: 10 }}>
+              <div
+                className={`h-full rounded-full ${isActive ? "bg-destructive" : "bg-destructive/60"}`}
+                style={{ width: `${(count / maxCount) * 100}%` }}
+              />
+            </div>
+            <span className="w-5 text-[11px] font-mono text-muted-foreground">{count}</span>
           </div>
-          <span className="w-5 text-[11px] font-mono text-muted-foreground">{count}</span>
-        </div>
-      ))}
+        );
+      })}
+      {/* 0284: "Why am I seeing this?" hint */}
+      {activeFlag && FLAG_EXPLANATIONS[activeFlag] && (
+        <p className="mt-1 rounded bg-muted/40 px-2 py-1 text-[10px] italic text-muted-foreground">
+          {FLAG_EXPLANATIONS[activeFlag]}
+        </p>
+      )}
     </div>
   );
 }
 
-// ── ResponseClusters (0272) ───────────────────────────────────────────
+// ── ResponseClusters (0272 + 0284) ────────────────────────────────────
 
 interface Cluster {
   response: string;
@@ -326,9 +354,13 @@ interface Cluster {
 
 interface ResponseClustersProps {
   clusters: Cluster[];
+  /** 0284: callback when a cluster is clicked */
+  onClusterClick?: (indices: number[]) => void;
+  /** 0284: currently active cluster (by response string) */
+  activeClusterResponse?: string | null;
 }
 
-export function ResponseClusters({ clusters }: ResponseClustersProps) {
+export function ResponseClusters({ clusters, onClusterClick, activeClusterResponse }: ResponseClustersProps) {
   if (clusters.length === 0) {
     return (
       <div
@@ -342,17 +374,26 @@ export function ResponseClusters({ clusters }: ResponseClustersProps) {
 
   return (
     <ul data-testid="response-clusters" className="divide-y divide-border rounded-md border border-border text-xs">
-      {clusters.map((c) => (
-        <li key={c.response} className="flex items-center justify-between px-3 py-1.5">
-          <span className="font-mono font-medium text-foreground">
-            {c.response || <span className="italic text-muted-foreground">(empty)</span>}
-          </span>
-          <span className="ml-2 text-muted-foreground">
-            {c.count}× · {c.words.slice(0, 4).join(", ")}
-            {c.words.length > 4 ? "…" : ""}
-          </span>
-        </li>
-      ))}
+      {clusters.map((c) => {
+        const isActive = activeClusterResponse === c.response;
+        return (
+          <li
+            key={c.response}
+            className={`flex items-center justify-between px-3 py-1.5 ${onClusterClick ? "cursor-pointer hover:bg-muted/50" : ""} ${isActive ? "bg-muted/60" : ""}`}
+            onClick={() => onClusterClick?.(c.sessionTrialIndices)}
+            data-cluster-response={c.response}
+            title={`Click to filter table to these ${c.count} trials`}
+          >
+            <span className="font-mono font-medium text-foreground">
+              {c.response || <span className="italic text-muted-foreground">(empty)</span>}
+            </span>
+            <span className="ml-2 text-muted-foreground">
+              {c.count}× · {c.words.slice(0, 4).join(", ")}
+              {c.words.length > 4 ? "…" : ""}
+            </span>
+          </li>
+        );
+      })}
     </ul>
   );
 }

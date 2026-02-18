@@ -1,15 +1,17 @@
 /**
  * ResultsDashboardPanel — 3-card summary + SVG charts + anomalies list.
  * Supports drilldown (0266), quality card (0268), pattern charts (0272), baseline overlays (0274).
- * Tickets 0265, 0266, 0268, 0272, 0274.
+ * Updated 0282 (indicator counts), 0283 (chart-first layout), 0284 (chart click → filter).
+ * Tickets 0265, 0266, 0268, 0272, 0274, 0282, 0283, 0284.
  */
 
 import { useState, useMemo } from "react";
-import type { SessionInsights, SessionContext, SessionInsights as SI } from "@/domain";
+import type { SessionInsights, SessionContext, SessionInsights as SI, FlagKind } from "@/domain";
 import { computeQualityIndex, getMicroGoal } from "@/domain";
 import { RtTimeline, RtHistogram, FlagBreakdownChart, ResponseClusters } from "./ResultsCharts";
 import { TrialDetailPanel } from "./TrialDetailPanel";
 import { CiBreakdownChart } from "./CiBreakdownChart";
+import type { CiCode } from "@/domain";
 
 
 interface Props {
@@ -19,6 +21,23 @@ interface Props {
   baselineInsights?: SI | null;
   /** 0279: Session ID for annotation persistence */
   sessionId?: string;
+  /**
+   * 0284: Called when a chart click should filter the table.
+   * Passes a set of sessionTrialIndices to highlight.
+   */
+  onChartFilter?: (indices: number[]) => void;
+  /**
+   * 0284: Called when a flag chart bar is clicked to activate that filter chip.
+   */
+  onFlagFilter?: (flag: FlagKind | null) => void;
+  /**
+   * 0284: Called when a CI chart bar is clicked to activate that CI chip.
+   */
+  onCiFilter?: (code: CiCode | null) => void;
+  /** 0284: Currently active flag filter (for chart highlighting). */
+  activeFlag?: FlagKind | null;
+  /** 0284: Currently active CI code filter (for chart highlighting). */
+  activeCiCode?: CiCode | null;
 }
 
 function StatRow({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
@@ -41,7 +60,17 @@ function DashCard({ title, children }: { title: string; children: React.ReactNod
   );
 }
 
-export function ResultsDashboardPanel({ insights, sessionContext, baselineInsights, sessionId }: Props) {
+export function ResultsDashboardPanel({
+  insights,
+  sessionContext,
+  baselineInsights,
+  sessionId,
+  onChartFilter,
+  onFlagFilter,
+  onCiFilter,
+  activeFlag,
+  activeCiCode,
+}: Props) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
   const deviceLabel = useMemo(() => {
@@ -58,6 +87,21 @@ export function ResultsDashboardPanel({ insights, sessionContext, baselineInsigh
     : null;
 
   const pct = (insights.nonEmptyResponseRate * 100).toFixed(1);
+
+  // 0284: Handle flag bar click — activate flag filter and switch to details
+  const handleFlagClick = (flag: FlagKind) => {
+    if (onFlagFilter) onFlagFilter(activeFlag === flag ? null : flag);
+  };
+
+  // 0284: Handle cluster click — filter table to those trial indices
+  const handleClusterClick = (indices: number[]) => {
+    if (onChartFilter) onChartFilter(indices);
+  };
+
+  // 0284: Handle CI bar click — activate CI filter
+  const handleCiClick = (code: CiCode) => {
+    if (onCiFilter) onCiFilter(activeCiCode === code ? null : code);
+  };
 
   return (
     <div className="mb-6 space-y-4">
@@ -124,24 +168,40 @@ export function ResultsDashboardPanel({ insights, sessionContext, baselineInsigh
         />
       </div>
 
-      {/* 0272 + 0278: Session Patterns */}
+      {/* 0272 + 0278 + 0284: Session Patterns — clickable charts */}
       <div data-testid="session-patterns-heading" className="space-y-3">
         <p className="text-xs font-semibold text-muted-foreground">Session Patterns</p>
+        {onFlagFilter && (
+          <p className="text-[10px] text-muted-foreground italic">
+            Click a bar to filter the table · click again to clear
+          </p>
+        )}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <p className="mb-1.5 text-[11px] text-muted-foreground">Flag Breakdown</p>
-            <FlagBreakdownChart counts={insights.flagCounts} />
+            <FlagBreakdownChart
+              counts={insights.flagCounts}
+              onFlagClick={onFlagFilter ? handleFlagClick : undefined}
+              activeFlag={activeFlag}
+            />
           </div>
           <div>
             <p className="mb-1.5 text-[11px] text-muted-foreground">Response Clusters</p>
-            <ResponseClusters clusters={insights.responseClusters} />
+            <ResponseClusters
+              clusters={insights.responseClusters}
+              onClusterClick={onChartFilter ? handleClusterClick : undefined}
+            />
           </div>
         </div>
         {/* 0278: CI Breakdown */}
         {Object.keys(insights.ciCounts).length > 0 && (
           <div>
             <p className="mb-1.5 text-[11px] text-muted-foreground">CI Code Breakdown</p>
-            <CiBreakdownChart counts={insights.ciCounts} />
+            <CiBreakdownChart
+              counts={insights.ciCounts}
+              onCodeClick={onCiFilter ? handleCiClick : undefined}
+              activeCode={activeCiCode}
+            />
           </div>
         )}
       </div>
