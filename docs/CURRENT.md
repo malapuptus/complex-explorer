@@ -1,28 +1,35 @@
-# Current State — Complex Mapper
+# CURRENT — Complex Mapper
 
-> Append-only snapshot. Update at the start/end of each batch.
-> Keep this file ≤30 lines.
+LAST_UPDATED: 2026-02-17
+RISK_TIER: B (MVP to users)
 
-## Status
+STATUS (1–3 lines)
 
-Last completed batch: **0281–0285 + 0166 + 0286–0287** (docs / indicators / charts-first / drilldown / observer mode / pack integrity).
-Test count at last run: **621/621 PASS**.
+- App is end-to-end complete for sessions + analysis + exports; test suite passing.
 
-## Next
+LAST_BATCH
 
-Proposed next batch (0288–0292):
-- 0288 — Freeze remaining pack hashes (demo-10, kent-rosanoff-1910) + hash-vector tests
-- 0289 — Add `manualIndicatorSummary` to ResultsExportActions JSON bundle + test
-- 0290 — Observer Mode entry point in ResultsView (collapsible panel)
-- 0291 — Accessibility audit: keyboard nav + ARIA for SVG charts
-- 0292 — Session comparison view (side-by-side diff panel)
+- BATCH: T\_**\_-T\_\_** | ************\_\_************
+- VERIFY: (paste VERIFY\_\* PASS/FAIL line here)
 
-## Risks
+NOW (Top 3 priorities)
 
-- `ResultsExportActions.tsx` has a standing hygiene exception (see SCOPE_EXCEPTIONS).
-- Lovable sandbox cannot run shell oracles 1–6; only tests (oracle 8) are directly verifiable.
+1. ***
+2. ***
+3. ***
 
-## Last Batch
+NEXT (Smallest verifiable steps)
 
-Batch 0281–0285: pack integrity freeze, unified Indicators system, Charts-First layout toggle,
-chart-click drilldown filter, Observer Mode manual tagging. All 621 tests pass.
+- [ ] ***
+- [ ] ***
+- [ ] ***
+
+RISKS / WATCHLIST
+
+- Verify runtime creep (keep verify(full) fast enough to run every batch).
+- Drift risk: keep docs/PROJECT_SUMMARY.md accurate; update when core invariants change.
+
+HOW TO VERIFY (repo truth)
+
+- Preferred: bash tools/verify
+- Fallback: node tools/verify.mjs
