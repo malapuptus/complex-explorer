@@ -31,10 +31,10 @@
 
 ## How to submit feedback
 
-Use GitHub Issues:
+Go to **Issues → New issue** to pick a form, or use these direct links:
 
-- **Bug** → use the ["Bug report"](../../issues/new?template=bug_report.yml) issue form
-- **Ideas** → use the ["Feature request"](../../issues/new?template=feature_request.yml) form
+- **Bug** → [Bug report](https://github.com/malapuptus/complex-explorer/issues/new?template=bug_report.yml)
+- **Ideas** → [Feature request](https://github.com/malapuptus/complex-explorer/issues/new?template=feature_request.yml)
 
 Include:
 
