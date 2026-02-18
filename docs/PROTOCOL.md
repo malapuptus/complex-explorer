@@ -10,6 +10,102 @@
 
 ---
 
+## 0. Batch Executor Protocol (AI Coding OS v3.3)
+
+> This section governs how any AI editor or human collaborator executes
+> tickets in this repo. It is the source of truth for preflight,
+> postflight, and failure handling.
+>
+> Escalation areas and core invariant paths are defined in
+> **`tools/config/policy.json`** — do not hard-code categories in prose.
+
+### 0.1 CAPABILITY Declaration
+
+Every ticket must declare one of:
+
+| CAPABILITY | Meaning |
+|------------|---------|
+| `EXECUTABLE` | Agent can run shell commands and paste raw output as evidence |
+| `EDITOR_ONLY` | Agent can only edit files; verify output must be pasted by the human |
+
+### 0.2 Preflight
+
+Before editing any file:
+
+1. Run `node tools/context.mjs` and record the snapshot in the ticket.
+2. Confirm the ticket's **Allowed edits** list — stop and raise a follow-up ticket if any needed file is missing.
+3. Read every file in the allowed list before modifying it.
+
+### 0.3 Batch Label Format
+
+```
+BATCH: T<nnnn>[-T<nnnn>] | <short description>
+```
+
+Examples:
+- `BATCH: T0217-T0220 | hygiene+verify UX`
+- `BATCH: T0221 | protocol doc`
+
+### 0.4 Verify Mode Discipline
+
+| Situation | Required mode |
+|-----------|--------------|
+| Any ticket touching domain/scoring/infra logic | `bash tools/verify` (full) |
+| Docs-only or tooling-only tickets | `bash tools/verify --fast` acceptable |
+| CI pipeline | Always full mode |
+
+Markers that must appear (exactly one per run):
+
+```
+VERIFY_FULL PASS | VERIFY_FULL FAIL   (full mode)
+VERIFY_FAST PASS | VERIFY_FAST FAIL   (fast mode)
+```
+
+### 0.5 Postflight
+
+After all edits and a passing verify:
+
+```sh
+bash tools/verify --receipt "BATCH: T<nnnn>-T<nnnn> | <description>"
+```
+
+Or separately:
+
+```sh
+bash tools/verify
+node tools/receipt.mjs "BATCH: T<nnnn>-T<nnnn> | <description>"
+```
+
+The receipt must include:
+- `BATCH:` — batch label
+- `TICKETS:` — ticket IDs
+- `ORACLES_RUN:` — `verify(full)` or `verify(fast)`
+- `RESULT:` — `PASS` or `FAIL`
+
+Paste the receipt into `docs/VERIFY_LOG.md`.
+
+### 0.6 Failure Protocol
+
+If any oracle fails:
+
+1. **Stop.** Do not attempt to fix forward without understanding root cause.
+2. Paste the raw failure output (not a summary).
+3. Identify whether the failure is:
+   - A **new violation** — code added outside baseline; fix or baseline it.
+   - A **baseline regression** — grandfathered code grew; update baseline to current count.
+   - An **out-of-scope change** — revert and raise a new ticket.
+4. If the fix requires editing a file not in the ticket's **Allowed edits**, stop and raise a follow-up ticket. Log the deviation in `docs/SCOPE_EXCEPTIONS.md`.
+
+### 0.7 Non-Negotiables
+
+- Never claim a command ran unless you paste raw output containing `PASS`/`FAIL` markers.
+- No refactors unless explicitly authorized by the ticket.
+- No incidental formatting or renames.
+- No silent domain-critical behavior changes without (a) a test OR (b) an explicit Risk Card note.
+- Default batch size: 5 tickets.
+
+---
+
 ## 1. Session Structure
 
 A session consists of two phases presented sequentially:
