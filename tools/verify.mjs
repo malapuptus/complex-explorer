@@ -10,6 +10,18 @@
 import { execSync } from "child_process";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 
+// ── Cache writer ──────────────────────────────────────────────────────
+function writeCache(result) {
+  const ts = new Date().toISOString();
+  const line = `VERIFY_FULL ${result} ${ts}\n`;
+  try {
+    mkdirSync(".cache", { recursive: true });
+    writeFileSync(".cache/verify-last.txt", line, "utf-8");
+  } catch {
+    // best-effort; don't mask real failures
+  }
+}
+
 // ── Canary mode ──────────────────────────────────────────────────────
 if (process.env.CANARY === "1") {
   const infraDir = "src/infra/__canary__";
@@ -77,11 +89,14 @@ for (const { name, cmd } of steps) {
     execSync(cmd, { stdio: "inherit" });
   } catch {
     console.error(`\nVERIFY: FAILED at step ${step} — ${name}`);
+    writeCache("FAIL");
     process.exit(1);
   }
   console.log();
 }
 
+writeCache("PASS");
 console.log("===============================");
+console.log("VERIFY_FULL PASS");
 console.log("VERIFY: ALL CHECKS PASSED");
 console.log("===============================");
