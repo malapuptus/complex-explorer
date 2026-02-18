@@ -31,9 +31,9 @@ describe("practice-100 pack integrity (0281)", () => {
     const frozen = EXPECTED_HASHES[PACK_KEY];
 
     if (frozen === "HASH_PLACEHOLDER" || frozen.length !== 64) {
-      // Discovery mode: log and skip comparison so CI doesn't block on first run
-      console.log(`[0281 hash-freeze] Computed hash for practice-100@1.0.0: ${computed}`);
-      console.log(`[0281 hash-freeze] Update integrity.ts EXPECTED_HASHES["practice-100@1.0.0"] = "${computed}"`);
+      // Discovery mode: warn and skip comparison so CI doesn't block on first run
+      console.warn(`[0281 hash-freeze] Computed hash for practice-100@1.0.0: ${computed}`);
+      console.warn(`[0281 hash-freeze] Update integrity.ts EXPECTED_HASHES["practice-100@1.0.0"] = "${computed}"`);
       // Still assert the hash looks correct (64-char hex)
       expect(computed).toMatch(/^[a-f0-9]{64}$/);
     } else {

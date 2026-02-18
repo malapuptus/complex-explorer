@@ -1,0 +1,10 @@
+{
+  "_comment": "Hygiene baseline — grandfathered violations (Ticket 0201). Do NOT add new entries; only remove when items are fixed.",
+  "entries": [
+    { "kind": "file_lines", "file": "app/DemoSession.tsx",        "baseline": 450 },
+    { "kind": "file_lines", "file": "app/ResultsCharts.tsx",      "baseline": 399 },
+    { "kind": "file_lines", "file": "app/ResultsView.tsx",        "baseline": 597 },
+    { "kind": "file_lines", "file": "domain/sessionInsights.ts",  "baseline": 403 },
+    { "kind": "file_lines", "file": "infra/localStorageSessionStore.ts", "baseline": 363 }
+  ]
+}
