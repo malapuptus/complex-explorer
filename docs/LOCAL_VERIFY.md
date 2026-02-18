@@ -1,23 +1,52 @@
 # Local Verification Runbook
 
-> Run the full verify pipeline on your machine before pushing — no CI yet.
+> Run the full verify pipeline on your machine before pushing.
 
 ## Prerequisites
 
 - **Node.js 20+** (uses `node:fs`, `node:child_process`; SubtleCrypto in tests)
 - **npm** (any version bundled with Node 20+)
 
-## Steps
+---
+
+## Standard Local Loop (v3.3)
+
+The recommended workflow per AI Coding OS v3.3 is: **context → verify → receipt**.
 
 ```sh
-# 1. Install dependencies (clean install preferred)
+# 1. Print repo context snapshot (preflight)
+node tools/context.mjs
+
+# 2. Install dependencies (clean install preferred)
 npm ci
 
-# 2. Run all 8 oracles
-node tools/verify.mjs        # ⚠️ Local only — does NOT run in Lovable
+# 3. Run all oracles (full mode, 10 oracles)
+bash tools/verify
+
+# 4. (Optional) Emit receipt after verify
+bash tools/verify --receipt "BATCH: T0217-T0220 | hygiene+verify UX"
+# — or separately:
+node tools/receipt.mjs "BATCH: T0217-T0220 | hygiene+verify UX"
 ```
 
 That's it. The script fails fast on the first broken oracle.
+
+### Fast mode (4 oracles — for rapid iteration)
+
+```sh
+bash tools/verify --fast
+bash tools/verify --fast --receipt "BATCH: T0217-T0220 | fast mode"
+```
+
+### Help
+
+```sh
+bash tools/verify --help
+```
+
+Prints usage including all flags and oracle descriptions.
+
+---
 
 ## What each oracle checks
 
@@ -38,10 +67,6 @@ That's it. The script fails fast on the first broken oracle.
 
 ### Fast mode (`--fast`) — 4 oracles
 
-```sh
-node tools/verify.mjs --fast   # or: bash tools/verify --fast
-```
-
 | # | Oracle | Notes |
 |---|--------|-------|
 | 1 | Repo hygiene | Same as full |
@@ -52,57 +77,34 @@ node tools/verify.mjs --fast   # or: bash tools/verify --fast
 Fast mode emits `VERIFY_FAST PASS` or `VERIFY_FAST FAIL`.
 Full mode emits `VERIFY_FULL PASS` or `VERIFY_FULL FAIL`.
 
-Receipts must state which mode ran: `ORACLES_RUN: verify(full)` or `ORACLES_RUN: verify(fast)`.
-
-## Troubleshooting
-
-### `crypto is not defined` / SubtleCrypto errors
-
-The fingerprint module uses `crypto.subtle` (WebCrypto). Node 20+ exposes this globally. If you're on Node 18, ensure `globalThis.crypto` is available — or upgrade to Node 20.
-
-### Boundary violations
-
-The boundary oracle enforces `app → domain → infra` layering. Domain files **must not** import from `infra/` or `app/`. If you need a new domain export, add it to `src/domain/index.ts`.
-
-### Vite build fails but `tsc` passes
-
-Vite tree-shakes differently from `tsc`. Check for side-effect imports or Node-only modules that snuck into browser code.
-
-## Cross-platform notes
-
-- **macOS / Linux:** `bash tools/verify` works (delegates to `verify.mjs`). ⚠️ **Local only.**
-- **Windows:** Use `node tools/verify.mjs` directly (the bash wrapper may not work without WSL/Git Bash). ⚠️ **Local only.**
-
-## Proxy verify — `tools/verify-proxy.mjs` ⚠️ Local only
-
-> **This script does NOT run in Lovable.** It requires shell access (`node`, `npx`).
-> It is designed for local environments where `verify.mjs` may partially fail.
-
-```sh
-node tools/verify-proxy.mjs   # ⚠️ Local only — does NOT run in Lovable
-```
-
-This attempts all 8 oracles, catching "command unavailable" errors and printing a summary table with PASS/SKIP/FAIL per oracle.
+Receipts state which mode ran: `ORACLES_RUN: verify(full)` or `ORACLES_RUN: verify(fast)`.
 
 ---
 
-## Lovable Verify Policy
+## Lovable Constraints
 
-> When working in **Lovable** (sandbox), `verify.mjs` and `verify-proxy.mjs` are **not runnable**. The sandbox only exposes the Vitest test runner. This section defines the minimum verification requirements for Lovable-only work.
+> **Lovable sandbox**: `verify.mjs` and `verify-proxy.mjs` are **not runnable**. Only the Vitest test runner is available.
 
-### Minimum required commands
+- `.gitignore` is **read-only** in Lovable. If `.cache/` needs to be ignored, add it manually in your local repo:
+  ```sh
+  echo '.cache/' >> .gitignore
+  git add .gitignore && git commit -m "chore: ignore .cache/"
+  ```
+- Confirm: `git check-ignore .cache/verify-last.txt` should return the path.
+
+### Minimum required commands (Lovable)
 
 | Command | What it covers | How to run in Lovable |
 |---------|---------------|----------------------|
-| `npx vitest run src` | Oracle 8 (tests) | Via Lovable's test runner |
+| `npx vitest run src` | Oracle 10 (tests) | Via Lovable's test runner |
 
-Oracles 1–7 (hygiene, format, lint, typecheck, boundaries, load-smoke, build) **cannot run** in Lovable. Build correctness is partially confirmed by the Lovable preview loading successfully (covers Oracle 4 typecheck and Oracle 7 build implicitly).
+Oracles 1–9 cannot run in Lovable. Build correctness is partially confirmed by the Lovable preview loading successfully (covers Oracle 4 typecheck and Oracle 7 build implicitly).
 
 ### Required canary artifacts (per ticket close-out)
 
 Every VERIFY_LOG entry must include **all three**:
 
-1. **CSV header + one data row** — proving export columns are intact (can be generated programmatically via exportParity test or from a real session)
+1. **CSV header + one data row** — proving export columns are intact
 2. **Research Bundle snippet** — showing required top-level keys: `sessionResult`, `protocolDocVersion`, `appVersion`, `scoringAlgorithm`, `exportedAt`, `exportSchemaVersion`
 3. **Break-trigger proof** — either:
    - breakLogic.test.ts passing output (threshold=2 test), OR
@@ -124,12 +126,52 @@ Mark each oracle as:
 
 ```
 - [ ] `npx vitest run src` passed (paste raw output)
-- [ ] Oracle table included (8 rows, Y/N per oracle)
+- [ ] Oracle table included (10 rows, Y/N per oracle)
 - [ ] CSV canary: header + one data row pasted
 - [ ] Bundle canary: snippet with required keys pasted
 - [ ] Break canary: test output or manual observation pasted
 - [ ] Environment line present: "Lovable (tests only)" or "Local (full verify)"
 ```
+
+---
+
+## Troubleshooting
+
+### `crypto is not defined` / SubtleCrypto errors
+
+The fingerprint module uses `crypto.subtle` (WebCrypto). Node 20+ exposes this globally. If you're on Node 18, ensure `globalThis.crypto` is available — or upgrade to Node 20.
+
+### Boundary violations
+
+The boundary oracle enforces `app → domain → infra` layering. Domain files **must not** import from `infra/` or `app/`. If you need a new domain export, add it to `src/domain/index.ts`.
+
+### Vite build fails but `tsc` passes
+
+Vite tree-shakes differently from `tsc`. Check for side-effect imports or Node-only modules that snuck into browser code.
+
+### Hygiene baseline regressions
+
+If CI reports `[baseline regression]`, a grandfathered file grew beyond its recorded baseline. Update `tools/hygiene-baseline.json` to the new line count (must be ≥ current, never decrease without actually fixing the code).
+
+---
+
+## Cross-platform notes
+
+- **macOS / Linux:** `bash tools/verify` works (delegates to `verify.mjs`). ⚠️ **Local only.**
+- **Windows:** Use `node tools/verify.mjs` directly (the bash wrapper may not work without WSL/Git Bash). ⚠️ **Local only.**
+
+---
+
+## Proxy verify — `tools/verify-proxy.mjs` ⚠️ Local only
+
+> **This script does NOT run in Lovable.** It requires shell access (`node`, `npx`).
+> It is designed for local environments where `verify.mjs` may partially fail.
+
+```sh
+node tools/verify-proxy.mjs   # ⚠️ Local only — does NOT run in Lovable
+```
+
+This attempts all oracles, catching "command unavailable" errors and printing a summary table with PASS/SKIP/FAIL per oracle.
 
 ---
 
@@ -164,12 +206,17 @@ This creates a temporary illegal import, verifies the oracle rejects it, then cl
    npm ci
    ```
 
-2. **Run full verify pipeline:**
+2. **Print context snapshot (preflight):**
    ```sh
-   node tools/verify.mjs
+   node tools/context.mjs
    ```
-   All 8 oracles must pass. If any fail, triage in this order:
-   1. **Hygiene** — file too long? Check `docs/SCOPE_EXCEPTIONS.md` for known exceptions
+
+3. **Run full verify pipeline:**
+   ```sh
+   bash tools/verify
+   ```
+   All oracles must pass. If any fail, triage in this order:
+   1. **Hygiene** — file too long? Check `tools/hygiene-baseline.json` for known exceptions
    2. **Format** — run `npx prettier --write "src/**/*.{ts,tsx}"` and retry
    3. **Lint** — fix reported issues, usually unused imports
    4. **Typecheck** — check for missing types or interface mismatches
@@ -178,19 +225,26 @@ This creates a temporary illegal import, verifies the oracle rejects it, then cl
    7. **Build** — usually same root cause as load-smoke
    8. **Tests** — run `npx vitest run` individually to isolate failures
 
-3. **Run proxy verify (optional comparison):**
+4. **Emit receipt (postflight):**
+   ```sh
+   bash tools/verify --receipt "BATCH: <label> | <tickets>"
+   # or separately after a passing verify:
+   node tools/receipt.mjs "BATCH: <label> | <tickets>"
+   ```
+
+5. **Run proxy verify (optional comparison):**
    ```sh
    node tools/verify-proxy.mjs
    ```
 
-4. **Compare canary artifacts to Lovable VERIFY_LOG:**
+6. **Compare canary artifacts to Lovable VERIFY_LOG:**
    - Generate a CSV export and compare header + first row to the latest `docs/VERIFY_LOG.md` entry
    - Export a Research Bundle and verify keys match: `sessionResult`, `protocolDocVersion`, `appVersion`, `scoringAlgorithm`, `exportedAt`, `exportSchemaVersion`
    - Run `npx vitest run src/app/__tests__/breakLogic.test.ts` and compare to logged break canary
 
-5. **Run canary mode to validate boundary oracle:**
+7. **Run canary mode to validate boundary oracle:**
    ```sh
    CANARY=1 node tools/verify.mjs
    ```
 
-6. **Paste full verify output into `docs/VERIFY_LOG.md`** with environment label "Local (full verify)".
+8. **Paste full verify output into `docs/VERIFY_LOG.md`** with environment label "Local (full verify)".

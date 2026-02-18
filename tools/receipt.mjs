@@ -4,6 +4,12 @@
  * Usage: node tools/receipt.mjs "<BATCH label>"
  *        bash tools/receipt "<BATCH label>"
  *
+ * Environment variables (used by CI and --receipt mode):
+ *   BATCH_LABEL  — batch label string (preferred)
+ *   BATCH        — alias for BATCH_LABEL
+ *   TICKETS      — comma-separated ticket IDs
+ *   ORACLES_MODE — "full" or "fast" (set by verify.mjs --receipt mode)
+ *
  * Prints a machine-parseable-ish receipt for the batch.
  * Reads .cache/verify-last.txt for verify provenance.
  */
@@ -43,11 +49,24 @@ function readLastVerify() {
   }
 }
 
+// ── Oracles mode ─────────────────────────────────────────────────────
+function resolveOraclesMode(verifyLine) {
+  // Explicit env set by verify.mjs --receipt
+  if (process.env.ORACLES_MODE) {
+    return `verify(${process.env.ORACLES_MODE})`;
+  }
+  // Infer from last verify cache line
+  if (verifyLine?.includes("VERIFY_FAST")) return "verify(fast)";
+  if (verifyLine?.includes("VERIFY_FULL")) return "verify(full)";
+  return "verify(full)";
+}
+
 // ── Gather ────────────────────────────────────────────────────────────
-const verifyLine = readLastVerify();
-const result     = verifyLine?.includes("PASS") ? "PASS" : (verifyLine ? "FAIL" : "UNKNOWN");
+const verifyLine   = readLastVerify();
+const result       = verifyLine?.includes("PASS") ? "PASS" : (verifyLine ? "FAIL" : "UNKNOWN");
 const filesChanged = git("git show --name-only --pretty= HEAD") ?? "unavailable";
-const tickets    = process.env.TICKETS ?? batchLabel.match(/T\d{4}/g)?.join(", ") ?? "see batch label";
+const tickets      = process.env.TICKETS ?? batchLabel.match(/T\d{4}/g)?.join(", ") ?? "see batch label";
+const oraclesRun   = resolveOraclesMode(verifyLine);
 
 // ── Output ────────────────────────────────────────────────────────────
 const lines = [
@@ -55,7 +74,7 @@ const lines = [
   `BATCH: ${batchLabel}`,
   `TICKETS: ${tickets}`,
   `FILES_CHANGED: ${filesChanged || "unavailable"}`,
-  `ORACLES_RUN: verify(full)`,
+  `ORACLES_RUN: ${oraclesRun}`,
   `RESULT: ${result}`,
   verifyLine ? `VERIFY_LAST_FILE: ${verifyLine}` : `VERIFY_LAST_FILE: unavailable`,
   `REDACTIONS_APPLIED: ${redactionCount} (tokens)`,

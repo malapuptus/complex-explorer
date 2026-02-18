@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 /**
  * tools/verify.mjs — Canonical verification pipeline (single source of truth).
- * Usage: node tools/verify.mjs              (full — 8 oracles)
- *        node tools/verify.mjs --fast       (fast — hygiene + typecheck + tests)
+ * Usage: node tools/verify.mjs              (full — 10 oracles)
+ *        node tools/verify.mjs --fast       (fast — hygiene + typecheck + discovery + tests)
+ *        node tools/verify.mjs --help       (print usage and exit 0)
+ *        node tools/verify.mjs --receipt "<label>"        (full + receipt)
+ *        node tools/verify.mjs --fast --receipt "<label>" (fast + receipt)
  *        bash tools/verify                  (delegates here)
  *        bash tools/verify --fast           (delegates here with --fast)
+ *        bash tools/verify --receipt "<label>"
  *
  * CANARY=1 node tools/verify.mjs  — proves boundary oracle catches violations
  *
@@ -16,8 +20,60 @@
 import { execSync } from "child_process";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 
-const IS_FAST = process.argv.includes("--fast");
+const args = process.argv.slice(2);
+const IS_FAST    = args.includes("--fast");
+const IS_HELP    = args.includes("--help");
+const receiptIdx = args.indexOf("--receipt");
+const RECEIPT_LABEL = receiptIdx !== -1 ? (args[receiptIdx + 1] ?? "") : null;
 const MODE = IS_FAST ? "FAST" : "FULL";
+
+// ── Help ──────────────────────────────────────────────────────────────
+if (IS_HELP) {
+  console.log(`
+verify — AI Coding OS v3.3 verification pipeline
+
+USAGE
+  bash tools/verify                        Run full verify (10 oracles)
+  bash tools/verify --fast                 Run fast verify (4 oracles)
+  bash tools/verify --receipt "<label>"    Full verify then emit receipt
+  bash tools/verify --fast --receipt "<label>"  Fast verify then emit receipt
+
+MODES
+  (default)   FULL verify — all 10 oracles
+              Emits: VERIFY_FULL PASS | VERIFY_FULL FAIL
+
+  --fast      FAST verify — hygiene + typecheck + discovery + tests (4 oracles)
+              Emits: VERIFY_FAST PASS | VERIFY_FAST FAIL
+
+  --receipt   Run verify then call node tools/receipt.mjs with <label>
+              Receipt shows ORACLES_RUN: verify(full) or verify(fast)
+              Available: now (T0219)
+
+  --help      Print this message and exit 0
+
+ORACLES (full mode)
+  1  Repo hygiene        File ≤350 lines, fn ≤60 lines, no console.log in src
+  2  Format check        Prettier compliance
+  3  Lint                ESLint rules
+  4  Typecheck           tsc --noEmit
+  5  Boundary check      Domain cannot import infra or app
+  6  Load smoke          Vite SSR import of domain+infra modules
+  7  Build               vite build production bundle
+  8  Discovery coverage  ≥1 .ts/.tsx file per layer (app/domain/infra)
+  9  Docs freshness      Key docs exist with ≥3 non-empty lines
+  10 Unit tests          vitest run
+
+ORACLES (fast mode)
+  1  Repo hygiene
+  2  Typecheck
+  3  Discovery coverage
+  4  Unit tests
+
+CANARY MODE
+  CANARY=1 node tools/verify.mjs   — proves boundary oracle catches violations
+`);
+  process.exit(0);
+}
 
 // ── Cache writer ──────────────────────────────────────────────────────
 function writeCache(result) {
@@ -124,3 +180,19 @@ console.log("===============================");
 console.log(`VERIFY_${MODE} PASS`);
 console.log("VERIFY: ALL CHECKS PASSED");
 console.log("===============================");
+
+// ── Receipt (--receipt mode) ──────────────────────────────────────────
+if (RECEIPT_LABEL !== null) {
+  console.log("\n--- receipt ---");
+  const env = {
+    ...process.env,
+    BATCH_LABEL: RECEIPT_LABEL || `BATCH: verify(${MODE.toLowerCase()})`,
+    ORACLES_MODE: MODE.toLowerCase(),
+  };
+  try {
+    execSync("node tools/receipt.mjs", { stdio: "inherit", env });
+  } catch {
+    // receipt failure is non-fatal for verify exit code
+    console.error("receipt: failed to emit (non-fatal)");
+  }
+}
