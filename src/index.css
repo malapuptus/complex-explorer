@@ -5,103 +5,120 @@
 /*
   CE Brand Palette (from CE_Wordmark_Lockup_v4_centered.svg)
   ──────────────────────────────────────────────────────────
-  Ink    #58381F  → hsl(26 48% 23%)   primary text / primary button
+  Ink    #58381F  → hsl(26 48% 23%)   primary text / strong UI
   Bark   #8F6743  → hsl(28 36% 41%)   secondary / links
   Sand   #BF986C  → hsl(32 39% 59%)   accent / highlights
   Olive  #C7BA94  → hsl(45 31% 68%)   borders / muted surfaces
-  Cream  #E9DBBE  → hsl(41 50% 83%)   background
+  Cream  #E9DBBE  → hsl(41 50% 83%)   warm surface
   Sage   #AFB7AC  → hsl(105 7% 70%)   muted UI / disabled
 
-  Definition of the design system. All colors MUST be HSL.
+  Deep Lapis (primary action)
+  Lapis  #2D4B8A  → hsl(221 52% 36%)  primary button / CTA
+  Lapis Light hsl(221 52% 96%)        primary-foreground
+
+  Typography
+  UI sans: system-ui, -apple-system, "Segoe UI", sans-serif
+  Wordmark serif: Georgia, "Times New Roman", serif (logo only)
 */
 
 @layer base {
   :root {
     /* ── Surfaces ── */
-    --background: 41 50% 83%;        /* Cream */
-    --foreground: 26 48% 23%;        /* Ink */
+    --background: 41 40% 88%;          /* Cream */
+    --foreground: 26 55% 18%;          /* Ink — deeper for contrast */
 
-    --card: 41 38% 88%;              /* Cream lighter */
-    --card-foreground: 26 48% 23%;   /* Ink */
+    --card: 40 35% 93%;                /* Light cream surface */
+    --card-foreground: 26 55% 18%;
 
-    --popover: 41 38% 91%;
-    --popover-foreground: 26 48% 23%;
+    --popover: 40 35% 95%;
+    --popover-foreground: 26 55% 18%;
 
-    /* ── Brand action ── */
-    --primary: 26 48% 23%;           /* Ink */
-    --primary-foreground: 41 50% 91%;/* light Cream */
+    /* ── Primary action — Deep Lapis ── */
+    --primary: 221 52% 36%;            /* Deep Lapis */
+    --primary-foreground: 221 52% 96%; /* near-white */
 
-    --secondary: 28 36% 41%;         /* Bark */
-    --secondary-foreground: 41 50% 91%;
+    /* ── Secondary — Bark ── */
+    --secondary: 28 20% 86%;           /* Pale sand, neutral */
+    --secondary-foreground: 26 55% 22%;
 
-    /* ── Muted / neutral ── */
-    --muted: 45 25% 78%;             /* Olive-ish wash */
-    --muted-foreground: 28 30% 38%;  /* dark Bark */
+    /* ── Muted ── */
+    --muted: 45 25% 82%;               /* Olive wash */
+    --muted-foreground: 28 25% 42%;    /* Bark-ish, readable */
 
-    /* ── Accent ── */
-    --accent: 32 39% 59%;            /* Sand */
-    --accent-foreground: 26 48% 18%;
+    /* ── Accent — Sand ── */
+    --accent: 32 39% 59%;              /* Sand */
+    --accent-foreground: 26 55% 16%;
 
     /* ── Semantic ── */
-    --destructive: 0 72% 45%;
-    --destructive-foreground: 41 50% 91%;
+    --destructive: 0 72% 40%;
+    --destructive-foreground: 0 0% 98%;
 
     /* ── Chrome ── */
-    --border: 45 31% 68%;            /* Olive */
-    --input: 45 31% 68%;             /* Olive */
-    --ring: 32 39% 59%;              /* Sand focus ring */
+    --border: 45 28% 72%;              /* Olive, softer */
+    --input: 40 30% 88%;               /* Same as card bg */
+    --ring: 221 52% 50%;               /* Lapis focus ring */
 
     --radius: 0.375rem;
 
     /* ── Sidebar ── */
-    --sidebar-background: 41 40% 79%;
-    --sidebar-foreground: 26 48% 23%;
-    --sidebar-primary: 26 48% 23%;
-    --sidebar-primary-foreground: 41 50% 91%;
-    --sidebar-accent: 45 25% 74%;
-    --sidebar-accent-foreground: 26 48% 23%;
-    --sidebar-border: 45 31% 65%;
-    --sidebar-ring: 32 39% 59%;
+    --sidebar-background: 41 35% 82%;
+    --sidebar-foreground: 26 55% 18%;
+    --sidebar-primary: 221 52% 36%;
+    --sidebar-primary-foreground: 221 52% 96%;
+    --sidebar-accent: 45 25% 77%;
+    --sidebar-accent-foreground: 26 55% 18%;
+    --sidebar-border: 45 28% 68%;
+    --sidebar-ring: 221 52% 50%;
+
+    /* ── Background gradient stops ── */
+    --bg-warm: hsl(41, 48%, 86%);      /* Cream warm */
+    --bg-cool: hsl(210, 18%, 90%);     /* Cool mist */
+
+    /* ── Jung motif ── */
+    --motif-opacity: 0.045;
   }
 
   .dark {
-    /* Dark mode: invert surface/text, keep brand hues */
-    --background: 26 35% 14%;
-    --foreground: 41 50% 87%;
+    --background: 26 35% 12%;
+    --foreground: 41 50% 90%;
 
-    --card: 26 35% 18%;
-    --card-foreground: 41 50% 87%;
+    --card: 26 30% 17%;
+    --card-foreground: 41 50% 90%;
 
-    --popover: 26 35% 16%;
-    --popover-foreground: 41 50% 87%;
+    --popover: 26 35% 14%;
+    --popover-foreground: 41 50% 90%;
 
-    --primary: 32 39% 59%;           /* Sand as primary in dark */
-    --primary-foreground: 26 48% 12%;
+    --primary: 221 60% 62%;            /* Lighter Lapis in dark */
+    --primary-foreground: 221 52% 10%;
 
-    --secondary: 45 25% 40%;
+    --secondary: 26 20% 26%;
     --secondary-foreground: 41 50% 87%;
 
-    --muted: 26 25% 22%;
-    --muted-foreground: 45 20% 62%;
+    --muted: 26 20% 20%;
+    --muted-foreground: 45 20% 65%;
 
     --accent: 28 36% 50%;
-    --accent-foreground: 41 50% 87%;
+    --accent-foreground: 41 50% 90%;
 
     --destructive: 0 62% 38%;
-    --destructive-foreground: 41 50% 91%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 26 25% 26%;
-    --input: 26 25% 26%;
-    --ring: 32 39% 55%;
+    --border: 26 22% 28%;
+    --input: 26 22% 22%;
+    --ring: 221 60% 55%;
 
-    --sidebar-background: 26 35% 11%;
-    --sidebar-foreground: 41 50% 85%;
-    --sidebar-primary: 32 39% 59%;
-    --sidebar-primary-foreground: 26 48% 12%;
-    --sidebar-accent: 26 25% 20%;
-    --sidebar-accent-foreground: 41 50% 85%;
-    --sidebar-border: 26 25% 22%;
-    --sidebar-ring: 32 39% 55%;
+    --sidebar-background: 26 35% 9%;
+    --sidebar-foreground: 41 50% 88%;
+    --sidebar-primary: 221 60% 62%;
+    --sidebar-primary-foreground: 221 52% 10%;
+    --sidebar-accent: 26 22% 18%;
+    --sidebar-accent-foreground: 41 50% 88%;
+    --sidebar-border: 26 22% 22%;
+    --sidebar-ring: 221 60% 55%;
+
+    --bg-warm: hsl(26, 30%, 10%);
+    --bg-cool: hsl(220, 15%, 12%);
+    --motif-opacity: 0.03;
   }
 }
 
@@ -110,9 +127,74 @@
     @apply border-border;
   }
 
+  html {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Parchment → cool-mist gradient */
+    background: linear-gradient(
+      160deg,
+      var(--bg-warm) 0%,
+      hsl(41, 40%, 89%) 40%,
+      var(--bg-cool) 100%
+    );
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  /* Subtle grain overlay via pseudo-element on the root */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.032;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 200px 200px;
+  }
+
+  /* Ensure stacking context: everything above the grain */
+  #root {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Solid card surfaces — never inherit the gradient */
+  .card-surface {
+    background: hsl(var(--card));
+  }
+
+  /* UI typography scale */
+  h1 { @apply text-2xl font-semibold tracking-tight; }
+  h2 { @apply text-xl font-semibold tracking-tight; }
+  h3 { @apply text-base font-semibold; }
+  h4 { @apply text-sm font-semibold; }
+
+  /* Wordmark serif stays isolated to the brand component */
+  .font-wordmark {
+    font-family: Georgia, "Times New Roman", serif;
+  }
+}
+
+/* ── Utility: bg-app — apply the gradient explicitly (e.g. on full-screen views) ── */
+@layer utilities {
+  .bg-app {
+    background: linear-gradient(
+      160deg,
+      var(--bg-warm) 0%,
+      hsl(41, 40%, 89%) 40%,
+      var(--bg-cool) 100%
+    );
+    background-attachment: fixed;
+  }
+
+  .bg-surface {
+    background-color: hsl(var(--card));
   }
 }
