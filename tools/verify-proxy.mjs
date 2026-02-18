@@ -13,14 +13,16 @@
 import { execSync } from "child_process";
 
 const oracles = [
-  { name: "Repo hygiene",  cmd: "npx tsx tools/check-hygiene.ts" },
-  { name: "Format check",  cmd: 'npx prettier --check "src/**/*.{ts,tsx}"' },
-  { name: "Lint",           cmd: "npx eslint ." },
-  { name: "Typecheck",      cmd: "npx tsc --noEmit" },
-  { name: "Boundary check", cmd: "npx tsx tools/check-boundaries.ts" },
-  { name: "Load smoke",     cmd: "node tools/load-smoke.mjs" },
-  { name: "Build",          cmd: "npx vite build" },
-  { name: "Unit tests",     cmd: "npx vitest run" },
+  { name: "Repo hygiene",        cmd: "npx tsx tools/check-hygiene.ts" },
+  { name: "Format check",        cmd: 'npx prettier --check "src/**/*.{ts,tsx}"' },
+  { name: "Lint",                cmd: "npx eslint ." },
+  { name: "Typecheck",           cmd: "npx tsc --noEmit" },
+  { name: "Boundary check",      cmd: "npx tsx tools/check-boundaries.ts" },
+  { name: "Load smoke",          cmd: "node tools/load-smoke.mjs" },
+  { name: "Build",               cmd: "npx vite build" },
+  { name: "Discovery coverage",  cmd: "node tools/check-discovery-coverage.mjs" },
+  { name: "Docs freshness",      cmd: "node tools/check-docs-freshness.mjs" },
+  { name: "Unit tests",          cmd: "npx vitest run" },
 ];
 
 const results = [];

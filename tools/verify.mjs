@@ -1,19 +1,28 @@
 #!/usr/bin/env node
 /**
  * tools/verify.mjs — Canonical verification pipeline (single source of truth).
- * Usage: node tools/verify.mjs
- *        bash tools/verify  (delegates here)
+ * Usage: node tools/verify.mjs              (full — 8 oracles)
+ *        node tools/verify.mjs --fast       (fast — hygiene + typecheck + tests)
+ *        bash tools/verify                  (delegates here)
+ *        bash tools/verify --fast           (delegates here with --fast)
  *
  * CANARY=1 node tools/verify.mjs  — proves boundary oracle catches violations
+ *
+ * Markers emitted (exactly one per run):
+ *   VERIFY_FULL PASS | VERIFY_FULL FAIL   (full mode)
+ *   VERIFY_FAST PASS | VERIFY_FAST FAIL   (fast mode)
  */
 
 import { execSync } from "child_process";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 
+const IS_FAST = process.argv.includes("--fast");
+const MODE = IS_FAST ? "FAST" : "FULL";
+
 // ── Cache writer ──────────────────────────────────────────────────────
 function writeCache(result) {
   const ts = new Date().toISOString();
-  const line = `VERIFY_FULL ${result} ${ts}\n`;
+  const line = `VERIFY_${MODE} ${result} ${ts}\n`;
   try {
     mkdirSync(".cache", { recursive: true });
     writeFileSync(".cache/verify-last.txt", line, "utf-8");
@@ -22,7 +31,7 @@ function writeCache(result) {
   }
 }
 
-// ── Canary mode ──────────────────────────────────────────────────────
+// ── Canary mode ───────────────────────────────────────────────────────
 if (process.env.CANARY === "1") {
   const infraDir = "src/infra/__canary__";
   const domainDir = "src/domain/__canary__";
@@ -69,17 +78,31 @@ if (process.env.CANARY === "1") {
   process.exit(0);
 }
 
-// ── Normal mode ──────────────────────────────────────────────────────
-const steps = [
-  { name: "Repo hygiene", cmd: "npx tsx tools/check-hygiene.ts" },
-  { name: "Format check", cmd: 'npx prettier --check "src/**/*.{ts,tsx}"' },
-  { name: "Lint", cmd: "npx eslint ." },
-  { name: "Typecheck", cmd: "npx tsc --noEmit" },
-  { name: "Boundary check", cmd: "npx tsx tools/check-boundaries.ts" },
-  { name: "Load smoke", cmd: "node tools/load-smoke.mjs" },
-  { name: "Build", cmd: "npx vite build" },
-  { name: "Unit tests", cmd: "npx vitest run" },
+// ── Step definitions ──────────────────────────────────────────────────
+const FULL_STEPS = [
+  { name: "Repo hygiene",        cmd: "npx tsx tools/check-hygiene.ts" },
+  { name: "Format check",        cmd: 'npx prettier --check "src/**/*.{ts,tsx}"' },
+  { name: "Lint",                cmd: "npx eslint ." },
+  { name: "Typecheck",           cmd: "npx tsc --noEmit" },
+  { name: "Boundary check",      cmd: "npx tsx tools/check-boundaries.ts" },
+  { name: "Load smoke",          cmd: "node tools/load-smoke.mjs" },
+  { name: "Build",               cmd: "npx vite build" },
+  { name: "Discovery coverage",  cmd: "node tools/check-discovery-coverage.mjs" },
+  { name: "Docs freshness",      cmd: "node tools/check-docs-freshness.mjs" },
+  { name: "Unit tests",          cmd: "npx vitest run" },
 ];
+
+const FAST_STEPS = [
+  { name: "Repo hygiene",        cmd: "npx tsx tools/check-hygiene.ts" },
+  { name: "Typecheck",           cmd: "npx tsc --noEmit" },
+  { name: "Discovery coverage",  cmd: "node tools/check-discovery-coverage.mjs" },
+  { name: "Unit tests",          cmd: "npx vitest run" },
+];
+
+const steps = IS_FAST ? FAST_STEPS : FULL_STEPS;
+
+// ── Run steps ─────────────────────────────────────────────────────────
+console.log(`=== verify mode: ${MODE} (${steps.length} steps) ===`);
 
 let step = 0;
 for (const { name, cmd } of steps) {
@@ -90,6 +113,7 @@ for (const { name, cmd } of steps) {
   } catch {
     console.error(`\nVERIFY: FAILED at step ${step} — ${name}`);
     writeCache("FAIL");
+    console.error(`VERIFY_${MODE} FAIL`);
     process.exit(1);
   }
   console.log();
@@ -97,6 +121,6 @@ for (const { name, cmd } of steps) {
 
 writeCache("PASS");
 console.log("===============================");
-console.log("VERIFY_FULL PASS");
+console.log(`VERIFY_${MODE} PASS`);
 console.log("VERIFY: ALL CHECKS PASSED");
 console.log("===============================");
