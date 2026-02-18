@@ -4,6 +4,7 @@ on:
   push:
   pull_request:
   workflow_call:
+  workflow_dispatch:
 
 jobs:
   verify:
@@ -13,5 +14,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm ci
-      - run: chmod +x tools/verify && bash tools/verify
+      - name: Context
+        run: node tools/context.mjs
+      - name: Install
+        run: npm ci
+      - name: Verify
+        run: chmod +x tools/verify && bash tools/verify
+      - name: Receipt
+        if: always()
+        env:
+          BATCH_LABEL: "CI | ${{ github.sha }}"
+          TICKETS: "CI"
+        run: node tools/receipt.mjs
