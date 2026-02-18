@@ -43,6 +43,22 @@ The `tools/verify` script runs these checks in order (fails fast):
 
 For manual integration testing, see [docs/QA_CHECKLIST.md](docs/QA_CHECKLIST.md).
 
+### Lovable constraints
+
+- `.gitignore` is **read-only** in Lovable. If `.cache/` needs to be excluded, add it manually:
+  ```sh
+  echo '.cache/' >> .gitignore
+  git add .gitignore && git commit -m "chore: ignore .cache/"
+  ```
+
+## How to Give Feedback
+
+Testing the app? Start with the [Beta Test Guide](docs/BETA_TEST.md) — it has a smoke checklist, repro tips, and console-capture instructions.
+
+- **Report a bug →** [GitHub Issues → Bug report](../../issues/new?template=bug_report.yml)
+- **Request a feature →** [GitHub Issues → Feature request](../../issues/new?template=feature_request.yml)
+- **Internal repro pack →** [docs/BUG_REPRO_PACK.md](docs/BUG_REPRO_PACK.md)
+
 ## How to Run Tickets Safely
 
 Every ticket lists an **Allowed edits** section with explicit file paths. When working inside Lovable (or any AI agent):

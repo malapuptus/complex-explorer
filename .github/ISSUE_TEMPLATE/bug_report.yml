@@ -1,0 +1,90 @@
+name: Bug report
+description: Report something broken or confusing.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing! Please fill this out so we can reproduce quickly.
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - P0 (blocks use / data loss)
+        - P1 (major broken behavior)
+        - P2 (minor / UX / polish)
+    validations:
+      required: true
+
+  - type: input
+    id: lovable_url
+    attributes:
+      label: Lovable link (if applicable)
+      description: Paste the Lovable URL you used (or leave blank if running locally).
+      placeholder: "https://..."
+    validations:
+      required: false
+
+  - type: input
+    id: commit
+    attributes:
+      label: Commit SHA (if known)
+      description: If you can find it in the footer/about screen or repo, paste it.
+      placeholder: "e.g. 663eae6"
+    validations:
+      required: false
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps are best.
+      placeholder: |
+        1)
+        2)
+        3)
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots / screen recording
+      description: Drag-and-drop images/video here if helpful.
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console errors (if any)
+      description: Paste relevant console output (Chrome DevTools → Console).
+      render: shell
+    validations:
+      required: false
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser + OS + desktop/mobile.
+      placeholder: "Chrome 122 on macOS / iOS Safari / etc."
+    validations:
+      required: true
