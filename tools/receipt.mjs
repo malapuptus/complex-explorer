@@ -11,7 +11,7 @@
 import { execSync } from "child_process";
 import { readFileSync, existsSync } from "node:fs";
 
-const batchLabel = process.argv[2] ?? "BATCH: (unlabeled)";
+const batchLabel = process.argv[2] ?? process.env.BATCH_LABEL ?? process.env.BATCH ?? "(unlabeled)";
 
 // ── Helpers ───────────────────────────────────────────────────────────
 function git(cmd) {
@@ -47,7 +47,7 @@ function readLastVerify() {
 const verifyLine = readLastVerify();
 const result     = verifyLine?.includes("PASS") ? "PASS" : (verifyLine ? "FAIL" : "UNKNOWN");
 const filesChanged = git("git show --name-only --pretty= HEAD") ?? "unavailable";
-const tickets    = batchLabel.match(/T\d{4}/g)?.join(", ") ?? "see batch label";
+const tickets    = process.env.TICKETS ?? batchLabel.match(/T\d{4}/g)?.join(", ") ?? "see batch label";
 
 // ── Output ────────────────────────────────────────────────────────────
 const lines = [
