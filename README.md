@@ -1,22 +1,18 @@
-# Welcome to Complex Mapper
+# Complex Mapper
 
 A word-association research tool built with React, TypeScript, Vite, and Tailwind CSS.
 
 ## Quick Start
 
 ```sh
-# 1. Clone the repository
-git clone <YOUR_GIT_URL>
-
-# 2. Navigate to the project directory
-cd <YOUR_PROJECT_NAME>
-
-# 3. Install dependencies
+# 1. Install dependencies
 npm ci
 
-# 4. Start the development server
+# 2. Start the development server
 npm run dev
 ```
+
+The app opens at `http://localhost:8080` by default.
 
 ## Local Verification Loop
 
