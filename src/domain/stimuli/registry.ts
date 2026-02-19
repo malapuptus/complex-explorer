@@ -11,7 +11,7 @@ const DEMO_LIST_V1: StimulusList = {
   id: "demo-10",
   version: "1.0.0",
   language: "en",
-  source: "Project demo list (not clinically validated)",
+  source: "Project demo list",
   provenance: {
     sourceName: "Complex Mapper Project",
     sourceYear: "2025",
@@ -168,15 +168,16 @@ const KENT_ROSANOFF_1910_V1: StimulusList = {
 /**
  * Practice-100 — 100-word clinician-provided stimulus list.
  * Not derived from any published clinical instrument.
- * For practice / piloting use only (not clinically validated).
+ * For practice / piloting use only. Not a diagnostic tool.
  *
- * Ticket 0276. Source: internal clinician-provided spreadsheet.
+ * Ticket 0276 / T0238. Source: internal clinician-provided spreadsheet.
+ * Word list updated T0238 (exact 100-word clinician-provided order).
  */
 const PRACTICE_100_V1: StimulusList = {
   id: "practice-100",
   version: "1.0.0",
   language: "en",
-  source: "Clinician-provided list (not clinically validated)",
+  source: "Clinician-provided list",
   provenance: {
     sourceName: "Complex Mapper Project (clinician-provided)",
     sourceYear: "2025",
@@ -185,18 +186,19 @@ const PRACTICE_100_V1: StimulusList = {
     licenseNote: "Project-internal; not for clinical use.",
   },
   words: [
-    "head", "green", "water", "sing", "dead", "long", "ship", "pay", "window",
-    "friendly", "ask", "cold", "stem", "dance", "village", "lake", "sick",
-    "pride", "cook", "ink", "angry", "needle", "swim", "travel", "blue", "lamp",
-    "sin", "bread", "rich", "tree", "pencil", "sleep", "spite", "hold", "flower",
-    "injustice", "mountain", "salt", "new", "habit", "mouse", "courage",
-    "shallow", "child", "method", "white", "fear", "paper", "distress", "soul",
-    "crush", "family", "worry", "queen", "kiss", "fight", "laugh", "honor",
-    "doubt", "woman", "thief", "joy", "patient", "success", "prayer", "book",
-    "despise", "afraid", "king", "music", "love", "danger", "doctor", "praise",
-    "wound", "fire", "obey", "money", "song", "high", "glass", "cow", "illness",
-    "command", "hatred", "hair", "shame", "heavy", "black", "work", "stupid",
-    "country", "part", "truth", "pin",
+    "Head", "Green", "Water", "Sing", "Dead", "Long", "Ship", "Make", "Woman",
+    "Friendly", "Bake", "Ask", "Cold", "Stalk", "Dance", "Village", "Pond",
+    "Sick", "Pride", "Bring", "Ink", "Angry", "Needle", "Swim", "Go", "Blue",
+    "Lamp", "Carry", "Bread", "Rich", "Tree", "Jump", "Pity", "Yellow",
+    "Street", "Bury", "Salt", "New", "Habit", "Pray", "Money", "Silly", "Book",
+    "Despise", "Finger", "Jolly", "Bird", "Walk", "Paper", "Wicked", "Frog",
+    "Try", "Hunger", "White", "Child", "Speak", "Pencil", "Sad", "Plum",
+    "Marry", "Home", "Nasty", "Glass", "Fight", "Wool", "Big", "Carrot",
+    "Give", "Doctor", "Frosty", "Flower", "Beat", "Box", "Old", "Family",
+    "Wait", "Cow", "Name", "Luck", "Say", "Table", "Naughty", "Brother",
+    "Afraid", "Love", "Chair", "Worry", "Kiss", "Bride", "Clean", "Bag",
+    "Choice", "Bed", "Pleased", "Happy", "Shut", "Wound", "Evil", "Door",
+    "Insult",
   ],
 };
 

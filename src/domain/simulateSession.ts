@@ -91,7 +91,7 @@ export function simulateSession(seed: number, wordCount = 10): SessionResult {
       listId: "simulated",
       listVersion: "1.0.0",
       language: "en",
-      source: "Simulated session — not clinically validated",
+      source: "Simulated session",
       sourceName: "Complex Mapper Simulator",
       sourceYear: "2026",
       sourceCitation: "Internal simulation — not derived from any clinical instrument.",
