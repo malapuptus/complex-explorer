@@ -9,6 +9,9 @@ import { SessionsDrawer } from "./SessionsDrawer";
 import { ResultsTableControls, RtBar, rowMatchesFilter } from "./ResultsTableControls";
 import type { FilterChip } from "./ResultsTableControls";
 import { HomeBar } from "./HomeBar";
+import { StimulusTable } from "./StimulusTable";
+import { RecallRun, RecallSummary } from "./RecallRun";
+import type { RecallResult } from "./RecallRun";
 
 
 
@@ -172,6 +175,9 @@ export function ResultsView({
   const [activeFlagFilter, setActiveFlagFilter] = useState<FlagKind | null>(null);
   // 0284: Cluster-filtered trial indices (null = no cluster filter)
   const [clusterIndices, setClusterIndices] = useState<Set<number> | null>(null);
+  // T0245: Recall run state
+  const [recallPhase, setRecallPhase] = useState<"idle" | "running" | "done">("idle");
+  const [recallResults, setRecallResults] = useState<RecallResult[]>([]);
 
   // 0284: Chart → filter bridge
   const handleFlagFilter = useCallback((flag: FlagKind | null) => {
@@ -204,6 +210,30 @@ export function ResultsView({
     setActiveCiCode(null);
   }, [filterHistory]);
 
+
+  // T0245: Recall run derived data
+  const recallWords = useMemo(() => trials.map((t) => t.stimulus.word), [trials]);
+  const recallOriginal = useMemo(() => trials.map((t) => getResponseText(t)), [trials]);
+
+  // T0245: Show recall screens instead of results
+  if (recallPhase === "running") {
+    return (
+      <RecallRun
+        words={recallWords}
+        originalResponses={recallOriginal}
+        onComplete={(results) => { setRecallResults(results); setRecallPhase("done"); }}
+        onCancel={() => setRecallPhase("idle")}
+      />
+    );
+  }
+  if (recallPhase === "done") {
+    return (
+      <RecallSummary
+        results={recallResults}
+        onDone={() => setRecallPhase("idle")}
+      />
+    );
+  }
 
   return (
     <>
@@ -561,6 +591,18 @@ export function ResultsView({
         );
       })()}
 
+      {/* T0242/T0243: Stimulus Table — always visible below the main view */}
+      {insights && (
+        <div className="mt-8">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Stimulus Table</h3>
+          <StimulusTable
+            trials={trials}
+            trialFlags={trialFlags}
+            minRt={insights.minRtMs}
+            maxRt={insights.maxRtMs}
+          />
+        </div>
+      )}
 
       {reflectionPrompts.length > 0 && (
         <div className="mt-8">
@@ -576,6 +618,24 @@ export function ResultsView({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* T0245: Recall Run entry point */}
+      {trials.length > 0 && (
+        <div className="mt-6 rounded-md border border-border bg-muted/20 px-4 py-4">
+          <h3 className="mb-1 text-sm font-semibold text-foreground">Recall Run — Optional</h3>
+          <p className="mb-3 text-xs text-muted-foreground">
+            See the same words again without time pressure, then compare your responses to this session.
+            For personal reflection only — not diagnostic.
+          </p>
+          <button
+            data-testid="start-recall-btn"
+            onClick={() => setRecallPhase("running")}
+            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+          >
+            Start Recall Run
+          </button>
         </div>
       )}
 
