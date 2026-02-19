@@ -1,11 +1,13 @@
 /**
  * RunningTrial — renders the active trial or break screen during a running session.
+ * T0241: HomeBar added.
  */
 
 import { useEffect, type MutableRefObject } from "react";
 import type { StimulusWord } from "@/domain";
 import { TrialView } from "./TrialView";
 import { BreakScreen } from "./BreakScreen";
+import { HomeBar } from "./HomeBar";
 import type { TrialMetrics } from "./TrialView";
 
 interface Props {
@@ -75,20 +77,23 @@ export function RunningTrial({
   const showSeedBanner = seedUsed !== null && scoredCompleted === 0 && !isPractice;
 
   return (
-    <div className="flex flex-col items-center">
-      {showSeedBanner && (
-        <p className="mb-2 text-xs text-muted-foreground">Seed: {seedUsed}</p>
-      )}
-      <TrialView
-        word={currentWord.word}
-        index={currentIndex}
-        total={words.length}
-        isPractice={isPractice}
-        practiceCount={practiceCount}
-        trialTimeoutMs={trialTimeoutMs}
-        onSubmit={onSubmit}
-        onTimeout={onTimeout}
-      />
-    </div>
+    <>
+      <HomeBar confirmLeave />
+      <div className="flex flex-col items-center pt-10">
+        {showSeedBanner && (
+          <p className="mb-2 text-xs text-muted-foreground">Seed: {seedUsed}</p>
+        )}
+        <TrialView
+          word={currentWord.word}
+          index={currentIndex}
+          total={words.length}
+          isPractice={isPractice}
+          practiceCount={practiceCount}
+          trialTimeoutMs={trialTimeoutMs}
+          onSubmit={onSubmit}
+          onTimeout={onTimeout}
+        />
+      </div>
+    </>
   );
 }
