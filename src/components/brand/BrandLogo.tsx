@@ -39,18 +39,10 @@ export function BrandLogo({ height = 40, className = "" }: BrandLogoProps) {
         letterSpacing="3"
         fill="hsl(var(--foreground))"
       >
-        COMPLEX MAPPER
+        COMPLEX EXPLORER
       </text>
       {/* Sand underline accent */}
-      <line
-        x1="24"
-        y1="51"
-        x2="296"
-        y2="51"
-        stroke="hsl(var(--accent))"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
+      <line x1="24" y1="51" x2="296" y2="51" stroke="hsl(var(--accent))" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
