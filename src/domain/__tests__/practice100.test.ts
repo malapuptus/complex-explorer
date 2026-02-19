@@ -14,10 +14,9 @@ describe("Practice-100 pack (0276)", () => {
     expect(pack!.version).toBe("1.0.0");
   });
 
-  it("has 95 words (the exact clinician-provided list)", () => {
+  it("has 100 words (the exact clinician-provided list, T0238)", () => {
     const pack = getStimulusList("practice-100", "1.0.0");
-    // The clinician-provided list has 95 unique words (ticket referred to ~100)
-    expect(pack!.words.length).toBe(95);
+    expect(pack!.words.length).toBe(100);
   });
 
   it("has language=en", () => {
@@ -40,8 +39,8 @@ describe("Practice-100 pack (0276)", () => {
     expect(found!.language).toBe("en");
   });
 
-  it("source mentions non-validated", () => {
+  it("source is neutral label (T0239)", () => {
     const pack = getStimulusList("practice-100", "1.0.0");
-    expect(pack!.source.toLowerCase()).toContain("not clinically validated");
+    expect(pack!.source).toBe("Clinician-provided list");
   });
 });
