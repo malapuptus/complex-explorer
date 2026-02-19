@@ -1,18 +1,22 @@
 /**
  * ProtocolScreen — standardized pre-session instructions.
+ * T0239: Pack chooser is Step 1; CTA is Step 2 directly beneath the dropdown.
+ *        CTA disabled until pack explicitly selected (Option B: default shown, hint for demo pack).
+ * T0240: WhyPanel collapsible explanation for first-time users.
  * Includes an Advanced section for experimental controls.
  * Supports custom pack import/export via ImportSection (0249).
  * ImportPreviewPanel extracted (0244); importedFrom + collision safety (0246, 0247).
  */
 
 import { useState } from "react";
-import type { ReactNode } from "react";
 import type { OrderPolicy } from "@/domain";
 import type { StimulusList } from "@/domain";
 import { localStorageStimulusStore, localStorageSessionStore } from "@/infra";
 import { formatKB } from "./ImportPreviewPanel";
 import { ImportSection } from "./ImportSection";
 import { CustomPackManager } from "./CustomPackManager";
+import { WhyPanel } from "./WhyPanel";
+import type { PackOption } from "./DemoSessionHelpers";
 
 const STORAGE_WARN_BYTES = 3 * 1024 * 1024; // 3 MB
 
@@ -33,7 +37,12 @@ interface ProtocolScreenProps {
   onReady: (config: AdvancedConfig) => void;
   onPackImported?: () => void;
   selectedPack?: StimulusList | null;
-  children?: ReactNode;
+  /** T0239: pack options for the Step 1 chooser */
+  packOptions: PackOption[];
+  selectedPackKey: string;
+  onPackKeyChange: (key: string) => void;
+  /** Extra content (e.g. draft-lock warning) */
+  notice?: React.ReactNode;
 }
 
 const INSTRUCTIONS = [
@@ -48,7 +57,8 @@ const DEFAULT_BREAK_EVERY = 20;
 
 export function ProtocolScreen({
   wordCount, practiceCount, source, estimatedMinutes,
-  isLongPack, onReady, onPackImported, selectedPack, children,
+  isLongPack, onReady, onPackImported, selectedPack,
+  packOptions, selectedPackKey, onPackKeyChange, notice,
 }: ProtocolScreenProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [orderPolicy, setOrderPolicy] = useState<OrderPolicy>("fixed");
@@ -57,6 +67,10 @@ export function ProtocolScreen({
   const [timeoutEnabled, setTimeoutEnabled] = useState(false);
   const [timeoutMs, setTimeoutMs] = useState(8000);
   const [showManager, setShowManager] = useState(false);
+  /** T0239: track whether user has explicitly touched the selector */
+  const [packExplicitlyChosen, setPackExplicitlyChosen] = useState(false);
+
+  const isDemoPack = selectedPackKey.startsWith("demo-10@");
 
   const handleReady = () => {
     const parsedSeed =
@@ -69,31 +83,92 @@ export function ProtocolScreen({
     });
   };
 
+  const handlePackChange = (key: string) => {
+    setPackExplicitlyChosen(true);
+    onPackKeyChange(key);
+  };
+
   const customPacks = localStorageStimulusStore.list();
   const storageSessionBytes = localStorageSessionStore.estimateBytes();
   const storagePackBytes = localStorageStimulusStore.estimateBytes();
   const storageTotalBytes = storageSessionBytes + storagePackBytes;
   const storageWarn = storageTotalBytes > STORAGE_WARN_BYTES;
 
+  // CTA is disabled if the demo pack is selected AND user hasn't explicitly chosen it
+  const ctaDisabled = isDemoPack && !packExplicitlyChosen;
+
   return (
     /* T0235: content sits on a card surface so it clearly floats above the gradient bg */
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8 px-4 py-10">
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-4 py-10">
+
+      {notice}
+
       {/* Card panel — provides the foreground surface for the instruction block */}
       <div className="w-full max-w-lg rounded-xl border border-border/70 bg-card shadow-md ring-1 ring-border/20 px-8 py-8 space-y-6">
         <h1 className="text-center text-2xl font-semibold tracking-tight text-foreground">
           Word Association Task
         </h1>
 
-        <div className="space-y-4">
-          <p className="text-center text-muted-foreground">
+        {/* ── Step 1: Choose a word list ─────────────────────────────── */}
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Step 1 — Choose a word list
+          </p>
+          <select
+            value={selectedPackKey}
+            onChange={(e) => handlePackChange(e.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            {packOptions.map((p) => (
+              <option key={`${p.id}@${p.version}`} value={`${p.id}@${p.version}`}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+
+          {/* Demo-pack hint */}
+          {isDemoPack && (
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Quick demo</span> — 10 words, ~1 min.
+              Switch to <em>Clinician-provided list (100 words)</em> for the full assessment.
+            </p>
+          )}
+
+          {/* Pack meta */}
+          <p className="text-xs text-muted-foreground">
+            {wordCount} words · estimated {estimatedMinutes} · Source: {source}
+          </p>
+          <p className="text-xs text-muted-foreground">
             You'll start with <strong className="text-foreground">{practiceCount}</strong> warm-up
-            words, then see <strong className="text-foreground">{wordCount}</strong> scored words. For
-            each word, type the first association that comes to mind.
+            words, then see <strong className="text-foreground">{wordCount}</strong> scored words.
           </p>
-          <p className="text-center text-sm text-muted-foreground">
-            Estimated time: <strong className="text-foreground">{estimatedMinutes}</strong>
+        </div>
+
+        {/* ── Step 2: Start ──────────────────────────────────────────── */}
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Step 2 — Start when ready
           </p>
-          <ul className="space-y-2 rounded-md border border-border/60 bg-muted/30 p-4">
+          <button
+            onClick={handleReady}
+            disabled={ctaDisabled}
+            className="w-full rounded-md bg-primary px-8 py-3 text-base font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {ctaDisabled ? "Select a word list above to continue" : "I'm ready — Start"}
+          </button>
+          {ctaDisabled && (
+            <p className="text-center text-xs text-muted-foreground">
+              Please choose a word list above, then press Start.
+            </p>
+          )}
+        </div>
+
+        {/* Instructions (below the CTA so they don't push it off-screen) */}
+        <details className="group">
+          <summary className="cursor-pointer list-none text-xs font-medium text-muted-foreground hover:text-foreground">
+            <span className="underline">Read instructions before starting ▼</span>
+          </summary>
+          <ul className="mt-3 space-y-2 rounded-md border border-border/60 bg-muted/30 p-4">
             {INSTRUCTIONS.map((text, i) => (
               <li key={i} className="flex gap-2 text-sm text-foreground">
                 <span className="shrink-0 text-muted-foreground">{i + 1}.</span>
@@ -101,14 +176,15 @@ export function ProtocolScreen({
               </li>
             ))}
           </ul>
-          <p className="text-center text-xs text-muted-foreground italic">
-            This is not a diagnostic tool. Results are for personal reflection only.
-          </p>
-          <p className="text-center text-xs text-muted-foreground">Source: {source}</p>
-        </div>
+        </details>
+
+        <p className="text-center text-xs text-muted-foreground italic">
+          This is not a diagnostic tool. Results are for personal reflection only.
+        </p>
       </div>
 
-      {children}
+      {/* T0240: Why panel */}
+      <WhyPanel />
 
       {/* Import section (0249): all import wiring extracted */}
       <ImportSection
@@ -157,13 +233,6 @@ export function ProtocolScreen({
           timeoutMs={timeoutMs} setTimeoutMs={setTimeoutMs}
         />
       )}
-
-      <button
-        onClick={handleReady}
-        className="rounded-md bg-primary px-8 py-3 text-lg text-primary-foreground hover:opacity-90"
-      >
-        I'm ready
-      </button>
     </div>
   );
 }

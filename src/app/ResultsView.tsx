@@ -8,6 +8,7 @@ import { ResultsDashboardPanel } from "./ResultsDashboardPanel";
 import { SessionsDrawer } from "./SessionsDrawer";
 import { ResultsTableControls, RtBar, rowMatchesFilter } from "./ResultsTableControls";
 import type { FilterChip } from "./ResultsTableControls";
+import { HomeBar } from "./HomeBar";
 
 
 
@@ -205,7 +206,9 @@ export function ResultsView({
 
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
+    <>
+    <HomeBar />
+    <div className="mx-auto max-w-3xl px-4 py-8 pt-12">
       {/* 0269: Header row with Sessions drawer access */}
       <div className="mb-4 flex items-center justify-between gap-2">
         <h2 className="text-2xl font-bold text-foreground">Session Results</h2>
@@ -593,5 +596,6 @@ export function ResultsView({
         </div>
       )}
     </div>
+    </>
   );
 }

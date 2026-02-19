@@ -13,6 +13,7 @@ import { localStorageSessionStore, buildStorageReport, uiPrefs } from "@/infra";
 import { simulateSession } from "@/domain";
 import { ResultsView } from "./ResultsView";
 import { isDevToolsEnabled } from "./devtools";
+import { HomeBar } from "./HomeBar";
 
 export function PreviousSessions() {
   const [entries, setEntries] = useState<SessionListEntry[]>([]);
@@ -122,9 +123,10 @@ export function PreviousSessions() {
     const prov = selected.provenanceSnapshot;
     return (
       <div>
+        <HomeBar />
         <button
           onClick={() => setSelected(null)}
-          className="mb-4 ml-4 mt-4 text-sm text-muted-foreground hover:text-foreground"
+          className="mb-4 ml-4 mt-12 text-sm text-muted-foreground hover:text-foreground"
         >
           ← Back to list
         </button>
@@ -172,7 +174,9 @@ export function PreviousSessions() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
+    <>
+    <HomeBar />
+    <div className="mx-auto max-w-2xl px-4 py-8 pt-12">
       <h1 className="mb-6 text-2xl font-bold text-foreground">Previous Sessions</h1>
 
       {entries.length === 0 ? (
@@ -294,5 +298,6 @@ export function PreviousSessions() {
         </>
       )}
     </div>
+    </>
   );
 }
