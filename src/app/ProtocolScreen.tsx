@@ -1,22 +1,24 @@
 /**
  * ProtocolScreen — standardized pre-session instructions.
  * T0239: Pack chooser is Step 1; CTA is Step 2 directly beneath the dropdown.
- *        CTA disabled until pack explicitly selected (Option B: default shown, hint for demo pack).
- * T0240: WhyPanel collapsible explanation for first-time users.
+ * T0246: Language shifted to "Experiment"; pack descriptions added.
+ * T0247: Exploration/Research mode toggle with persistence.
+ * T0248: Consent checkbox gates CTA.
  * Includes an Advanced section for experimental controls.
  * Supports custom pack import/export via ImportSection (0249).
  * ImportPreviewPanel extracted (0244); importedFrom + collision safety (0246, 0247).
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { OrderPolicy } from "@/domain";
 import type { StimulusList } from "@/domain";
-import { localStorageStimulusStore, localStorageSessionStore } from "@/infra";
+import { localStorageStimulusStore, localStorageSessionStore, uiPrefs } from "@/infra";
 import { formatKB } from "./ImportPreviewPanel";
 import { ImportSection } from "./ImportSection";
 import { CustomPackManager } from "./CustomPackManager";
 import { WhyPanel } from "./WhyPanel";
 import type { PackOption } from "./DemoSessionHelpers";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const STORAGE_WARN_BYTES = 3 * 1024 * 1024; // 3 MB
 
@@ -28,13 +30,15 @@ export interface AdvancedConfig {
   trialTimeoutMs: number | undefined;
 }
 
+export type SessionMode = "exploration" | "research";
+
 interface ProtocolScreenProps {
   wordCount: number;
   practiceCount: number;
   source: string;
   estimatedMinutes: string;
   isLongPack: boolean;
-  onReady: (config: AdvancedConfig) => void;
+  onReady: (config: AdvancedConfig, mode: SessionMode) => void;
   onPackImported?: () => void;
   selectedPack?: StimulusList | null;
   /** T0239: pack options for the Step 1 chooser */
@@ -55,6 +59,20 @@ const INSTRUCTIONS = [
 
 const DEFAULT_BREAK_EVERY = 20;
 
+/** T0246: Per-pack description text. */
+function packDescription(packKey: string): string | null {
+  if (packKey.startsWith("demo-10@")) {
+    return "A short sampler — get a feel for the task in about a minute.";
+  }
+  if (packKey.startsWith("kent-rosanoff-1910@")) {
+    return "The classic Kent–Rosanoff list (1910) — 100 everyday words designed to elicit natural associations.";
+  }
+  if (packKey.startsWith("practice-100@")) {
+    return "A broader 100-word set intended for deeper exploration of personal response patterns.";
+  }
+  return null;
+}
+
 export function ProtocolScreen({
   wordCount, practiceCount, source, estimatedMinutes,
   isLongPack, onReady, onPackImported, selectedPack,
@@ -69,6 +87,15 @@ export function ProtocolScreen({
   const [showManager, setShowManager] = useState(false);
   /** T0239: track whether user has explicitly touched the selector */
   const [packExplicitlyChosen, setPackExplicitlyChosen] = useState(false);
+  /** T0247: mode toggle */
+  const [mode, setMode] = useState<SessionMode>(() => uiPrefs.getSessionMode() ?? "exploration");
+  /** T0248: consent checkbox */
+  const [consented, setConsented] = useState(false);
+
+  // T0247: persist mode changes
+  useEffect(() => {
+    uiPrefs.setSessionMode(mode);
+  }, [mode]);
 
   const isDemoPack = selectedPackKey.startsWith("demo-10@");
 
@@ -80,7 +107,7 @@ export function ProtocolScreen({
       orderPolicy, seed: finalSeed,
       breakEveryN: isLongPack ? breakEvery : 0,
       trialTimeoutMs: timeoutEnabled ? timeoutMs : undefined,
-    });
+    }, mode);
   };
 
   const handlePackChange = (key: string) => {
@@ -94,20 +121,53 @@ export function ProtocolScreen({
   const storageTotalBytes = storageSessionBytes + storagePackBytes;
   const storageWarn = storageTotalBytes > STORAGE_WARN_BYTES;
 
-  // CTA is disabled if the demo pack is selected AND user hasn't explicitly chosen it
-  const ctaDisabled = isDemoPack && !packExplicitlyChosen;
+  // CTA is disabled if (demo pack AND not explicitly chosen) OR consent not given
+  const packNotChosen = isDemoPack && !packExplicitlyChosen;
+  const ctaDisabled = packNotChosen || !consented;
+
+  const descriptionText = packDescription(selectedPackKey);
 
   return (
-    /* T0235: content sits on a card surface so it clearly floats above the gradient bg */
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-4 py-10">
 
       {notice}
 
-      {/* Card panel — provides the foreground surface for the instruction block */}
+      {/* Card panel */}
       <div className="w-full max-w-lg rounded-xl border border-border/70 bg-card shadow-md ring-1 ring-border/20 px-8 py-8 space-y-6">
         <h1 className="text-center text-2xl font-semibold tracking-tight text-foreground">
-          Word Association Task
+          Word Association Experiment
         </h1>
+
+        {/* T0247: Mode toggle */}
+        <div className="flex items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMode("exploration")}
+            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
+              mode === "exploration"
+                ? "bg-primary text-primary-foreground"
+                : "border border-border text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            Exploration
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("research")}
+            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
+              mode === "research"
+                ? "bg-primary text-primary-foreground"
+                : "border border-border text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            Research
+          </button>
+        </div>
+        <p className="text-center text-xs text-muted-foreground">
+          {mode === "exploration"
+            ? "Exploration mode — respond freely; timing may be noisy, and that's fine."
+            : "Research mode — find a quiet space and respond as consistently as you can."}
+        </p>
 
         {/* ── Step 1: Choose a word list ─────────────────────────────── */}
         <div className="space-y-2">
@@ -126,11 +186,16 @@ export function ProtocolScreen({
             ))}
           </select>
 
+          {/* T0246: Pack description */}
+          {descriptionText && (
+            <p className="text-xs text-muted-foreground">{descriptionText}</p>
+          )}
+
           {/* Demo-pack hint */}
           {isDemoPack && (
             <p className="text-xs text-muted-foreground">
               <span className="font-medium text-foreground">Quick demo</span> — 10 words, ~1 min.
-              Switch to <em>Clinician-provided list (100 words)</em> for the full assessment.
+              Switch to a full list for the complete experiment.
             </p>
           )}
 
@@ -144,6 +209,19 @@ export function ProtocolScreen({
           </p>
         </div>
 
+        {/* T0248: Consent checkbox */}
+        <div className="flex items-start gap-3">
+          <Checkbox
+            id="consent-check"
+            checked={consented}
+            onCheckedChange={(v) => setConsented(v === true)}
+            className="mt-0.5"
+          />
+          <label htmlFor="consent-check" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+            I understand this is for personal reflection, not diagnosis, and I can stop anytime.
+          </label>
+        </div>
+
         {/* ── Step 2: Start ──────────────────────────────────────────── */}
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -154,16 +232,20 @@ export function ProtocolScreen({
             disabled={ctaDisabled}
             className="w-full rounded-md bg-primary px-8 py-3 text-base font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {ctaDisabled ? "Select a word list above to continue" : "I'm ready — Start"}
+            {packNotChosen
+              ? "Select a word list above to continue"
+              : !consented
+                ? "Check the box above to continue"
+                : "I'm ready — Start"}
           </button>
-          {ctaDisabled && (
+          {packNotChosen && (
             <p className="text-center text-xs text-muted-foreground">
               Please choose a word list above, then press Start.
             </p>
           )}
         </div>
 
-        {/* Instructions (below the CTA so they don't push it off-screen) */}
+        {/* Instructions */}
         <details className="group">
           <summary className="cursor-pointer list-none text-xs font-medium text-muted-foreground hover:text-foreground">
             <span className="underline">Read instructions before starting ▼</span>

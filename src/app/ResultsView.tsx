@@ -12,6 +12,9 @@ import { HomeBar } from "./HomeBar";
 import { StimulusTable } from "./StimulusTable";
 import { RecallRun, RecallSummary } from "./RecallRun";
 import type { RecallResult } from "./RecallRun";
+import { StopGroundDialog } from "./StopGroundDialog";
+import { CiSummaryPanel } from "./CiSummaryPanel";
+import type { SessionMode } from "./ProtocolScreen";
 
 
 
@@ -30,6 +33,7 @@ interface Props {
     breakEveryN?: number;
   }) => void;
   sessionResult?: SessionResult;
+  sessionMode?: SessionMode;
   csvMeta?: {
     sessionId: string;
     packId: string;
@@ -69,7 +73,7 @@ function CopyButton({ text }: { text: string }) {
 
 export function ResultsView({
   trials, trialFlags, meanReactionTimeMs, medianReactionTimeMs,
-  onReset, onReproduce, sessionResult, csvMeta,
+  onReset, onReproduce, sessionResult, sessionMode, csvMeta,
 }: Props) {
   const reflectionPrompts = useMemo(
     () => generateReflectionPrompts(trials, trialFlags),
@@ -175,7 +179,8 @@ export function ResultsView({
   const [activeFlagFilter, setActiveFlagFilter] = useState<FlagKind | null>(null);
   // 0284: Cluster-filtered trial indices (null = no cluster filter)
   const [clusterIndices, setClusterIndices] = useState<Set<number> | null>(null);
-  // T0245: Recall run state
+  // T0248: Stop & Ground
+  const [stopDialogOpen, setStopDialogOpen] = useState(false);
   const [recallPhase, setRecallPhase] = useState<"idle" | "running" | "done">("idle");
   const [recallResults, setRecallResults] = useState<RecallResult[]>([]);
 
@@ -239,11 +244,31 @@ export function ResultsView({
     <>
     <HomeBar />
     <div className="mx-auto max-w-3xl px-4 py-8 pt-12">
-      {/* 0269: Header row with Sessions drawer access */}
+      {/* Header row */}
       <div className="mb-4 flex items-center justify-between gap-2">
-        <h2 className="text-2xl font-bold text-foreground">Session Results</h2>
         <div className="flex items-center gap-2">
-          {/* 0271: Baseline indicator */}
+          <h2 className="text-2xl font-bold text-foreground">Session Results</h2>
+          {/* T0247: mode badge */}
+          {sessionMode && (
+            <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
+              sessionMode === "exploration"
+                ? "bg-primary/10 text-primary"
+                : "bg-accent text-accent-foreground"
+            }`}>
+              {sessionMode === "exploration" ? "Exploration" : "Research"}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {/* T0248: Stop & Ground */}
+          <button
+            type="button"
+            onClick={() => setStopDialogOpen(true)}
+            className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
+          >
+            Stop &amp; Ground
+          </button>
+          {/* Baseline indicator */}
           {baselineId && baselineId === sessionResult?.id && (
             <span
               data-testid="baseline-set-indicator"
@@ -260,13 +285,17 @@ export function ResultsView({
               {baselineId === sessionResult.id ? "Baseline ✓" : "Mark as baseline"}
             </button>
           )}
-          {/* 0269: Sessions drawer */}
           <SessionsDrawer />
         </div>
       </div>
       <p className="mb-4 text-sm text-muted-foreground">
         Mean RT: {meanReactionTimeMs} ms &middot; Median RT: {medianReactionTimeMs} ms
       </p>
+
+      {/* T0250: Complex Indicators panel */}
+      <div className="mb-6">
+        <CiSummaryPanel trials={trials} trialFlags={trialFlags} />
+      </div>
 
       {/* 0283: Layout toggle */}
       {insights && (
@@ -656,6 +685,14 @@ export function ResultsView({
         </div>
       )}
     </div>
+
+    <StopGroundDialog
+      open={stopDialogOpen}
+      onOpenChange={setStopDialogOpen}
+      onResume={() => {}}
+      onEnd={() => { window.location.href = "/"; }}
+      showTimingWarning={sessionMode === "research"}
+    />
     </>
   );
 }

@@ -1,14 +1,17 @@
 /**
  * RunningTrial — renders the active trial or break screen during a running session.
  * T0241: HomeBar added.
+ * T0248: Stop & Ground dialog.
  */
 
-import { useEffect, type MutableRefObject } from "react";
+import { useEffect, useState, type MutableRefObject } from "react";
 import type { StimulusWord } from "@/domain";
 import { TrialView } from "./TrialView";
 import { BreakScreen } from "./BreakScreen";
 import { HomeBar } from "./HomeBar";
+import { StopGroundDialog } from "./StopGroundDialog";
 import type { TrialMetrics } from "./TrialView";
+import type { SessionMode } from "./ProtocolScreen";
 
 interface Props {
   currentWord: StimulusWord;
@@ -23,6 +26,8 @@ interface Props {
   trialTimeoutMs?: number;
   onSubmit: (response: string, metrics: TrialMetrics) => void;
   onTimeout: (metrics: TrialMetrics) => void;
+  sessionMode?: SessionMode;
+  onEndSession?: () => void;
 }
 
 export function RunningTrial({
@@ -38,15 +43,15 @@ export function RunningTrial({
   trialTimeoutMs,
   onSubmit,
   onTimeout,
+  sessionMode,
+  onEndSession,
 }: Props) {
   const isPractice = currentIndex < practiceCount;
   const scoredCompleted = isPractice ? 0 : currentIndex - practiceCount;
   const totalScored = words.length - practiceCount;
 
-  // Trigger break via effect (not during render).
-  // Guards: !onBreak prevents re-fire while showing break screen;
-  // lastBreakAtRef prevents duplicate triggers for the same threshold
-  // (including React Strict Mode double-invocation).
+  const [stopDialogOpen, setStopDialogOpen] = useState(false);
+
   useEffect(() => {
     if (
       breakEveryN > 0 &&
@@ -61,15 +66,14 @@ export function RunningTrial({
     }
   }, [scoredCompleted, breakEveryN, isPractice]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Show break screen (onBreak is the single source of truth)
   if (onBreak) {
     return (
       <BreakScreen
         completedScored={scoredCompleted}
         totalScored={totalScored}
-        onContinue={() => {
-          setOnBreak(false);
-        }}
+        onContinue={() => setOnBreak(false)}
+        sessionMode={sessionMode}
+        onEndSession={onEndSession}
       />
     );
   }
@@ -83,6 +87,16 @@ export function RunningTrial({
         {showSeedBanner && (
           <p className="mb-2 text-xs text-muted-foreground">Seed: {seedUsed}</p>
         )}
+
+        {/* T0248: Stop & Ground button */}
+        <button
+          type="button"
+          onClick={() => setStopDialogOpen(true)}
+          className="mb-4 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
+        >
+          Stop &amp; Ground
+        </button>
+
         <TrialView
           word={currentWord.word}
           index={currentIndex}
@@ -94,6 +108,14 @@ export function RunningTrial({
           onTimeout={onTimeout}
         />
       </div>
+
+      <StopGroundDialog
+        open={stopDialogOpen}
+        onOpenChange={setStopDialogOpen}
+        onResume={() => {}}
+        onEnd={() => { onEndSession?.(); window.location.href = "/"; }}
+        showTimingWarning={sessionMode === "research"}
+      />
     </>
   );
 }
