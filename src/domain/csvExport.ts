@@ -28,6 +28,7 @@ const CSV_HEADERS = [
   "flags",
   "emotions",
   "candidate_complexes",
+  "association_types",
 ] as const;
 
 function escapeCsv(value: string): string {
@@ -48,6 +49,7 @@ function trialToCsvRow(
   flags: readonly string[],
   emotions?: readonly string[],
   candidateComplexes?: readonly string[],
+  associationTypes?: readonly string[],
 ): string {
   const a = trial.association;
   const values: string[] = [
@@ -71,6 +73,7 @@ function trialToCsvRow(
     escapeCsv(flags.join("; ")),
     escapeCsv((emotions ?? []).join("; ")),
     escapeCsv((candidateComplexes ?? []).join("; ")),
+    escapeCsv((associationTypes ?? []).join("; ")),
   ];
   return values.join(",");
 }
@@ -79,8 +82,8 @@ function trialToCsvRow(
 export interface CsvExportOptions {
   /** If true, response column is replaced with empty string. */
   redactResponses?: boolean;
-  /** T0254: Per-trial annotations for emotions/complexes CSV columns. */
-  trialAnnotations?: Record<number, { emotions?: string[]; candidateComplexes?: string[] }>;
+  /** T0254: Per-trial annotations for emotions/complexes/association types CSV columns. */
+  trialAnnotations?: Record<number, { emotions?: string[]; candidateComplexes?: string[]; associationTypes?: string[] }>;
 }
 
 /** Export a single session's trials as CSV. */
@@ -114,6 +117,7 @@ export function sessionTrialsToCsv(
         flags,
         ann?.emotions,
         ann?.candidateComplexes,
+        ann?.associationTypes,
       ),
     );
   }

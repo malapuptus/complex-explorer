@@ -12,6 +12,7 @@ import { sessionResultsToCsv } from "@/domain";
 import { localStorageSessionStore, buildStorageReport, uiPrefs } from "@/infra";
 import { simulateSession } from "@/domain";
 import { ResultsView } from "./ResultsView";
+import { SessionComparePanel } from "./SessionComparePanel";
 import { isDevToolsEnabled } from "./devtools";
 import { HomeBar } from "./HomeBar";
 
@@ -19,6 +20,8 @@ export function PreviousSessions() {
   const [entries, setEntries] = useState<SessionListEntry[]>([]);
   const [selected, setSelected] = useState<SessionResult | null>(null);
   const [cleanupMsg, setCleanupMsg] = useState<string | null>(null);
+  const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
+  const [compareSessions, setCompareSessions] = useState<[SessionResult, SessionResult] | null>(null);
   const navigate = useNavigate();
   const baselineId = uiPrefs.getBaselineSessionId();
 
@@ -117,6 +120,34 @@ export function PreviousSessions() {
     setSelected(null);
     refresh();
   };
+  const toggleCompareId = useCallback((id: string) => {
+    setCompareIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else if (next.size < 2) next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleCompare = useCallback(async () => {
+    const ids = [...compareIds];
+    if (ids.length !== 2) return;
+    const [a, b] = await Promise.all(ids.map((id) => localStorageSessionStore.load(id)));
+    if (a && b) setCompareSessions([a, b]);
+  }, [compareIds]);
+
+  if (compareSessions) {
+    return (
+      <>
+        <HomeBar />
+        <SessionComparePanel
+          sessionA={compareSessions[0]}
+          sessionB={compareSessions[1]}
+          onBack={() => { setCompareSessions(null); setCompareIds(new Set()); }}
+        />
+      </>
+    );
+  }
 
   if (selected) {
     const scoredTrials = selected.trials.filter((t) => !t.isPractice);
@@ -191,11 +222,44 @@ export function PreviousSessions() {
         </div>
       ) : (
         <>
+          {/* T0259: Compare controls */}
+          {entries.length >= 2 && (
+            <div className="mb-4 flex items-center gap-3">
+              <p className="text-xs text-muted-foreground">
+                Select 2 sessions to compare ({compareIds.size}/2)
+              </p>
+              <button
+                onClick={handleCompare}
+                disabled={compareIds.size !== 2}
+                className="rounded-md border border-border px-3 py-1 text-xs text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Compare
+              </button>
+              {compareIds.size > 0 && (
+                <button
+                  onClick={() => setCompareIds(new Set())}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
+
           <ul className="space-y-2">
             {entries.map((entry) => {
               const isImported = (entry as unknown as Record<string, unknown>)._imported === true;
+              const isCompareChecked = compareIds.has(entry.id);
               return (
-                <li key={entry.id}>
+                <li key={entry.id} className="flex items-center gap-2">
+                  {entries.length >= 2 && (
+                    <input
+                      type="checkbox"
+                      checked={isCompareChecked}
+                      onChange={() => toggleCompareId(entry.id)}
+                      className="h-3.5 w-3.5 shrink-0 rounded border-border"
+                    />
+                  )}
                   <button
                     onClick={async () => {
                       const s = await localStorageSessionStore.load(entry.id);

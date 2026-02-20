@@ -77,6 +77,8 @@ export interface TrialAnnotation {
   emotions?: string[];
   /** T0254: Candidate complex labels (multi-select). */
   candidateComplexes?: string[];
+  /** T0256: Jung/Riklin association type tags (multi-select). */
+  associationTypes?: string[];
 }
 
 type AnnotationStore = Record<string, Record<number, TrialAnnotation>>;
@@ -119,7 +121,8 @@ function setAnnotation(
     annotation.note.trim() === "" &&
     (annotation.manualIndicators?.length ?? 0) === 0 &&
     (annotation.emotions?.length ?? 0) === 0 &&
-    (annotation.candidateComplexes?.length ?? 0) === 0;
+    (annotation.candidateComplexes?.length ?? 0) === 0 &&
+    (annotation.associationTypes?.length ?? 0) === 0;
   if (isEmpty) {
     if (store[sessionId]) {
       delete store[sessionId][trialIndex];
