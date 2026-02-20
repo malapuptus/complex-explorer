@@ -1,19 +1,25 @@
 /**
  * BreakScreen — shown every N scored trials to reduce fatigue.
- * Break time does NOT affect trial timing.
- * T0241: HomeBar added.
+ * T0241: HomeBar added. T0248: Stop & Ground.
  */
 
+import { useState } from "react";
 import { HomeBar } from "./HomeBar";
+import { StopGroundDialog } from "./StopGroundDialog";
+import type { SessionMode } from "./ProtocolScreen";
 
 interface Props {
   completedScored: number;
   totalScored: number;
   onContinue: () => void;
+  sessionMode?: SessionMode;
+  onEndSession?: () => void;
 }
 
-export function BreakScreen({ completedScored, totalScored, onContinue }: Props) {
+export function BreakScreen({ completedScored, totalScored, onContinue, sessionMode, onEndSession }: Props) {
   const remaining = totalScored - completedScored;
+  const [stopDialogOpen, setStopDialogOpen] = useState(false);
+
   return (
     <>
       <HomeBar confirmLeave />
@@ -26,14 +32,31 @@ export function BreakScreen({ completedScored, totalScored, onContinue }: Props)
         <p className="text-sm text-muted-foreground">
           Take a moment to rest. Press continue when you're ready.
         </p>
-        <button
-          autoFocus
-          onClick={onContinue}
-          className="rounded-md bg-primary px-8 py-3 text-lg text-primary-foreground hover:opacity-90"
-        >
-          Continue
-        </button>
+        <div className="flex gap-3">
+          <button
+            autoFocus
+            onClick={onContinue}
+            className="rounded-md bg-primary px-8 py-3 text-lg text-primary-foreground hover:opacity-90"
+          >
+            Continue
+          </button>
+          <button
+            type="button"
+            onClick={() => setStopDialogOpen(true)}
+            className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground hover:bg-muted"
+          >
+            Stop &amp; Ground
+          </button>
+        </div>
       </div>
+
+      <StopGroundDialog
+        open={stopDialogOpen}
+        onOpenChange={setStopDialogOpen}
+        onResume={() => {}}
+        onEnd={() => { onEndSession?.(); window.location.href = "/"; }}
+        showTimingWarning={sessionMode === "research"}
+      />
     </>
   );
 }

@@ -1,7 +1,7 @@
 /**
  * DemoSession — runs a word-association session with pack selection.
  * Autosaves draft after each scored trial; offers resume on reload.
- * Quota recovery workflow added (0230).
+ * T0247: mode support. T0248: Stop & Ground. T0249: debrief gate.
  */
 
 declare const __APP_VERSION__: string;
@@ -14,9 +14,10 @@ import { useSession } from "./useSession";
 import type { SessionSnapshot, StartOverrides } from "./useSession";
 import { ResultsView } from "./ResultsView";
 import { ProtocolScreen } from "./ProtocolScreen";
-import type { AdvancedConfig } from "./ProtocolScreen";
+import type { AdvancedConfig, SessionMode } from "./ProtocolScreen";
 import { ResumePrompt } from "./ResumePrompt";
 import { RunningTrial } from "./RunningTrial";
+import { DebriefScreen } from "./DebriefScreen";
 import { generateId, generateTabId, PRACTICE_WORDS, DEFAULT_BREAK_EVERY } from "./DemoSessionHelpers";
 import { usePackSelection } from "./usePackSelection";
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -119,6 +120,10 @@ export function DemoSession() {
   const draftIdRef = useRef(generateId());
   const tabIdRef = useRef(generateTabId());
   const startedAtRef = useRef<string | null>(null);
+  /** T0247: session mode */
+  const [sessionMode, setSessionMode] = useState<SessionMode>("exploration");
+  /** T0249: debrief gate */
+  const [debriefDone, setDebriefDone] = useState(false);
 
   const session = useSession(list.words as string[], {
     practiceWords: PRACTICE_WORDS,
@@ -252,7 +257,6 @@ export function DemoSession() {
         }
       }
     } else {
-      // For session saves, just dismiss — session will be in results view
       setQuotaError(null);
     }
   }, [quotaError, buildDraft]);
@@ -297,11 +301,13 @@ export function DemoSession() {
     setDraftLocked(false);
   }, []);
 
-  const handleStart = useCallback((config: AdvancedConfig) => {
+  const handleStart = useCallback((config: AdvancedConfig, mode: SessionMode) => {
     const acquired = localStorageSessionStore.acquireDraftLock(tabIdRef.current);
     if (!acquired) { setDraftLocked(true); return; }
     startedAtRef.current = new Date().toISOString();
     setActiveConfig(config);
+    setSessionMode(mode);
+    setDebriefDone(false);
     const overrides: StartOverrides = {
       orderPolicy: config.orderPolicy, seed: config.seed,
       trialTimeoutMs: config.trialTimeoutMs,
@@ -319,6 +325,7 @@ export function DemoSession() {
     setDraftLocked(false);
     setSessionFingerprint(null);
     setQuotaError(null);
+    setDebriefDone(false);
     localStorageSessionStore.releaseDraftLock(tabIdRef.current);
     session.reset();
   }, [session]);
@@ -340,8 +347,8 @@ export function DemoSession() {
       breakEveryN: config.breakEveryN ?? DEFAULT_BREAK_EVERY,
       trialTimeoutMs: config.trialTimeoutMs,
     };
-    setTimeout(() => handleStart(advConfig), 0);
-  }, [resolveList, handleReset, setSelectedPackKey, handleStart]);
+    setTimeout(() => handleStart(advConfig, sessionMode), 0);
+  }, [resolveList, handleReset, setSelectedPackKey, handleStart, sessionMode]);
 
   // Release lock on unmount
   useEffect(() => {
@@ -408,11 +415,20 @@ export function DemoSession() {
         lastBreakAtRef={lastBreakAtRef} seedUsed={session.seedUsed}
         trialTimeoutMs={session.trialTimeoutMs}
         onSubmit={session.submitResponse} onTimeout={session.handleTimeout}
+        sessionMode={sessionMode}
+        onEndSession={handleReset}
       />
     );
   }
 
-  if (session.phase === "done" && session.scoring) {
+  // T0249: Debrief gate
+  if (session.phase === "done" && session.scoring && !debriefDone) {
+    return (
+      <DebriefScreen onContinue={() => setDebriefDone(true)} />
+    );
+  }
+
+  if (session.phase === "done" && session.scoring && debriefDone) {
     const scoredTrials = session.trials.filter((t) => !t.isPractice);
     return (
       <ResultsView
@@ -421,6 +437,7 @@ export function DemoSession() {
         medianReactionTimeMs={session.scoring.summary.medianReactionTimeMs}
         onReset={handleReset}
         onReproduce={handleReproduce}
+        sessionMode={sessionMode}
         csvMeta={{
           sessionId: draftIdRef.current, packId: list.id,
           packVersion: list.version, seed: session.seedUsed,
