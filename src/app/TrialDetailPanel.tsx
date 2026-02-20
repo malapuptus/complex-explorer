@@ -39,6 +39,12 @@ const DEFAULT_EMOTIONS = [
   "anxious", "sad", "angry", "shame", "joy", "disgust", "fear", "numb",
 ];
 
+/** T0256: Jung/Riklin association type defaults. */
+const DEFAULT_ASSOCIATION_TYPES = [
+  "Predicate", "Definition", "Coordinate", "Contrast", "Cause/Effect",
+  "Part/Whole", "Superordinate", "Sound/Clang", "Perseveration", "Other",
+];
+
 function flagLabel(f: FlagKind): string {
   return FLAG_LABELS[f as string] ?? f;
 }
@@ -59,40 +65,43 @@ export function TrialDetailPanel({ trialRef, onClose, sessionId, existingComplex
   const [complexes, setComplexes] = useState<string[]>([]);
   const [customEmotion, setCustomEmotion] = useState("");
   const [newComplex, setNewComplex] = useState("");
+  const [assocTypes, setAssocTypes] = useState<string[]>([]);
+  const [customAssocType, setCustomAssocType] = useState("");
 
   // Load annotation when trial changes
   useEffect(() => {
-    if (!trialRef || !sessionId) { setTags([]); setNote(""); setEmotions([]); setComplexes([]); return; }
+    if (!trialRef || !sessionId) { setTags([]); setNote(""); setEmotions([]); setComplexes([]); setAssocTypes([]); return; }
     const ann = trialAnnotations.getAnnotation(sessionId, trialRef.sessionTrialIndex);
     setTags(ann?.tags ?? []);
     setNote(ann?.note ?? "");
     setEmotions(ann?.emotions ?? []);
     setComplexes(ann?.candidateComplexes ?? []);
+    setAssocTypes(ann?.associationTypes ?? []);
   }, [trialRef?.sessionTrialIndex, sessionId]);
 
-  const persist = useCallback((t: SelfTagCode[], n: string, em: string[], cx: string[]) => {
+  const persist = useCallback((t: SelfTagCode[], n: string, em: string[], cx: string[], at: string[]) => {
     if (!trialRef || !sessionId) return;
     trialAnnotations.setAnnotation(sessionId, trialRef.sessionTrialIndex, {
-      tags: t, note: n, emotions: em, candidateComplexes: cx,
+      tags: t, note: n, emotions: em, candidateComplexes: cx, associationTypes: at,
     });
   }, [trialRef, sessionId]);
 
   const handleTagToggle = useCallback((tag: SelfTagCode) => {
     const next = tags.includes(tag) ? tags.filter((t) => t !== tag) : [...tags, tag];
     setTags(next);
-    persist(next, note, emotions, complexes);
-  }, [tags, note, emotions, complexes, persist]);
+    persist(next, note, emotions, complexes, assocTypes);
+  }, [tags, note, emotions, complexes, assocTypes, persist]);
 
   const handleNoteChange = useCallback((v: string) => {
     setNote(v);
-    persist(tags, v, emotions, complexes);
-  }, [tags, emotions, complexes, persist]);
+    persist(tags, v, emotions, complexes, assocTypes);
+  }, [tags, emotions, complexes, assocTypes, persist]);
 
   const toggleEmotion = useCallback((em: string) => {
     const next = emotions.includes(em) ? emotions.filter((e) => e !== em) : [...emotions, em];
     setEmotions(next);
-    persist(tags, note, next, complexes);
-  }, [tags, note, emotions, complexes, persist]);
+    persist(tags, note, next, complexes, assocTypes);
+  }, [tags, note, emotions, complexes, assocTypes, persist]);
 
   const addCustomEmotion = useCallback(() => {
     const trimmed = customEmotion.trim().toLowerCase();
@@ -100,14 +109,14 @@ export function TrialDetailPanel({ trialRef, onClose, sessionId, existingComplex
     const next = [...emotions, trimmed];
     setEmotions(next);
     setCustomEmotion("");
-    persist(tags, note, next, complexes);
-  }, [customEmotion, tags, note, emotions, complexes, persist]);
+    persist(tags, note, next, complexes, assocTypes);
+  }, [customEmotion, tags, note, emotions, complexes, assocTypes, persist]);
 
   const toggleComplex = useCallback((label: string) => {
     const next = complexes.includes(label) ? complexes.filter((c) => c !== label) : [...complexes, label];
     setComplexes(next);
-    persist(tags, note, emotions, next);
-  }, [tags, note, emotions, complexes, persist]);
+    persist(tags, note, emotions, next, assocTypes);
+  }, [tags, note, emotions, complexes, assocTypes, persist]);
 
   const addNewComplex = useCallback(() => {
     const trimmed = newComplex.trim();
@@ -115,8 +124,23 @@ export function TrialDetailPanel({ trialRef, onClose, sessionId, existingComplex
     const next = [...complexes, trimmed];
     setComplexes(next);
     setNewComplex("");
-    persist(tags, note, emotions, next);
-  }, [newComplex, tags, note, emotions, complexes, persist]);
+    persist(tags, note, emotions, next, assocTypes);
+  }, [newComplex, tags, note, emotions, complexes, assocTypes, persist]);
+
+  const toggleAssocType = useCallback((type: string) => {
+    const next = assocTypes.includes(type) ? assocTypes.filter((t) => t !== type) : [...assocTypes, type];
+    setAssocTypes(next);
+    persist(tags, note, emotions, complexes, next);
+  }, [tags, note, emotions, complexes, assocTypes, persist]);
+
+  const addCustomAssocType = useCallback(() => {
+    const trimmed = customAssocType.trim();
+    if (!trimmed || assocTypes.includes(trimmed)) { setCustomAssocType(""); return; }
+    const next = [...assocTypes, trimmed];
+    setAssocTypes(next);
+    setCustomAssocType("");
+    persist(tags, note, emotions, complexes, next);
+  }, [customAssocType, tags, note, emotions, complexes, assocTypes, persist]);
 
   // Merge existing session labels with current trial's labels for the complex chip set
   const allComplexLabels = [...new Set([...existingComplexLabels, ...complexes])].sort();
@@ -287,6 +311,50 @@ export function TrialDetailPanel({ trialRef, onClose, sessionId, existingComplex
                     onChange={(e) => setNewComplex(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addNewComplex(); } }}
                     placeholder="Add new…"
+                    className="w-full rounded-md border border-border bg-background px-2 py-0.5 text-[10px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* T0256: Association types section */}
+            {sessionId && (
+              <div className="border-t border-border pt-2">
+                <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Association type</p>
+                <div className="flex flex-wrap gap-1.5" data-testid="assoc-types-section">
+                  {DEFAULT_ASSOCIATION_TYPES.map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => toggleAssocType(type)}
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                        assocTypes.includes(type)
+                          ? "bg-primary text-primary-foreground"
+                          : "border border-border text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                  {/* Custom types already added */}
+                  {assocTypes.filter((t) => !DEFAULT_ASSOCIATION_TYPES.includes(t)).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => toggleAssocType(type)}
+                      className="rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-[10px] font-medium"
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-1.5 flex gap-1">
+                  <input
+                    type="text"
+                    value={customAssocType}
+                    onChange={(e) => setCustomAssocType(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomAssocType(); } }}
+                    placeholder="Add custom…"
                     className="w-full rounded-md border border-border bg-background px-2 py-0.5 text-[10px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>

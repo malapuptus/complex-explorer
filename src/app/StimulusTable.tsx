@@ -290,11 +290,17 @@ export function StimulusTable({
                         {annotation?.candidateComplexes?.map((cx) => (
                           <span key={cx} className="rounded bg-accent/50 px-1 py-0.5 text-[9px] text-accent-foreground">{cx}</span>
                         ))}
+                        {/* T0256: association type badges */}
+                        {annotation?.associationTypes?.length ? (
+                          <span className="rounded bg-secondary px-1 py-0.5 text-[9px] text-secondary-foreground" title={annotation.associationTypes.join(", ")}>
+                            Type: {annotation.associationTypes.length}
+                          </span>
+                        ) : null}
                         {/* Self-tag badges */}
                         {annotation?.tags?.map((tag) => (
                           <span key={tag} className="rounded bg-primary/15 px-1 py-0.5 text-[9px] font-mono font-semibold text-primary">{tag}</span>
                         ))}
-                        {!annotation?.emotions?.length && !annotation?.candidateComplexes?.length && !annotation?.tags?.length && (
+                        {!annotation?.emotions?.length && !annotation?.candidateComplexes?.length && !annotation?.tags?.length && !annotation?.associationTypes?.length && (
                           <span className="text-[9px] text-muted-foreground">—</span>
                         )}
                       </div>

@@ -16,6 +16,7 @@ import { StopGroundDialog } from "./StopGroundDialog";
 import { CiSummaryPanel } from "./CiSummaryPanel";
 import { InterpretationGuidePanel } from "./InterpretationGuidePanel";
 import { ComplexWorkbookPanel } from "./ComplexWorkbookPanel";
+import { RtSequenceLens } from "./RtSequenceLens";
 import type { SessionMode } from "./ProtocolScreen";
 
 
@@ -316,6 +317,15 @@ export function ResultsView({
       {/* T0250: Complex Indicators panel */}
       <div className="mb-6">
         <CiSummaryPanel
+          trials={trials}
+          trialFlags={trialFlags}
+          onJumpToTrial={(idx) => { setStimTableHighlight(idx); setLayout("details"); }}
+        />
+      </div>
+
+      {/* T0257: RT Sequence Lens */}
+      <div className="mb-6">
+        <RtSequenceLens
           trials={trials}
           trialFlags={trialFlags}
           onJumpToTrial={(idx) => { setStimTableHighlight(idx); setLayout("details"); }}

@@ -19,7 +19,8 @@ import { CustomPackManager } from "./CustomPackManager";
 import { WhyPanel } from "./WhyPanel";
 import type { PackOption } from "./DemoSessionHelpers";
 import { Checkbox } from "@/components/ui/checkbox";
-
+import { PackPathCards } from "./PackPathCards";
+import { ResearchStartRitual } from "./ResearchStartRitual";
 const STORAGE_WARN_BYTES = 3 * 1024 * 1024; // 3 MB
 
 /** Config produced by the Advanced settings panel. */
@@ -185,17 +186,31 @@ export function ProtocolScreen({
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Step 1 — Choose a word list
           </p>
-          <select
-            value={selectedPackKey}
-            onChange={(e) => handlePackChange(e.target.value)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            {packOptions.map((p) => (
-              <option key={`${p.id}@${p.version}`} value={`${p.id}@${p.version}`}>
-                {p.label}
-              </option>
-            ))}
-          </select>
+
+          {/* T0260: Path cards */}
+          <PackPathCards
+            packOptions={packOptions}
+            selectedPackKey={selectedPackKey}
+            onSelect={(key) => handlePackChange(key)}
+          />
+
+          {/* Dropdown (all packs) */}
+          <details className="group">
+            <summary className="cursor-pointer list-none text-[10px] text-muted-foreground hover:text-foreground underline">
+              All packs ▼
+            </summary>
+            <select
+              value={selectedPackKey}
+              onChange={(e) => handlePackChange(e.target.value)}
+              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              {packOptions.map((p) => (
+                <option key={`${p.id}@${p.version}`} value={`${p.id}@${p.version}`}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </details>
 
           {/* T0251: Pack details block */}
           <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2.5 space-y-1.5">
@@ -244,17 +259,26 @@ export function ProtocolScreen({
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Step 2 — Start when ready
           </p>
-          <button
-            onClick={handleReady}
-            disabled={ctaDisabled}
-            className="w-full rounded-md bg-primary px-8 py-3 text-base font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {packNotChosen
-              ? "Select a word list above to continue"
-              : !consented
-                ? "Check the box above to continue"
-                : "I'm ready — Start"}
-          </button>
+
+          {/* T0258: Research mode ritual */}
+          {mode === "research" && !ctaDisabled && (
+            <ResearchStartRitual onReady={handleReady} />
+          )}
+
+          {/* Standard CTA (shown in exploration mode or when disabled) */}
+          {(mode !== "research" || ctaDisabled) && (
+            <button
+              onClick={handleReady}
+              disabled={ctaDisabled}
+              className="w-full rounded-md bg-primary px-8 py-3 text-base font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {packNotChosen
+                ? "Select a word list above to continue"
+                : !consented
+                  ? "Check the box above to continue"
+                  : "I'm ready — Start"}
+            </button>
+          )}
           {packNotChosen && (
             <p className="text-center text-xs text-muted-foreground">
               Please choose a word list above, then press Start.
