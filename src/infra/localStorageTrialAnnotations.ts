@@ -73,6 +73,10 @@ export interface TrialAnnotation {
    * Source is always "manual" — never auto-detected.
    */
   manualIndicators?: ManualIndicatorCode[];
+  /** T0254: Emotion tags (multi-select). */
+  emotions?: string[];
+  /** T0254: Candidate complex labels (multi-select). */
+  candidateComplexes?: string[];
 }
 
 type AnnotationStore = Record<string, Record<number, TrialAnnotation>>;
@@ -113,7 +117,9 @@ function setAnnotation(
   const isEmpty =
     annotation.tags.length === 0 &&
     annotation.note.trim() === "" &&
-    (annotation.manualIndicators?.length ?? 0) === 0;
+    (annotation.manualIndicators?.length ?? 0) === 0 &&
+    (annotation.emotions?.length ?? 0) === 0 &&
+    (annotation.candidateComplexes?.length ?? 0) === 0;
   if (isEmpty) {
     if (store[sessionId]) {
       delete store[sessionId][trialIndex];

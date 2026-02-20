@@ -26,6 +26,8 @@ const CSV_HEADERS = [
   "compositions",
   "timed_out",
   "flags",
+  "emotions",
+  "candidate_complexes",
 ] as const;
 
 function escapeCsv(value: string): string {
@@ -44,6 +46,8 @@ function trialToCsvRow(
   seed: number | null,
   trial: Trial,
   flags: readonly string[],
+  emotions?: readonly string[],
+  candidateComplexes?: readonly string[],
 ): string {
   const a = trial.association;
   const values: string[] = [
@@ -65,6 +69,8 @@ function trialToCsvRow(
     String(a.compositionCount),
     trial.timedOut ? "true" : "false",
     escapeCsv(flags.join("; ")),
+    escapeCsv((emotions ?? []).join("; ")),
+    escapeCsv((candidateComplexes ?? []).join("; ")),
   ];
   return values.join(",");
 }
@@ -73,6 +79,8 @@ function trialToCsvRow(
 export interface CsvExportOptions {
   /** If true, response column is replaced with empty string. */
   redactResponses?: boolean;
+  /** T0254: Per-trial annotations for emotions/complexes CSV columns. */
+  trialAnnotations?: Record<number, { emotions?: string[]; candidateComplexes?: string[] }>;
 }
 
 /** Export a single session's trials as CSV. */
@@ -93,6 +101,7 @@ export function sessionTrialsToCsv(
     const trial = options?.redactResponses
       ? { ...trials[i], association: { ...trials[i].association, response: "" } }
       : trials[i];
+    const ann = options?.trialAnnotations?.[i];
     rows.push(
       trialToCsvRow(
         sessionId,
@@ -103,6 +112,8 @@ export function sessionTrialsToCsv(
         seed,
         trial,
         flags,
+        ann?.emotions,
+        ann?.candidateComplexes,
       ),
     );
   }
