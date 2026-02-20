@@ -21,7 +21,7 @@ export function JungMotif({ className = "", size = 480 }: JungMotifProps) {
       aria-hidden="true"
       focusable="false"
       className={className}
-      style={{ opacity: "var(--motif-opacity, 0.045)" }}
+      style={{ opacity: "var(--motif-opacity, 0.065)" }}
     >
       {/* Outer ring */}
       <circle cx="240" cy="240" r="220" fill="none" stroke="hsl(26,48%,23%)" strokeWidth="1" />
