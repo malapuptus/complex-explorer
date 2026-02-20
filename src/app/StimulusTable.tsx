@@ -11,6 +11,7 @@ import type { Trial, TrialFlag, FlagKind } from "@/domain";
 import { getResponseText, getTimedOut } from "@/domain";
 import type { TrialAnnotation } from "@/infra";
 import { RtBar } from "./ResultsTableControls";
+import { getComplexColorForTrial } from "./ComplexColorLegend";
 
 interface Props {
   trials: Trial[];
@@ -23,6 +24,8 @@ interface Props {
   sessionAnnotations?: Record<number, TrialAnnotation>;
   /** T0255: filter to trials with this candidate complex label. */
   complexFilter?: string | null;
+  /** T0262: complex color map for row borders. */
+  complexColorMap?: Record<string, number>;
 }
 
 type SortKey = "order" | "rt";
@@ -87,7 +90,7 @@ function getContextRows(
 
 export function StimulusTable({
   trials, trialFlags, minRt, maxRt,
-  highlightIndex, sessionAnnotations, complexFilter,
+  highlightIndex, sessionAnnotations, complexFilter, complexColorMap = {},
 }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("order");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -234,6 +237,10 @@ export function StimulusTable({
                     className={`border-t border-border transition-colors ${hasFlagOrTimeout ? "bg-destructive/5" : ""} ${
                       flags.length > 0 ? "cursor-pointer hover:bg-muted/40" : ""
                     } ${isFlashing ? "ring-2 ring-primary/50 bg-primary/5" : ""}`}
+                    style={(() => {
+                      const ci = getComplexColorForTrial(complexColorMap, annotation?.candidateComplexes);
+                      return ci ? { borderLeft: `3px solid ${ci.color}` } : {};
+                    })()}
                     onClick={() => flags.length > 0 && setExpandedRow(isExpanded ? null : i)}
                     data-testid={`stimulus-row-${i}`}
                   >

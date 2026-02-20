@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState, useEffect } from "react";
+import { useMemo, useCallback, useState, useEffect, useRef } from "react";
 import type { Trial, TrialFlag, OrderPolicy, SessionResult, StimulusPackSnapshot, CiCode, FlagKind } from "@/domain";
 import { generateReflectionPrompts, getStimulusList, buildSessionInsights, getResponseText, getTimedOut } from "@/domain";
 import { localStorageStimulusStore, localStorageSessionStore, uiPrefs, trialAnnotations } from "@/infra";
@@ -17,6 +17,8 @@ import { CiSummaryPanel } from "./CiSummaryPanel";
 import { InterpretationGuidePanel } from "./InterpretationGuidePanel";
 import { ComplexWorkbookPanel } from "./ComplexWorkbookPanel";
 import { RtSequenceLens } from "./RtSequenceLens";
+import { TaggingWorkflowPanel } from "./TaggingWorkflowPanel";
+import { ReportView } from "./ReportView";
 import type { SessionMode } from "./ProtocolScreen";
 
 
@@ -190,6 +192,13 @@ export function ResultsView({
   const [stimTableHighlight, setStimTableHighlight] = useState<number | null>(null);
   // T0255: candidate complex filter
   const [activeComplexFilter, setActiveComplexFilter] = useState<string | null>(null);
+  // T0262: complex color map
+  const [complexColorMap, setComplexColorMap] = useState<Record<string, number>>(() => uiPrefs.getComplexColorMap());
+  // T0265: report view
+  const [showReport, setShowReport] = useState(false);
+  // T0261: refs for tagging workflow scroll targets
+  const stimTableRef = useRef<HTMLDivElement>(null);
+  const workbookRef = useRef<HTMLDivElement>(null);
 
   // Session annotations for T0254/T0255
   const sessionAnnotations = useMemo(
@@ -205,6 +214,22 @@ export function ResultsView({
     }
     return [...labels].sort();
   }, [sessionAnnotations]);
+
+  // T0261: tagging workflow counts
+  const flaggedCount = useMemo(() => trialFlags.filter((tf) => tf.flags.length > 0).length, [trialFlags]);
+  const annotatedCount = useMemo(() => Object.keys(sessionAnnotations).length, [sessionAnnotations]);
+  const complexLabelCount = existingComplexLabels.length;
+
+  // T0262: color map handlers
+  const handleComplexColorChange = useCallback((label: string, colorIndex: number) => {
+    setComplexColorMap((prev) => ({ ...prev, [label]: colorIndex }));
+    uiPrefs.setComplexColor(label, colorIndex);
+  }, []);
+
+  const handleClearComplexColors = useCallback(() => {
+    setComplexColorMap({});
+    uiPrefs.clearComplexColors();
+  }, []);
 
   // 0284: Chart → filter bridge
   const handleFlagFilter = useCallback((flag: FlagKind | null) => {
@@ -258,6 +283,19 @@ export function ResultsView({
       <RecallSummary
         results={recallResults}
         onDone={() => setRecallPhase("idle")}
+      />
+    );
+  }
+
+  // T0265: Report view
+  if (showReport) {
+    return (
+      <ReportView
+        trials={trials}
+        trialFlags={trialFlags}
+        sessionResult={sessionResult}
+        sessionMode={sessionMode}
+        onClose={() => setShowReport(false)}
       />
     );
   }
@@ -323,12 +361,51 @@ export function ResultsView({
         />
       </div>
 
+      {/* T0264: Retest button */}
+      {csvMeta && onReproduce && (
+        <div className="mb-6 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => onReproduce({
+              packId: csvMeta.packId, packVersion: csvMeta.packVersion,
+              seed: csvMeta.seed, orderPolicy: csvMeta.orderPolicy ?? "fixed",
+              trialTimeoutMs: csvMeta.trialTimeoutMs, breakEveryN: csvMeta.breakEveryN,
+            })}
+            className="rounded-md border border-primary bg-primary/5 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10"
+            data-testid="retest-btn"
+          >
+            Retest (triangulate)
+          </button>
+          <span className="text-xs text-muted-foreground">
+            Retest helps distinguish signal from noise.
+          </span>
+        </div>
+      )}
+
       {/* T0257: RT Sequence Lens */}
       <div className="mb-6">
         <RtSequenceLens
           trials={trials}
           trialFlags={trialFlags}
           onJumpToTrial={(idx) => { setStimTableHighlight(idx); setLayout("details"); }}
+          complexColorMap={complexColorMap}
+          sessionAnnotations={sessionAnnotations}
+        />
+      </div>
+
+      {/* T0261: Tagging Workflow */}
+      <div className="mb-6">
+        <TaggingWorkflowPanel
+          flaggedCount={flaggedCount}
+          annotatedCount={annotatedCount}
+          complexLabelCount={complexLabelCount}
+          onTagNow={() => {
+            setLayout("details");
+            setTimeout(() => stimTableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+          }}
+          onDoneTagging={() => {
+            workbookRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
         />
       </div>
 
@@ -338,11 +415,14 @@ export function ResultsView({
       </div>
 
       {/* T0255: Complex Workbook */}
-      <div className="mb-6">
+      <div className="mb-6" ref={workbookRef}>
         <ComplexWorkbookPanel
           sessionAnnotations={sessionAnnotations}
           activeComplex={activeComplexFilter}
           onComplexFilter={setActiveComplexFilter}
+          complexColorMap={complexColorMap}
+          onColorChange={handleComplexColorChange}
+          onClearColors={handleClearComplexColors}
         />
       </div>
 
@@ -671,7 +751,7 @@ export function ResultsView({
 
       {/* T0242/T0243: Stimulus Table — always visible below the main view */}
       {insights && (
-        <div className="mt-8">
+        <div className="mt-8" ref={stimTableRef}>
           <h3 className="mb-3 text-sm font-semibold text-foreground">Stimulus Table</h3>
           <StimulusTable
             trials={trials}
@@ -681,6 +761,7 @@ export function ResultsView({
             highlightIndex={stimTableHighlight}
             sessionAnnotations={sessionAnnotations}
             complexFilter={activeComplexFilter}
+            complexColorMap={complexColorMap}
           />
         </div>
       )}
@@ -727,6 +808,7 @@ export function ResultsView({
           sessionResult={sessionResult} csvMeta={csvMeta}
           persistedSnapshot={persistedSnapshot} packIsInstalled={packIsInstalled}
           onReproduce={onReproduce} onReset={onReset}
+          onOpenReport={() => setShowReport(true)}
         />
       )}
       {!csvMeta && (

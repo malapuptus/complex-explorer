@@ -9,11 +9,14 @@ const PREFS_KEY = "complex-mapper-ui-prefs";
 interface UiPrefs {
   baselineSessionId: string | null;
   sessionMode: "exploration" | "research" | null;
+  /** T0262: color index per candidate complex label */
+  complexColorMap: Record<string, number>;
 }
 
 const DEFAULTS: UiPrefs = {
   baselineSessionId: null,
   sessionMode: null,
+  complexColorMap: {},
 };
 
 function getAll(): UiPrefs {
@@ -58,5 +61,18 @@ export const uiPrefs = {
 
   setSessionMode(mode: "exploration" | "research"): void {
     this.set({ sessionMode: mode });
+  },
+
+  getComplexColorMap(): Record<string, number> {
+    return getAll().complexColorMap;
+  },
+
+  setComplexColor(label: string, colorIndex: number): void {
+    const map = { ...getAll().complexColorMap, [label]: colorIndex };
+    this.set({ complexColorMap: map });
+  },
+
+  clearComplexColors(): void {
+    this.set({ complexColorMap: {} });
   },
 };
