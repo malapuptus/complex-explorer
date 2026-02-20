@@ -7,12 +7,18 @@
 import { useState, useMemo, useCallback } from "react";
 import type { Trial, TrialFlag, FlagKind } from "@/domain";
 import { getResponseText } from "@/domain";
+import type { TrialAnnotation } from "@/infra";
+import { getComplexColorForTrial } from "./ComplexColorLegend";
 
 interface Props {
   trials: Trial[];
   trialFlags: TrialFlag[];
   hideResponses?: boolean;
   onJumpToTrial?: (index: number) => void;
+  /** T0262: complex color map */
+  complexColorMap?: Record<string, number>;
+  /** T0262: session annotations for color lookup */
+  sessionAnnotations?: Record<number, TrialAnnotation>;
 }
 
 const FLAG_LABELS: Record<string, string> = {
@@ -42,7 +48,7 @@ function computeZScores(rts: number[]): number[] {
   return rts.map((rt) => (rt - mean) / sd);
 }
 
-export function RtSequenceLens({ trials, trialFlags, hideResponses, onJumpToTrial }: Props) {
+export function RtSequenceLens({ trials, trialFlags, hideResponses, onJumpToTrial, complexColorMap = {}, sessionAnnotations = {} }: Props) {
   const [normalize, setNormalize] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -154,18 +160,26 @@ export function RtSequenceLens({ trials, trialFlags, hideResponses, onJumpToTria
               const cy = yScale(d.value);
               const isFlagged = d.flags.length > 0;
               const isHovered = hoveredIndex === i;
+              // T0262: complex color
+              const ann = sessionAnnotations[i];
+              const complexInfo = getComplexColorForTrial(complexColorMap, ann?.candidateComplexes);
+              const markerColor = complexInfo ? complexInfo.color : undefined;
               return (
                 <circle
                   key={i}
                   cx={cx}
                   cy={cy}
                   r={isFlagged ? 4 : isHovered ? 3 : 2}
+                  fill={markerColor ?? undefined}
                   className={
-                    isFlagged
-                      ? "fill-destructive stroke-destructive cursor-pointer"
-                      : "fill-primary/60 stroke-primary/60 cursor-pointer"
+                    markerColor
+                      ? "cursor-pointer"
+                      : isFlagged
+                        ? "fill-destructive stroke-destructive cursor-pointer"
+                        : "fill-primary/60 stroke-primary/60 cursor-pointer"
                   }
                   strokeWidth={isHovered ? 2 : 0}
+                  stroke={markerColor ?? undefined}
                   onMouseEnter={() => setHoveredIndex(i)}
                   onMouseLeave={() => setHoveredIndex(null)}
                   onClick={() => onJumpToTrial?.(i)}

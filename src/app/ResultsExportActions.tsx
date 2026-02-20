@@ -156,6 +156,8 @@ interface Props {
     breakEveryN?: number;
   }) => void;
   onReset: () => void;
+  /** T0265: callback to open report view */
+  onOpenReport?: () => void;
 }
 
 /** Resolve the full word list for the bundle (best-effort). */
@@ -334,7 +336,7 @@ export function buildBundleObject(
 export function ExportActions({
   trials, trialFlags, meanReactionTimeMs, medianReactionTimeMs,
   sessionResult, csvMeta, persistedSnapshot, packIsInstalled,
-  onReproduce, onReset,
+  onReproduce, onReset, onOpenReport,
 }: Props) {
   const [privacyMode, setPrivacyMode] = useState<BundleMode>("full");
   const [anonymize, setAnonymize] = useState(false);
@@ -444,6 +446,16 @@ export function ExportActions({
 
   return (
     <div className="mt-6 space-y-3">
+      {/* T0265: Report View */}
+      {onOpenReport && (
+        <button
+          onClick={onOpenReport}
+          className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+          data-testid="open-report-btn"
+        >
+          Open Report View
+        </button>
+      )}
       {/* Privacy mode selector (0229) */}
       <div className="flex items-center gap-3">
         <label id="privacy-mode-label" className="text-sm text-muted-foreground">Privacy mode:</label>
