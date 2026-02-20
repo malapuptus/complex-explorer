@@ -14,6 +14,8 @@ import { RecallRun, RecallSummary } from "./RecallRun";
 import type { RecallResult } from "./RecallRun";
 import { StopGroundDialog } from "./StopGroundDialog";
 import { CiSummaryPanel } from "./CiSummaryPanel";
+import { InterpretationGuidePanel } from "./InterpretationGuidePanel";
+import { ComplexWorkbookPanel } from "./ComplexWorkbookPanel";
 import type { SessionMode } from "./ProtocolScreen";
 
 
@@ -183,6 +185,25 @@ export function ResultsView({
   const [stopDialogOpen, setStopDialogOpen] = useState(false);
   const [recallPhase, setRecallPhase] = useState<"idle" | "running" | "done">("idle");
   const [recallResults, setRecallResults] = useState<RecallResult[]>([]);
+  // T0253: jump-to-trial from CI panel
+  const [stimTableHighlight, setStimTableHighlight] = useState<number | null>(null);
+  // T0255: candidate complex filter
+  const [activeComplexFilter, setActiveComplexFilter] = useState<string | null>(null);
+
+  // Session annotations for T0254/T0255
+  const sessionAnnotations = useMemo(
+    () => sessionResult ? trialAnnotations.getSessionAnnotations(sessionResult.id) : {},
+    [sessionResult],
+  );
+
+  // T0254: Collect all existing candidate complex labels for TrialDetailPanel reuse
+  const existingComplexLabels = useMemo(() => {
+    const labels = new Set<string>();
+    for (const ann of Object.values(sessionAnnotations)) {
+      for (const cx of (ann.candidateComplexes ?? [])) labels.add(cx);
+    }
+    return [...labels].sort();
+  }, [sessionAnnotations]);
 
   // 0284: Chart → filter bridge
   const handleFlagFilter = useCallback((flag: FlagKind | null) => {
@@ -294,7 +315,25 @@ export function ResultsView({
 
       {/* T0250: Complex Indicators panel */}
       <div className="mb-6">
-        <CiSummaryPanel trials={trials} trialFlags={trialFlags} />
+        <CiSummaryPanel
+          trials={trials}
+          trialFlags={trialFlags}
+          onJumpToTrial={(idx) => { setStimTableHighlight(idx); setLayout("details"); }}
+        />
+      </div>
+
+      {/* T0252: Interpretation Guide */}
+      <div className="mb-6">
+        <InterpretationGuidePanel sessionMode={sessionMode} />
+      </div>
+
+      {/* T0255: Complex Workbook */}
+      <div className="mb-6">
+        <ComplexWorkbookPanel
+          sessionAnnotations={sessionAnnotations}
+          activeComplex={activeComplexFilter}
+          onComplexFilter={setActiveComplexFilter}
+        />
       </div>
 
       {/* 0283: Layout toggle */}
@@ -629,6 +668,9 @@ export function ResultsView({
             trialFlags={trialFlags}
             minRt={insights.minRtMs}
             maxRt={insights.maxRtMs}
+            highlightIndex={stimTableHighlight}
+            sessionAnnotations={sessionAnnotations}
+            complexFilter={activeComplexFilter}
           />
         </div>
       )}

@@ -59,16 +59,25 @@ const INSTRUCTIONS = [
 
 const DEFAULT_BREAK_EVERY = 20;
 
-/** T0246: Per-pack description text. */
-function packDescription(packKey: string): string | null {
+/** T0251: Per-pack description + framing. */
+function packDescription(packKey: string): { description: string; framing: string } | null {
   if (packKey.startsWith("demo-10@")) {
-    return "A short sampler — get a feel for the task in about a minute.";
+    return {
+      description: "A short sampler — get a feel for the task in about a minute.",
+      framing: "UI demo only — not intended for interpretation or pattern analysis.",
+    };
   }
   if (packKey.startsWith("kent-rosanoff-1910@")) {
-    return "The classic Kent–Rosanoff list (1910) — 100 everyday words designed to elicit natural associations.";
+    return {
+      description: "The classic Kent–Rosanoff list (1910) — 100 everyday words designed to elicit natural associations.",
+      framing: "Historical / public-domain list. No claims of clinical validity.",
+    };
   }
   if (packKey.startsWith("practice-100@")) {
-    return "A broader 100-word set intended for deeper exploration of personal response patterns.";
+    return {
+      description: "A broader 100-word set intended for deeper exploration of personal response patterns.",
+      framing: "Clinician-provided practice list. No claims of clinical validity.",
+    };
   }
   return null;
 }
@@ -125,7 +134,9 @@ export function ProtocolScreen({
   const packNotChosen = isDemoPack && !packExplicitlyChosen;
   const ctaDisabled = packNotChosen || !consented;
 
-  const descriptionText = packDescription(selectedPackKey);
+  const packInfo = packDescription(selectedPackKey);
+  // T0251: Provenance from selectedPack
+  const provenance = selectedPack?.provenance ?? null;
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-4 py-10">
@@ -186,27 +197,33 @@ export function ProtocolScreen({
             ))}
           </select>
 
-          {/* T0246: Pack description */}
-          {descriptionText && (
-            <p className="text-xs text-muted-foreground">{descriptionText}</p>
-          )}
-
-          {/* Demo-pack hint */}
-          {isDemoPack && (
+          {/* T0251: Pack details block */}
+          <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2.5 space-y-1.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-sm font-medium text-foreground">{wordCount} words</span>
+              <span className="text-xs text-muted-foreground">~{estimatedMinutes}</span>
+            </div>
+            {packInfo && (
+              <>
+                <p className="text-xs text-muted-foreground">{packInfo.description}</p>
+                <p className="text-[10px] font-medium text-muted-foreground/80 italic">{packInfo.framing}</p>
+              </>
+            )}
+            {provenance && (
+              <div className="space-y-0.5 pt-1 border-t border-border/40">
+                {provenance.sourceCitation && (
+                  <p className="text-[10px] text-muted-foreground"><span className="font-semibold">Citation:</span> {provenance.sourceCitation}</p>
+                )}
+                {provenance.licenseNote && (
+                  <p className="text-[10px] text-muted-foreground"><span className="font-semibold">License:</span> {provenance.licenseNote}</p>
+                )}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">Quick demo</span> — 10 words, ~1 min.
-              Switch to a full list for the complete experiment.
+              You'll start with <strong className="text-foreground">{practiceCount}</strong> warm-up
+              words, then see <strong className="text-foreground">{wordCount}</strong> scored words.
             </p>
-          )}
-
-          {/* Pack meta */}
-          <p className="text-xs text-muted-foreground">
-            {wordCount} words · estimated {estimatedMinutes} · Source: {source}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            You'll start with <strong className="text-foreground">{practiceCount}</strong> warm-up
-            words, then see <strong className="text-foreground">{wordCount}</strong> scored words.
-          </p>
+          </div>
         </div>
 
         {/* T0248: Consent checkbox */}

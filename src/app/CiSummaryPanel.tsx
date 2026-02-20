@@ -11,6 +11,8 @@ interface Props {
   trials: Trial[];
   trialFlags: TrialFlag[];
   hideResponses?: boolean;
+  /** T0253: callback to jump to a trial in the StimulusTable. */
+  onJumpToTrial?: (index: number) => void;
 }
 
 const FLAG_LABELS: Record<string, string> = {
@@ -30,7 +32,7 @@ interface FlaggedItem {
   flags: FlagKind[];
 }
 
-export function CiSummaryPanel({ trials, trialFlags, hideResponses }: Props) {
+export function CiSummaryPanel({ trials, trialFlags, hideResponses, onJumpToTrial }: Props) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   // Count flags by type
@@ -101,6 +103,18 @@ export function CiSummaryPanel({ trials, trialFlags, hideResponses }: Props) {
                 <span className="font-medium text-foreground">{item.word}</span>
                 <span className="text-destructive">{item.flags.map((f) => FLAG_LABELS[f] ?? f).join(", ")}</span>
                 <span className="ml-auto font-mono text-muted-foreground">{item.rt}ms</span>
+                {onJumpToTrial && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => { e.stopPropagation(); onJumpToTrial(item.index); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onJumpToTrial(item.index); } }}
+                    className="rounded px-1.5 py-0.5 text-[9px] text-primary hover:bg-primary/10"
+                    title="Jump to this trial in the table"
+                  >
+                    jump ↓
+                  </span>
+                )}
                 <span className="text-muted-foreground text-[10px]">{isExpanded ? "▲" : "▼"}</span>
               </button>
 
